@@ -48,7 +48,7 @@ Each charm's two lines are in quotes: what it gives, and what it takes. Names ar
 |---|---|---|---|---|---|
 | 0 | Gaunt | Wolf's tooth | "Rifle shots hit half again as hard." | "Your lantern's light shrinks." | Rifle damage ×1.5, with Steady hands and Through-and-through too. The lantern's clear light and its fade both reach ×0.6 as far (Wide wick included) |
 | 1 | Gaunt | Red thread | "Each kill heals you a little." | "The stove no longer heals you." | Every kill, by shot or by fire, heals you 4, up to your maximum. In a lull the stove doesn't heal you. It still sells upgrades, and Warm hands still heals |
-| 2 | Gaunt | Crow's feather | "Every ember is worth one more." | "They hurt you a third more." | An ember dropped while you wear it is worth 1 more (crawler 2, leaper 3, gaunt 4; the Mother still drops none). All damage you take is ×4/3 |
+| 2 | Gaunt | Crow's feather | "Every ember is worth one more." | "They hurt you a third more." | An ember dropped while you wear it is worth 1 more (crawler 2, leaper 3, gaunt 4, drawn bigger still; the Mother still drops none). All damage you take is ×4/3 |
 | 3 | Leaper | Grave salt | "They slow in your lantern's light." | "Embers cool twice as fast." | A creature within your lantern's clear light (2.5 cells, 3.5 with Wide wick) moves at ×0.75. That's on top of a flare's slowing, and a leaper's leap slows too. Embers on the snow cool twice as fast: 7.5 s, flickering for the last 1.5 s |
 | 4 | Leaper | Hare's foot | "Move a quarter faster." | "You hold 75 health at most." | Walk, run and acceleration ×1.25, on top of Snowshoes. Your maximum health is 75: taking it brings you down to 75 at once, and taking it off lets the stove heal you back to 100 |
 | 5 | The Mother | The Mother's eye | "Their eyes show through walls." | "Your lantern gutters low." | Every after-eater's eyes glow at full strength at any distance, and show through walls. The lantern's clear light and fade reach ×0.3 as far |
@@ -68,7 +68,7 @@ The Mother comes in the last hour, so her eye is a gift for the end of the night
   - A charm lies on the snow until the next wave begins, then it's gone.
   - In a lull's last 3 s, charms on the snow flicker, so you can see they're going.
   - The Mother's lies until dawn, since her wave is the last.
-- **Pool.** At most **8** charms lie on the snow at once. A new one in a full pool takes the place of the oldest.
+- **One of each.** Each charm is in one place at most: worn, on the snow, or not dropped yet. So the snow holds at most six, and there's a slot for each.
 - **Reading.**
   - Stand within **0.8 cells** of a charm to read it. The nearest one within reach is the one you read.
   - The reading is a small dark panel at the top of the view, under the hour:
@@ -119,7 +119,7 @@ New code follows the existing rules:
 
 | File | Change |
 |---|---|
-| `src/tuning.js` | `CHARMS`: drop chances, reach, pool size, the lull's flicker, the snow's light, and each charm's numbers; `KEYS.take` (`KeyE`) |
+| `src/tuning.js` | `CHARMS`: drop chances, reach, the lull's flicker, the gentle drift, the snow's light, and each charm's numbers; `KEYS.take` (`KeyE`) |
 | `src/charms.js` (new) | The charm list (key, name, lines, from), the pool on the snow, `dropCharm`, `updateCharms` (fading, gentle drift, reading, taking), `wearCharm`, and `lantern(state)`: your lantern's light now |
 | `src/creatures.js` | `kill()` drops a charm, and heals you with Red thread; Crow's feather adds 1 to the ember; Grave salt slows creatures in your light |
 | `src/embers.js` | Grave salt: embers cool twice as fast |
@@ -129,7 +129,7 @@ New code follows the existing rules:
 | `src/sim.js` | New state (`charm`, `charms`, `charmRng`, `charmAt`); `createState({ charm })`; `updateCharms` in the update order |
 | `src/input.js` | E gives a `take` press |
 | `src/bot.js` | Its intents include `take: 0`; it never takes a charm |
-| `src/scene.js` | Charm sprites and their light; the lantern from `lantern(state)`; eyes at full glow with the Mother's eye, and marked to show through walls |
+| `src/scene.js` | Charm sprites and their light; the lantern from `lantern(state)`; eyes at full glow with the Mother's eye, and marked to show through walls; an ember worth 4 (Crow's feather) drawn bigger still |
 | `src/render.js` | A sprite marked `xray` draws its glowing pixels (the eyes) even behind walls |
 | `src/hud.js` | The reading; the worn charm's icon; "E charm" on the title screen |
 | `src/audio.js` | Sounds for the new events |
@@ -168,8 +168,7 @@ Node tests, like the rest. At least:
   - burn kills drop too;
   - drops don't change the night's main random stream.
 - **Lying and fading:**
-  - a charm stays through the rest of its wave and the lull, and is gone when the next wave begins, with `charmOut`;
-  - a full pool replaces the oldest.
+  - a charm stays through the rest of its wave and the lull, and is gone when the next wave begins, with `charmOut`.
 - **Reading and taking:**
   - the reading shows within 0.8 cells, for the nearest charm, and not beyond;
   - E takes only a charm that was already showing;
@@ -202,7 +201,6 @@ These are my starting values, untested, to be tuned by play.
 | Gaunt drop chance | 1 in 10 | About 4 charms in a whole night (the Mother's aside) |
 | Leaper drop chance | 1 in 15 | Same |
 | Reach | 0.8 cells | Easy to stand over; never read by accident from across the porch |
-| Pool | 8 | Never full in play |
 | Flicker before the wave | last 3 s of the lull | You notice they're going |
 | Light on the snow | clear to 0.1 cells, dark by 0.9, intensity 0.3 | Findable in the dark; not mistaken for an ember |
 | Wolf's tooth | rifle ×1.5, lantern ×0.6 | Taken sometimes, and sometimes regretted |
@@ -228,6 +226,9 @@ These are recorded as ruling, reason, and cost if wrong.
 - **The reading sits at the top of the view**, not in the middle.
   - Why: charms lie where the fighting is, and a panel in the middle would cover the crosshair.
   - Cost if wrong: layout only.
+- **One slot for each charm**, not a pool of 8 that replaces the oldest.
+  - Why: a drop is never the charm you wear or one on the snow, so no charm can be in two places, and six slots can never fill.
+  - Cost if wrong: none.
 - **No end-screen charm, and the bot wears no charms.**
   - Why: the end screens already show the night's upgrades. The bot is a test harness, and its gates (dawn in god mode, 5 to 7 picks) stay exactly as they were.
   - Cost if wrong: small, and easy to add later.
