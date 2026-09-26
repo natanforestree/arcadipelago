@@ -5,8 +5,9 @@ import { parseMap } from '../src/map.js';
 import { NIGHT, DT, LIGHT } from '../src/tuning.js';
 import { startWave, LAST_WAVE } from '../src/night.js';
 import { intents } from './helpers.js';
-import { spawnCreature, CRAWLER } from '../src/creatures.js';
+import { spawnCreature, CRAWLER, MOTHER } from '../src/creatures.js';
 import { UPGRADE_LIST } from '../src/upgrades.js';
+import { CHARM_LIST, EYE, WOLF } from '../src/charms.js';
 
 function memoryStorage(init = {}) {
   const m = new Map(Object.entries(init));
@@ -159,9 +160,47 @@ test('the first lull asks for embers at the stove', () => {
   assert.equal(g.banner.sub, 'Bring embers to the stove.');
 });
 
+test('charms: the first one of the session gets a banner, after the Embers one; a charm taken shows its name', () => {
+  const g = createGame({ storage: memoryStorage(), map, seed: 1 });
+  g.newNight();
+  const s = g.state;
+  s.perks.pierce = true; // one round through both: a crawler's ember and the Mother's charm drop together
+  spawnCreature(s, CRAWLER, 19.5, 23.5);
+  spawnCreature(s, MOTHER, 19.5, 26.5).hp = 1; // she always drops hers
+  g.tick(intents({ facing: Math.PI / 2, fire: true }));
+  assert.ok(s.charms.some((c) => c.id === EYE));
+  assert.equal(g.banner.text, 'Embers', 'the Embers banner first');
+  g.banner.t = 0.5;
+  g.tick(intents());
+  assert.deepEqual([g.banner.text, g.banner.sub], ['A charm', 'Something glints where it fell.']);
+  g.banner.t = 0;
+  g.newNight();
+  spawnCreature(g.state, MOTHER, 19.5, 26.5).hp = 1;
+  g.tick(intents({ facing: Math.PI / 2, fire: true }));
+  g.tick(intents());
+  assert.equal(g.banner.t, 0, 'not again in the same session');
+  const t = g.state;
+  t.night.phase = 'lull';
+  t.night.t = 1e9;
+  const c = t.charms.find((o) => o.id === EYE);
+  t.player.x = c.x;
+  t.player.y = c.y;
+  g.tick(intents());
+  g.tick(intents({ take: 1 }));
+  assert.deepEqual([g.banner.text, g.banner.sub], [CHARM_LIST[EYE].name, CHARM_LIST[EYE].gives]);
+});
+
 test('"Embers come to you" and ?embers= reach each new night', () => {
   const g = createGame({ storage: memoryStorage(), map, debug: { embers: 40 } });
   g.gentle = true;
   g.newNight();
   assert.deepEqual([g.state.gentle, g.state.carried], [true, 40]);
+});
+
+test('?charm= starts each night wearing that charm', () => {
+  const g = createGame({ storage: memoryStorage(), map, debug: { charm: WOLF } });
+  g.newNight();
+  assert.equal(g.state.charm, WOLF);
+  g.newNight();
+  assert.equal(g.state.charm, WOLF);
 });

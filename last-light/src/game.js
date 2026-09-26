@@ -1,11 +1,12 @@
 // The screens and the flow between them: title, playing, paused, dead, dawn. Owns the night being
 // played, turns its events into banners, and remembers your best night: the latest hour you reached,
 // and how many dawns you've seen. `gentle` ("Embers come to you", from the pause menu) goes into each
-// new night.
+// new night, and so does ?charm= (debug.charm), the charm you start wearing.
 import { createState, step } from './sim.js';
 import { NIGHT, LIGHT, DT } from './tuning.js';
 import { LAST_WAVE } from './night.js';
 import { UPGRADE_LIST } from './upgrades.js';
+import { CHARM_LIST } from './charms.js';
 
 const BEST_KEY = 'last-light-best', DAWNS_KEY = 'last-light-dawns';
 const DEAD_DELAY = 1.5; // seconds between dying and the death screen
@@ -32,15 +33,18 @@ export function createGame({ storage, map, seed = Date.now(), debug = {} }) {
     gentle: false, // "Embers come to you"
     taught: false, // the first ember of the session has had its banner
     embersDue: false, // the first ember has dropped; its banner waits for the one showing to fade
+    charmTaught: false, // the first charm of the session has had its banner
+    charmDue: false, // the first charm has dropped; its banner waits its turn too
 
     newNight() {
-      game.state = createState({ seed: nextSeed++, wave: debug.wave ?? 0, god: !!debug.god, gentle: game.gentle, embers: debug.embers ?? 0, map });
+      game.state = createState({ seed: nextSeed++, wave: debug.wave ?? 0, god: !!debug.god, gentle: game.gentle, embers: debug.embers ?? 0, charm: debug.charm ?? -1, map });
       game.screen = 'playing';
       game.endT = 0;
       game.shownT = 0;
       game.saved = false;
       game.banner.t = 0;
       game.embersDue = false;
+      game.charmDue = false;
     },
     pause() {
       if (game.screen === 'playing') game.screen = 'paused';
@@ -75,6 +79,8 @@ export function createGame({ storage, map, seed = Date.now(), debug = {} }) {
         else if (e.type === 'pickup' && e.a === 2) show('Shotgun', '1 and 2 switch guns', 3);
         else if (e.type === 'emberDrop' && !game.taught) game.embersDue = true;
         else if (e.type === 'upgrade') show(UPGRADE_LIST[e.a].name, UPGRADE_LIST[e.a].line, 2.5);
+        else if (e.type === 'charmDrop' && !game.charmTaught) game.charmDue = true;
+        else if (e.type === 'charm') show(CHARM_LIST[e.a].name, CHARM_LIST[e.a].gives, 2.5);
       }
       // The first ember's banner waits for whatever banner is showing to fade, so it never cuts off
       // the night's opening line.
@@ -82,6 +88,10 @@ export function createGame({ storage, map, seed = Date.now(), debug = {} }) {
         game.embersDue = false;
         game.taught = true;
         show('Embers', 'Take them before they cool.', 3);
+      } else if (game.charmDue && game.banner.t <= 1) {
+        game.charmDue = false;
+        game.charmTaught = true;
+        show('A charm', 'Something glints where it fell.', 3);
       }
       const phase = s.night.phase;
       if (phase === 'dead' || phase === 'dawn') {

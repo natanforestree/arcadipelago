@@ -248,6 +248,20 @@ export function createAudio(storage) {
         case 'alight':
           burst(voiceAt(e.x, e.y, 0.5, lx, ly), t, { len: 0.45, type: 'lowpass', freq: 600, to: 1800, vol: 0.6 });
           break;
+        case 'charmDrop': {
+          // A thin glassy chime where it fell, so one heard dropping out in the dark can be found.
+          const g = voiceAt(e.x, e.y, 1.2, lx, ly);
+          tone(g, t, { len: 1.1, freq: 1976, vol: 0.2, attack: 0.002 });
+          tone(g, t + 0.07, { len: 0.9, freq: 2637, vol: 0.12, attack: 0.002 });
+          break;
+        }
+        case 'charm':
+          // Taken: a low bell, with a sour note under it.
+          for (const [freq, vol] of [[147, 0.35], [156, 0.25], [405, 0.1]]) tone(sfx, t, { len: 1.6, freq, vol, attack: 0.01 });
+          break;
+        case 'charmOut':
+          tone(voiceAt(e.x, e.y, 0.8, lx, ly), t, { len: 0.7, freq: 1760, to: 880, vol: 0.08 });
+          break;
         case 'wave': {
           // A bell tolls the hour.
           for (const [ratio, vol] of [[1, 0.5], [2.76, 0.2], [5.4, 0.1]]) tone(sfx, t, { len: 3, freq: 98 * ratio, vol, attack: 0.01 });

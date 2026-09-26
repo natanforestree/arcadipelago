@@ -7,8 +7,9 @@
 //
 // Debug (URL): ?debug=fps shows frame times; ?debug=bot plays by itself (&speed=N runs N updates per
 // update); the flags combine with a comma (?debug=bot,fps). ?wave=N starts at wave N (1-8); ?god
-// means you can't die; ?seed=N fixes the night; ?embers=N starts each night carrying N embers. With
-// any of them, window.__lastlight exposes the game, and window.__lastlightPerf the frame timing
+// means you can't die; ?seed=N fixes the night; ?embers=N starts each night carrying N embers;
+// ?charm=wolf (or thread, crow, salt, hare, eye) starts each night wearing that charm. With any of them,
+// window.__lastlight exposes the game, and window.__lastlightPerf the frame timing
 // ({ frameMs, updates }), for the browser checks.
 import { createInput } from './input.js';
 import { createClock } from './clock.js';
@@ -21,9 +22,10 @@ import { chooseView } from './view.js';
 import { createRenderer } from './render.js';
 import { createLightmap, bakeStatic } from './lightmap.js';
 import { createScene, buildFrame, sceneEvents } from './scene.js';
-import { drawHud, drawScreen } from './hud.js';
+import { drawHud, drawScreen, createSwing } from './hud.js';
 import { createBot, botIntents } from './bot.js';
 import { createState } from './sim.js';
+import { CHARM_LIST } from './charms.js';
 import { LIGHT, MOUSE, DT } from './tuning.js';
 
 // The module is running, so the page's "couldn't start" message will never be needed.
@@ -41,10 +43,11 @@ const debug = {
   god: params.has('god'),
   wave: int(params.get('wave'), 1, 8, 1) - 1,
   embers: int(params.get('embers'), 0, 999, 0),
+  charm: CHARM_LIST.findIndex((c) => c.key === params.get('charm')),
 };
 const speed = debug.bot ? int(params.get('speed'), 1, 20, 1) : 1;
 const seed = params.has('seed') ? int(params.get('seed'), 0, 2 ** 31, 1) : Date.now();
-const anyDebug = debug.fps || debug.bot || debug.god || params.has('wave') || params.has('seed') || params.has('embers');
+const anyDebug = debug.fps || debug.bot || debug.god || params.has('wave') || params.has('seed') || params.has('embers') || params.has('charm');
 
 const canvas = document.getElementById('game');
 const message = (title, detail) => {
@@ -206,7 +209,7 @@ async function boot() {
   const perf = { frameMs: 0, updates: 0 };
   if (anyDebug) window.__lastlightPerf = perf;
   const frameView = { facing: 0, pitch: 0, alpha: 0, time: 0, dt: 0, reducedMotion: false, h: 0, focal: 0 };
-  const hudInfo = { time: 0, hitT: 0, banner: game.banner, reducedMotion: false };
+  const hudInfo = { time: 0, hitT: 0, banner: game.banner, reducedMotion: false, swing: createSwing(), facing: 0, dt: 0 };
   const screenInfo = { time: 0, best: game.best, reached: 0, kills: 0, taken: null, bought: 0 };
   const loop = (now) => {
     try {
@@ -256,6 +259,8 @@ async function boot() {
       hudInfo.time = time;
       hudInfo.hitT = game.hitT;
       hudInfo.reducedMotion = frameView.reducedMotion;
+      hudInfo.facing = facing;
+      hudInfo.dt = game.screen === 'playing' ? dt : 0; // paused, the charm on your gun holds still
       drawHud(octx, art, s, view, hudInfo);
     } else if (game.screen !== 'paused') {
       screenInfo.time = time;
