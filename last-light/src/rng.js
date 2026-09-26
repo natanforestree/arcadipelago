@@ -1,4 +1,5 @@
-// Seeded random numbers (mulberry32). The simulation draws from state.rng only, so a night replays
+// Seeded random numbers (mulberry32). The simulation draws from state.rng, and charm drops from
+// state.charmRng (a stream of their own, so they never change the night's), so a night replays
 // identically from its seed.
 export function createRng(seed) {
   return { s: seed >>> 0 };

@@ -56,12 +56,12 @@ test('an update allocates nothing that lasts, with embers, burning, choosing and
       const c = s.creatures.find((c) => c.alive && !c.dying);
       if (c) igniteCreature(s, c);
     }
-    // Every 7 s a charm turns up at your feet, and two updates later you take it.
-    if (i % every === 0) {
-      const slot = s.charms.find((c) => c.id < 0);
-      let id = 0;
-      while (id === s.charm || s.charms.some((c) => c.id === id)) id = (id + 1) % CHARM_COUNT;
-      Object.assign(slot, { id, x: s.player.x, y: s.player.y, until: s.night.wave + 1, settled: true });
+    // Every 7 s in a wave or a lull, a charm you don't have turns up at your feet (while one is left),
+    // and two updates later you take it.
+    if (i % every === 0 && (s.night.phase === 'wave' || s.night.phase === 'lull')) {
+      let id = -1;
+      for (let k = 0; k < CHARM_COUNT && id < 0; k++) if (k !== s.charm && !s.charms.some((c) => c.id === k)) id = k;
+      if (id >= 0) Object.assign(s.charms.find((c) => c.id < 0), { id, x: s.player.x, y: s.player.y, until: s.night.wave + 1, settled: true });
     }
     const it = botIntents(s, bot, DT);
     it.take = i % every === 2 ? 1 : 0;

@@ -72,6 +72,7 @@ export function step(state, intents) {
   if (p.health <= 0 && state.night.phase !== 'dead') {
     p.health = 0;
     state.night.phase = 'dead';
+    state.charmAt = -1; // nothing to read once you're dead
     emit(state, 'dead');
   }
   return state;

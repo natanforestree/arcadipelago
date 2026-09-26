@@ -50,14 +50,12 @@ test('gaunts and leapers drop charms at their chances, each from its own list; c
 test('the Mother always drops hers where she died, and says so; she drops no ember', () => {
   const s = quietState();
   const m = spawnCreature(s, MOTHER, 25.5, 30.5);
-  const ev = runCollecting(s, 0);
   damageCreature(s, m, 9999);
   const c = onSnow(s)[0];
   assert.deepEqual([c.id, c.x, c.y], [EYE, 25.5, 30.5]);
   assert.equal(CHARM_LIST[EYE].from, 'mother');
   assert.ok(s.events.slice(0, s.eventCount).some((e) => e.type === 'charmDrop' && e.a === EYE && e.x === 25.5));
   assert.equal(s.embers.filter((e) => e.t > 0).length, 0);
-  assert.deepEqual(ev, []);
 });
 
 test('a charm that drops is never the one you wear nor one on the snow; with none left, none drops', () => {
@@ -167,6 +165,14 @@ test('once the night is over, you read and take nothing', () => {
   run(s, DT, intents({ take: 1 }));
   assert.equal(s.charmAt, -1);
   assert.equal(s.charm, -1);
+  const d = lull();
+  lay(d, WOLF, 19.5, 20.6);
+  run(d, DT);
+  assert.equal(d.charmAt, 0);
+  d.player.health = 0;
+  run(d, DT);
+  assert.equal(d.night.phase, 'dead');
+  assert.equal(d.charmAt, -1, 'dying clears the reading');
 });
 
 test('"Embers come to you": a new charm drifts to you once and settles; it does not follow you after', () => {

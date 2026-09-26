@@ -55,13 +55,14 @@ export function dropCharm(state, kind, x, y) {
   let n = 0;
   for (let id = 0; id < CHARM_COUNT; id++) if (CHARM_LIST[id].from === kind && free(state, id)) pool[n++] = id;
   if (n === 0) return null;
-  let c = state.charms[0];
+  let c = null;
   for (const o of state.charms) {
     if (o.id < 0) {
       c = o;
       break;
     }
   }
+  if (c === null) return null; // can't happen: there's a slot for every charm
   lay(state, c, pool[Math.floor(which * n)], x, y, false);
   emit(state, 'charmDrop', x, y, c.id);
   return c;
