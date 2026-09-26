@@ -1,7 +1,8 @@
 -- Last Light's HUD icons: health, rounds and shells (full and spent), flares, the crosshair (and its
--- warm Steady hands variant), the hit tick, the ember counter's ember, and one 12x12 icon for each of
--- the fire's upgrades ("up-" and its key in last-light/src/upgrades.js), in last-light/assets/hud.png
--- with each icon's place in hud.json. Run from the repo root:
+-- warm Steady hands variant), the hit tick, the ember counter's ember, one 12x12 icon for each of the
+-- fire's upgrades ("up-" and its key in last-light/src/upgrades.js), and one 12x12 icon for each charm
+-- ("charm-" and its key in last-light/src/charms.js), in last-light/assets/hud.png with each icon's
+-- place in hud.json. Run from the repo root:
 --   aseprite -b --script art/last-light/hud.lua
 --
 -- Each icon is drawn from rows of characters, one colour each ('.' is empty). They're drawn over the
@@ -16,6 +17,8 @@ local KEY = {
   B = C.brass1, b = C.brass0, u = C.ui, d = C.uiDim, t = C.uiDim .. "99",
   k = C.iron1, w = C.snow4,
   Y = C.fire4, O = C.fire3, r = C.fire2, E = C.ember0, g = C.stone3, W = C.wood4, n = C.snow2,
+  P = C.flesh4, p = C.flesh3, q = C.flesh2, K = C.night4, e = C.eye1, y = C.eye2, G = C.gum,
+  m = C.wood3, ["5"] = C.wood5, S = C.snow3,
 }
 
 local function icon(rows)
@@ -312,6 +315,96 @@ L.writePieces("hud", {
     "...W.u.uW...",
     "....WuuW....",
     ".....WW.....",
+    "............",
+  }) },
+  -- Wolf's tooth: a long fang hanging from its cord.
+  { "charm-wolf", icon({
+    "....dddd....",
+    "...d....d...",
+    "....d..d....",
+    ".....dd.....",
+    "....PPPp....",
+    "....PPPpq...",
+    "....PPPpq...",
+    ".....PPpq...",
+    ".....PPpq...",
+    "......Ppq...",
+    ".......pq...",
+    "........q...",
+  }) },
+  -- Red thread: a loop of it, knotted, the ends hanging loose.
+  { "charm-thread", icon({
+    "............",
+    "....RRRR....",
+    "...R....R...",
+    "..R......R..",
+    "..R......R..",
+    "..R......R..",
+    "...R....R...",
+    "....RHHR....",
+    ".....HH.....",
+    "....H..H....",
+    "...H....H...",
+    "............",
+  }) },
+  -- Crow's feather: blue-black, with a pale sheen down its edge and a bare quill.
+  { "charm-crow", icon({
+    "..........n.",
+    ".........nK.",
+    "........nKK.",
+    ".......nKKK.",
+    "......nKKKK.",
+    ".....nKKKK..",
+    "....nKKKK...",
+    "...nKKKK....",
+    "...KKKK.....",
+    "..d.KK......",
+    ".d..........",
+    "d...........",
+  }) },
+  -- Grave salt: a little heap of it, glinting.
+  { "charm-salt", icon({
+    "............",
+    ".....w......",
+    "....w.w.....",
+    ".....w......",
+    "............",
+    ".....wS.....",
+    "....wSSw....",
+    "...wSSwSw...",
+    "..wSSSSSSw..",
+    ".wSSnSSSnSw.",
+    ".nnnnnnnnnn.",
+    "............",
+  }) },
+  -- Hare's foot: a furry foot tied with a cord, its claws showing.
+  { "charm-hare", icon({
+    "....dd......",
+    "...d..d.....",
+    "....dd......",
+    "....mm......",
+    "...m5mm.....",
+    "...m55m.....",
+    "...m55mm....",
+    "...m555m....",
+    "..m5555mm...",
+    "..m55555m...",
+    "..mm5555mm..",
+    "...p.p.p....",
+  }) },
+  -- The Mother's eye: open, glowing, in its lids.
+  { "charm-eye", icon({
+    "............",
+    "............",
+    "....GGGG....",
+    "..GGyyyyGG..",
+    ".GyyekkeyyG.",
+    "GyyekkkkeyyG",
+    ".GyyekkeyyG.",
+    "..GGyyyyGG..",
+    "....GGGG....",
+    "............",
+    "............",
     "............",
   }) },
 })

@@ -1,7 +1,7 @@
 -- Last Light's sprites: the creatures and props the game draws in the world (the crawler, gaunt,
--- leaper and the Mother; the stove, well and lone pine; a burning flare and the three pickups), in
--- last-light/assets/sprites.png, with their frames and animations in sprites.json. Run from the repo
--- root:
+-- leaper and the Mother; the stove, well and lone pine; a burning flare, an ember, a charm and the
+-- three pickups), in last-light/assets/sprites.png, with their frames and animations in sprites.json.
+-- Run from the repo root:
 --   aseprite -b --script art/last-light/sprites.lua
 --
 -- The after-eaters are built from shared body parts (a skull with its eyes and jaw, a ribcage and spine,
@@ -1305,6 +1305,34 @@ local function emberFrames()
   return frames
 end
 
+-- A charm on the snow: a bone pendant on a dark cord, hovering a little. 8x9. A cold glint (the glowing
+-- star colour, so it shows in the dark) crosses it in three frames, then it rests for three.
+local CHARM_KEY = { c = C.ichor1, P = C.flesh4, p = C.flesh3, q = C.flesh2, ["*"] = C.star }
+local function charmFrames()
+  local base = {
+    "..cccc..",
+    ".c....c.",
+    ".c....c.",
+    "..c..c..",
+    "...PP...",
+    "..PPPp..",
+    "..PPpq..",
+    "...Pq...",
+    "....q...",
+  }
+  local frames = {}
+  for _, glint in ipairs({ { { 3, 4 } }, { { 3, 5 }, { 2, 5 }, { 4, 5 }, { 3, 4 }, { 3, 6 } }, { { 4, 6 } }, {} }) do
+    local rows = {}
+    for i, r in ipairs(base) do rows[i] = r end
+    for _, g in ipairs(glint) do
+      local r = rows[g[2] + 1]
+      rows[g[2] + 1] = r:sub(1, g[1]) .. "*" .. r:sub(g[1] + 2)
+    end
+    frames[#frames + 1] = picture(rows, CHARM_KEY)
+  end
+  return frames
+end
+
 local PICKUP_KEY = {
   F = C.flare2, R = C.flare1, h = C.hurt, k = C.iron1, K = C.iron2, i = C.iron0, g = C.stone2, G = C.stone3,
   B = C.brass1, b = C.brass0, W = C.snow4, S = C.snow3, s = C.snow2, d = C.snow1, m = C.mouth,
@@ -1370,6 +1398,7 @@ L.writeSprites(P, {
   { name = "pine", frames = { pine() }, height = 2.6, anims = { idle = { 0 } } },
   { name = "flare", frames = flareFrames(), height = 0.25, ms = 80, anims = { idle = { 0, 1, 2 } } },
   { name = "ember", frames = emberFrames(), height = 0.12, ms = 110, anims = { idle = { 0, 1, 2 } } },
+  { name = "charm", frames = charmFrames(), height = 0.14, ms = 140, anims = { idle = { 0, 1, 2, 3, 3, 3 } } },
   { name = "pickup-flare", frames = { pickupFlare() }, height = 0.2, anims = { idle = { 0 } } },
   { name = "pickup-shells", frames = { pickupShells() }, height = 0.2, anims = { idle = { 0 } } },
   { name = "pickup-shotgun", frames = { pickupShotgun() }, height = 0.2, anims = { idle = { 0 } } },

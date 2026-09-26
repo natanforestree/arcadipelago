@@ -11,6 +11,7 @@ import { KINDS } from '../src/creatures.js';
 import { CREATURES } from '../src/tuning.js';
 import { HAND_FRAMES, HUD_ICONS } from '../src/hud.js';
 import { UPGRADE_LIST } from '../src/upgrades.js';
+import { CHARM_LIST } from '../src/charms.js';
 
 const file = (f) => new URL(`../${f}`, import.meta.url);
 const json = (f) => JSON.parse(readFileSync(file(`assets/${f}`), 'utf8'));
@@ -107,6 +108,13 @@ test('the ember and the new icons are the sizes the scene and the HUD expect', (
   const { icons } = json('hud.json');
   for (const n of ['ember', 'crosshairSteady']) assert.deepEqual(icons[n].slice(2), [7, 7], n);
   for (const u of UPGRADE_LIST) assert.deepEqual(icons[`up-${u.key}`].slice(2), [12, 12], u.key);
+});
+
+test('the charm and its icons are the sizes the scene and the HUD expect', () => {
+  const { sprites } = json('sprites.json');
+  assert.deepEqual([sprites.charm.w, sprites.charm.h, sprites.charm.count, sprites.charm.height], [8, 9, 4, 0.14]);
+  const { icons } = json('hud.json');
+  for (const c of CHARM_LIST) assert.deepEqual(icons[`charm-${c.key}`].slice(2), [12, 12], c.key);
 });
 
 test('every hands frame and HUD icon, inside their sheets', () => {
