@@ -7,7 +7,8 @@ import { dropEmber } from '../src/embers.js';
 import { startWave } from '../src/night.js';
 import { createState } from '../src/sim.js';
 import { CHARMS, CREATURES, EMBERS, LIGHT, NIGHT, PERKS, PLAYER, RIFLE, DT } from '../src/tuning.js';
-import { quietState, run, runCollecting, intents, room } from './helpers.js';
+import { quietState, run, runCollecting, intents } from './helpers.js';
+import { isSolid } from '../src/map.js';
 
 const south = Math.PI / 2;
 const onSnow = (s) => s.charms.filter((c) => c.id >= 0);
@@ -214,13 +215,22 @@ test('"Embers come to you": a new charm drifts to you once and settles; it does 
 });
 
 test('"Embers come to you": a charm that would come to rest inside a wall settles at your feet', () => {
-  const s = createState({ seed: 1, map: room() });
-  s.night.phase = 'lull';
-  s.night.t = Infinity;
+  const s = lull();
   s.gentle = true;
-  s.player.x = 1.3; // your back to the west wall, which ends at x = 1
-  s.player.y = 5.5;
-  const c = lay(s, WOLF, 0.3, 5.5); // coming through the wall
+  // A wall on the real map with open snow east of it: stand with your back to it.
+  let wx = -1, wy = -1;
+  for (let y = 1; y < s.map.h - 1 && wx < 0; y++) {
+    for (let x = 1; x < s.map.w - 3; x++) {
+      if (isSolid(s.map, x, y) && !isSolid(s.map, x + 1, y) && !isSolid(s.map, x + 2, y)) {
+        wx = x;
+        wy = y;
+        break;
+      }
+    }
+  }
+  s.player.x = s.player.px = wx + 1.3; // your back to the wall, which ends at wx + 1
+  s.player.y = s.player.py = wy + 0.5;
+  const c = lay(s, WOLF, wx + 0.3, wy + 0.5); // coming through the wall
   run(s, 1);
   assert.equal(c.settled, true);
   assert.deepEqual([c.x, c.y], [s.player.x, s.player.y]);
