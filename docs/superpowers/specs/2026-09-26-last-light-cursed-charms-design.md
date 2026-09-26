@@ -53,17 +53,17 @@ Each charm's two lines are in quotes: what it gives, and what it takes. Names ar
 | 4 | Leaper | Hare's foot | "Move a quarter faster." | "You hold 75 health at most." | Walk, run and acceleration ×1.25, on top of Snowshoes. Your maximum health is 75: taking it brings you down to 75 at once, and taking it off lets the stove heal you back to 100 |
 | 5 | The Mother | The Mother's eye | "Their eyes show through walls." | "Your lantern gutters low." | Every after-eater's eyes glow at full strength at any distance, and show through walls. The lantern's clear light and fade reach ×0.3 as far |
 
-The Mother comes in the last hour, so her eye is a gift for the end of the night: in near-dark you see every one of them, wherever they are.
+The Mother comes in the last hour, so her eye is a gift for the end of the night: in near-dark you see every one of them, wherever they are. She drops it when she's half dead, so it lies near her while she fights on.
 
 ## 2. Dropping, reading, taking
 
 - **Dropping.** When an after-eater is killed, by a shot or by burning:
   - a gaunt drops a charm 1 time in 10, and a leaper 1 in 15;
-  - the Mother always drops hers;
+  - the Mother always drops hers, the moment her health first falls to half (by a shot or by fire), not as she dies: she's usually the last to fall, and a charm dropped then would lie untaken at dawn. If she dies from above half in one blow, she drops it as she dies;
   - a crawler never does.
 - **Which one.** A gaunt's charm is one of the gaunt's three, and a leaper's one of the leaper's two, at random. It's never the one you wear or one already on the snow. If none is left, nothing drops.
 - **Their own dice.** Charm drops use a random stream of their own, seeded from the night's seed. So a night where you never take a charm plays exactly as it did before charms existed.
-- **Where.** A charm drops where the creature died, next to its ember.
+- **Where.** A charm lands beside the creature's ember, a quarter of a cell towards you, unless that's in a wall (then on the spot).
 - **How long.**
   - A charm lies on the snow until the next wave begins, then it's gone.
   - In a lull's last 3 s, charms on the snow flicker, so you can see they're going.
@@ -87,9 +87,9 @@ The Mother comes in the last hour, so her eye is a gift for the end of the night
   - There's no way to take a charm off except by taking another.
 - **Gentler nights ("Embers come to you").**
   - A newly dropped charm drifts straight towards you at **3 cells/s**, through anything, like an ember.
-  - It stops once it's within half its reach, and settles there.
+  - It stops once it's within half its reach, and settles there; if that would be inside a wall (it drifts through anything), it settles at your feet.
   - It doesn't follow you after that. The one you leave behind when you swap settles where it falls.
-- **Teaching.** The first time a charm drops in a session, a banner reads **"A charm"**, with the line *"Something glints where it fell."* Like the first ember's banner, it waits for the banner showing to fade.
+- **Teaching.** The first time a charm drops in a session, a banner reads **"A charm"**, with the line *"Something glints where it fell."* Like the first ember's banner, it waits for the banner showing to fade. If you take a charm before it shows, it never shows.
 
 ## 3. Display, sound, art
 
@@ -209,6 +209,8 @@ These are my starting values, untested, to be tuned by play.
 | Value | Start | How you'd know it's right |
 |---|---|---|
 | Gaunt drop chance | 1 in 10 | About 4 charms in a whole night (the Mother's aside) |
+| The Mother's drop | at half her health | Her eye can be taken before dawn, near her |
+| Beside the ember | 0.25 cells towards you | The charm isn't hidden by its ember |
 | Leaper drop chance | 1 in 15 | Same |
 | Reach | 0.8 cells | Easy to stand over; never read by accident from across the porch |
 | Flicker before the wave | last 3 s of the lull | You notice they're going |
@@ -245,6 +247,11 @@ These are recorded as ruling, reason, and cost if wrong.
 - **Pendants are drawn turned, not turned at run time.**
   - Why: pixel art turned by the canvas at run time comes out ragged and uneven; drawing each turn in the Lua keeps every pixel a palette colour, and 11 turns look smooth at this size.
   - Cost if wrong: hud.png grows by 66 small pieces (about 3,000 pixels wide, mostly empty).
+- **The Mother drops her eye at half health** (the final review, 2026-09-26).
+  - Why: dropped as she died, it could almost never be taken: in 8 of 12 bot nights she was the last to die, so dawn began in the same update, and reading stops at dawn.
+  - Cost if wrong: one number in tuning.
+- **The charm on your gun is well damped.** Walking with Snowshoes or Hare's foot steps about twice a second, just as often as the charm swings, and slammed it into its stop every step; more damping keeps every pace under about 22 degrees.
+  - Cost if wrong: one number in `hud.js`.
 - **No end-screen charm, and the bot wears no charms.**
   - Why: the end screens already show the night's upgrades. The bot is a test harness, and its gates (dawn in god mode, 5 to 7 picks) stay exactly as they were.
   - Cost if wrong: small, and easy to add later.
