@@ -1,7 +1,7 @@
 # Last Light: Cursed charms (design spec)
 
 **Date:** 2026-09-26
-**Status:** Design approved by Nathan in conversation (2026-09-26). He pitched gun charms that monsters drop, "the more powerful monsters the better charms". The reply, from Max's game-design-consultant skill, recommended **cursed charms**: every charm has a power and a price, you wear one at a time, and a swap leaves yours behind. Nathan's answer: "build it!". The game it changes is specified in `docs/superpowers/specs/2026-09-24-last-light-design.md`, with Dark harvest in `docs/superpowers/specs/2026-09-25-last-light-dark-harvest-design.md`.
+**Status:** Design approved by Nathan in conversation (2026-09-26). Amended the same day at his request: the charm you wear hangs from your gun (§3). He pitched gun charms that monsters drop, "the more powerful monsters the better charms". The reply, from Max's game-design-consultant skill, recommended **cursed charms**: every charm has a power and a price, you wear one at a time, and a swap leaves yours behind. Nathan's answer: "build it!". The game it changes is specified in `docs/superpowers/specs/2026-09-24-last-light-design.md`, with Dark harvest in `docs/superpowers/specs/2026-09-25-last-light-dark-harvest-design.md`.
 
 Dark harvest's upgrades only ever add: you never give anything up. Charms bring the one decision the game lacks: **what will you give up for this?**
 - The after-eaters sometimes drop a **charm** where they die. Gaunts and leapers rarely drop one; the Mother always drops hers.
@@ -83,7 +83,7 @@ The Mother comes in the last hour, so her eye is a gift for the end of the night
   - A banner shows its name and what it gives.
   - E works in waves and lulls, and not once the night is over.
 - **Wearing.**
-  - Your charm's icon sits at the bottom left, beside the embers you carry.
+  - Your charm hangs from the gun in your hands (§3).
   - There's no way to take a charm off except by taking another.
 - **Gentler nights ("Embers come to you").**
   - A newly dropped charm drifts straight towards you at **3 cells/s**, through anything, like an ember.
@@ -94,15 +94,22 @@ The Mother comes in the last hour, so her eye is a gift for the end of the night
 ## 3. Display, sound, art
 
 - **The display:**
-  - the reading and the worn charm, as in §2;
+  - the reading, as in §2;
   - the title screen's keys line gains **"E charm"**.
+- **The charm on your gun.** The charm you wear hangs on a short chain from the inner side (towards the middle of the view) of the gun in your hands, from its fore-end, like a weapon charm in a shooter's loadout (Nathan's reference: The Finals).
+  - It swings like a pendulum, about twice a second: it leans away as you turn, rocks with your steps, and jumps when you fire, then settles back.
+  - It moves with the gun: down with the rifle when it loads, down and up in a switch, and down with the shotgun's barrels when they're broken open.
+  - With reduced motion it hangs straight, and while the game is paused it holds still.
+  - It's not drawn once you're dead.
 - **Sound** (made live, like the rest; positional where it has a place):
   - a charm dropping: a thin glassy chime where it fell, so you can hear one drop out in the dark;
   - taking one: a low bell with a sour note under it;
   - one fading at the wave: a faint falling chime where it was.
 - **Art** (Lua through Aseprite, deterministic, like all Last Light art):
   - a **charm** sprite in `sprites.lua`: a small bone trinket on a dark cord in the snow, with a cold glint (the glowing `star` colour) that moves across it in four frames, 0.14 cells tall;
-  - six **charm icons** in `hud.lua`, 12×12, named `charm-` and the charm's key, drawn as rows of characters like the upgrade icons, in colours that read on the dark panel and on the snow.
+  - six **charm icons** in `hud.lua`, 12×12, named `charm-` and the charm's key, drawn as rows of characters like the upgrade icons, in colours that read on the dark panel and on the snow;
+  - six **pendants** in `hud.lua`, each a bigger charm under a short chain, outlined in the dark so it reads on the snow and the gun, drawn turned to 11 angles from -0.75 to 0.75 radians about the top of its chain (`hang-`, the key and the turn), so it swings without being turned at run time;
+  - the point on each gun frame where the charm hangs, projected from the gun's model in `hands.lua` and written to `hands.json` as `charms`.
 - **On screen in the world:**
   - a charm on the snow hovers a little, like a supply, and glints;
   - it lights a small patch of snow round it, so it can be found in the dark;
@@ -131,13 +138,15 @@ New code follows the existing rules:
 | `src/bot.js` | Its intents include `take: 0`; it never takes a charm |
 | `src/scene.js` | Charm sprites and their light; the lantern from `lantern(state)`; eyes at full glow with the Mother's eye, and marked to show through walls; an ember worth 4 (Crow's feather) drawn bigger still |
 | `src/render.js` | A sprite marked `xray` draws its glowing pixels (the eyes) even behind walls |
-| `src/hud.js` | The reading; the worn charm's icon; "E charm" on the title screen |
+| `src/hud.js` | The reading; the charm on your gun, swinging (`createSwing`, `swingCharm`); "E charm" on the title screen |
 | `src/audio.js` | Sounds for the new events |
 | `src/game.js` | Banners (the first charm; a charm taken) |
-| `src/main.js` | `?charm=<key>` (debug): start each night wearing that charm |
+| `src/main.js` | `?charm=<key>` (debug): start each night wearing that charm; the swing, your facing and the frame time go to the HUD |
+| `src/assets.js` | `art.hands.charms`: where the charm hangs from each gun frame |
 | `src/events.js` | Documents the new events |
 | `bench.js` | Charms on the snow, and the creatures drawn with `xray` (the Mother's eye, the worst case) |
-| `art/last-light/sprites.lua`, `hud.lua` | The charm sprite; the six icons |
+| `art/last-light/sprites.lua`, `hud.lua` | The charm sprite; the six icons; the six pendants, turned |
+| `art/last-light/hands.lua`, `lib.lua` | Each gun frame's charm point, in `hands.json` |
 
 **New events:**
 
@@ -181,7 +190,8 @@ Node tests, like the rest. At least:
 - **Input:** E gives `take`.
 - **Display:**
   - the reading, and its line with and without a charm worn;
-  - the worn icon.
+  - the charm on your gun: where the frame says, down with the rifle to load, gone when you're dead, turned as it swings, straight with reduced motion;
+  - the swing: turning swings it away and it settles back, a shot jolts it, and it swings alike at any frame rate.
 - **Scene:**
   - charm sprites with their light;
   - the lantern's reach under each charm;
@@ -189,7 +199,7 @@ Node tests, like the rest. At least:
 - **Render:** an `xray` sprite behind a wall draws its glowing pixels, and only those.
 - **Bot:** it plays a whole night to dawn (god mode) wearing each charm, from `createState({ charm })`.
 - **Allocation:** an update allocates nothing that lasts, with charms dropping, worn and swapped.
-- **Art:** the sprite and the six icons exist at the sizes above.
+- **Art:** the sprite, the six icons and the pendants exist at the sizes above, every gun frame has its charm point on the gun, and the loader passes the points on.
 - **Benchmark:** the existing frames, plus charms on the snow and `xray` creatures, stay under 4 ms.
 
 ## 6. Starting tuning values
@@ -229,6 +239,12 @@ These are recorded as ruling, reason, and cost if wrong.
 - **One slot for each charm**, not a pool of 8 that replaces the oldest.
   - Why: a drop is never the charm you wear or one on the snow, so no charm can be in two places, and six slots can never fill.
   - Cost if wrong: none.
+- **The charm hangs from your gun, and the corner icon is gone** (Nathan, 2026-09-26, with a reference picture).
+  - Why: "attach it to your gun" was the pitch; seeing it swing there says what you wear without another icon.
+  - Cost if wrong: the corner icon is one line to bring back.
+- **Pendants are drawn turned, not turned at run time.**
+  - Why: pixel art turned by the canvas at run time comes out ragged and uneven; drawing each turn in the Lua keeps every pixel a palette colour, and 11 turns look smooth at this size.
+  - Cost if wrong: hud.png grows by 66 small pieces (about 3,000 pixels wide, mostly empty).
 - **No end-screen charm, and the bot wears no charms.**
   - Why: the end screens already show the night's upgrades. The bot is a test harness, and its gates (dawn in god mode, 5 to 7 picks) stay exactly as they were.
   - Cost if wrong: small, and easy to add later.
