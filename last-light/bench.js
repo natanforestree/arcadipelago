@@ -1,8 +1,8 @@
 // Times the renderer on a busy late-night frame at 480x270 in Node: 30 creatures, their eyes showing
 // through walls (the Mother's eye, the worst case), 3 flares, 20 embers and 3 charms on the snow (each
 // lighting it), the lantern, falling snow; then the same looking all the way down (the most snow to
-// draw), and inside the cabin looking all the way up (the most rafters). `npm run bench`. The target is under 4 ms a
-// frame. Not a test, because timings vary from machine to machine.
+// draw), and inside the cabin looking all the way up (the most rafters). `npm run bench`. The target is
+// under 4 ms a frame. Not a test, because timings vary from machine to machine.
 import { parseMap } from './src/map.js';
 import { chooseView } from './src/view.js';
 import { buildShades } from './src/shade.js';

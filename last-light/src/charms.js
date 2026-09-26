@@ -7,6 +7,7 @@
 import { CHARMS, LIGHT, PERKS, PLAYER } from './tuning.js';
 import { nextRandom } from './rng.js';
 import { emit } from './events.js';
+import { isSolid } from './map.js';
 
 export const WOLF = 0, THREAD = 1, CROW = 2, SALT = 3, HARE = 4, EYE = 5;
 // from: the kind of after-eater that drops it.
@@ -46,7 +47,8 @@ function free(state, id) {
 const pool = new Int8Array(CHARM_COUNT);
 
 // A kill of `kind` (its name) at (x, y) may drop a charm: at the kind's chance, one of its charms that's
-// free, at random. Returns the charm on the snow, or null.
+// free, at random. It lands beside the creature's ember, a little towards you, unless that's in a wall.
+// Returns the charm on the snow, or null.
 export function dropCharm(state, kind, x, y) {
   const chance = CHARMS.drop[kind];
   if (!(chance > 0)) return null;
@@ -63,6 +65,14 @@ export function dropCharm(state, kind, x, y) {
     }
   }
   if (c === null) return null; // can't happen: there's a slot for every charm
+  const p = state.player, dx = p.x - x, dy = p.y - y, d = Math.sqrt(dx * dx + dy * dy);
+  if (d > CHARMS.beside) {
+    const bx = x + (dx / d) * CHARMS.beside, by = y + (dy / d) * CHARMS.beside;
+    if (!isSolid(state.map, Math.floor(bx), Math.floor(by))) {
+      x = bx;
+      y = by;
+    }
+  }
   lay(state, c, pool[Math.floor(which * n)], x, y, false);
   emit(state, 'charmDrop', x, y, c.id);
   return c;
@@ -107,7 +117,14 @@ export function updateCharms(state, intents, dt) {
         c.x += (dx / d) * step;
         c.y += (dy / d) * step;
       }
-      if (d - step <= stop) c.settled = true;
+      if (d - step <= stop) {
+        c.settled = true;
+        // It drifts through anything, so it could come to rest in a wall: then it settles at your feet.
+        if (isSolid(state.map, Math.floor(c.x), Math.floor(c.y))) {
+          c.x = p.x;
+          c.y = p.y;
+        }
+      }
       dx = p.x - c.x;
       dy = p.y - c.y;
     }

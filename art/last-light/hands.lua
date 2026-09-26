@@ -11,8 +11,9 @@
 --
 -- Each frame is cropped from a view-sized canvas, so its (ox, oy) is exact: where its top-left sits
 -- relative to the bottom centre of the view. Each gun frame also has the point, on the same terms,
--- where the charm you wear hangs from it (hud.js swings the charm from there). Every frame reaches the bottom of the view, and nothing
--- comes within 5 px of the crosshair at any view height the game draws at (checked at the end).
+-- where the charm you wear hangs from it (hud.js swings the charm from there). Every frame reaches the
+-- bottom of the view, and nothing comes within 5 px of the crosshair at any view height the game draws
+-- at (checked at the end).
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.-)[^/]+$") or ""
 local L = dofile(here .. "lib.lua")
 local P = L.palette()
@@ -381,7 +382,8 @@ local RIFLE_AT = V(0.13, 0.2, 0.38)
 local RIFLE_FWD = aimAt(RIFLE_AT, V(0, -0.024, 0.66), MUZZLE[1], MUZZLE[2])
 
 -- Where a charm hangs from each gun: on the inner side (towards the middle of the view) of its fore-end,
--- clear of the receiver and your hand. The shotgun's swings down with its barrels when it's broken open.
+-- clear of the receiver and your hand. The shotgun's fore-end swings down with its barrels when it's
+-- broken open, and the charm with it.
 local RIFLE_CHARM = V(-0.0165, 0.004, 0.24)
 local SHOTGUN_CHARM = V(-0.0185, 0.002, 0.22)
 

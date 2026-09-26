@@ -7,7 +7,7 @@ import { dropEmber } from '../src/embers.js';
 import { startWave } from '../src/night.js';
 import { createState } from '../src/sim.js';
 import { CHARMS, CREATURES, EMBERS, LIGHT, NIGHT, PERKS, PLAYER, RIFLE, DT } from '../src/tuning.js';
-import { quietState, run, runCollecting, intents } from './helpers.js';
+import { quietState, run, runCollecting, intents, room } from './helpers.js';
 
 const south = Math.PI / 2;
 const onSnow = (s) => s.charms.filter((c) => c.id >= 0);
@@ -47,15 +47,39 @@ test('gaunts and leapers drop charms at their chances, each from its own list; c
   }
 });
 
-test('the Mother always drops hers where she died, and says so; she drops no ember', () => {
-  const s = quietState();
+test('the Mother always drops hers, beside her, and says so; she drops no ember', () => {
+  const s = quietState(); // you're at (19.5, 20.5)
   const m = spawnCreature(s, MOTHER, 25.5, 30.5);
   damageCreature(s, m, 9999);
   const c = onSnow(s)[0];
-  assert.deepEqual([c.id, c.x, c.y], [EYE, 25.5, 30.5]);
+  assert.equal(c.id, EYE);
   assert.equal(CHARM_LIST[EYE].from, 'mother');
-  assert.ok(s.events.slice(0, s.eventCount).some((e) => e.type === 'charmDrop' && e.a === EYE && e.x === 25.5));
+  const off = Math.sqrt((c.x - 25.5) ** 2 + (c.y - 30.5) ** 2);
+  assert.ok(Math.abs(off - CHARMS.beside) < 1e-9, `beside where she fell: ${off}`);
+  assert.ok((c.x - 25.5) * (19.5 - 25.5) + (c.y - 30.5) * (20.5 - 30.5) > 0, 'on your side of it');
+  assert.ok(s.events.slice(0, s.eventCount).some((e) => e.type === 'charmDrop' && e.a === EYE && e.x === c.x && e.y === c.y));
   assert.equal(s.embers.filter((e) => e.t > 0).length, 0);
+});
+
+test('the Mother drops hers the moment her health falls to half, while she fights on, and no other as she dies', () => {
+  const half = CREATURES.mother.health * CHARMS.motherAt;
+  const s = quietState();
+  const m = spawnCreature(s, MOTHER, 25.5, 30.5);
+  damageCreature(s, m, CREATURES.mother.health - half - 1);
+  assert.equal(onSnow(s).length, 0, 'not yet');
+  damageCreature(s, m, 2);
+  assert.equal(onSnow(s)[0].id, EYE);
+  assert.ok(m.alive && !m.dying, 'she fights on');
+  damageCreature(s, m, 9999);
+  assert.equal(onSnow(s).length, 1, 'her death drops no second one');
+  // Burning down past half drops it too.
+  const t = quietState();
+  const n = spawnCreature(t, MOTHER, 25.5, 30.5);
+  n.hp = half + 1;
+  igniteCreature(t, n);
+  run(t, 1);
+  assert.ok(n.alive && !n.dying);
+  assert.equal(onSnow(t)[0].id, EYE);
 });
 
 test('a charm that drops is never the one you wear nor one on the snow; with none left, none drops', () => {
@@ -187,6 +211,19 @@ test('"Embers come to you": a new charm drifts to you once and settles; it does 
   assert.equal(c.settled, true);
   run(s, 1, intents({ facing: -south, forward: 1 }));
   assert.ok(Math.abs(c.y - (20.5 + CHARMS.reach / 2)) < 1e-6, 'it stays where it settled');
+});
+
+test('"Embers come to you": a charm that would come to rest inside a wall settles at your feet', () => {
+  const s = createState({ seed: 1, map: room() });
+  s.night.phase = 'lull';
+  s.night.t = Infinity;
+  s.gentle = true;
+  s.player.x = 1.3; // your back to the west wall, which ends at x = 1
+  s.player.y = 5.5;
+  const c = lay(s, WOLF, 0.3, 5.5); // coming through the wall
+  run(s, 1);
+  assert.equal(c.settled, true);
+  assert.deepEqual([c.x, c.y], [s.player.x, s.player.y]);
 });
 
 test("Wolf's tooth: rifle shots hit half again as hard, and the lantern's light shrinks", () => {

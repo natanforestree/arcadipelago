@@ -346,19 +346,23 @@ test('the charm swings: it leans away as you turn and settles back, a shot jolts
   assert.ok(Math.abs(after(30) - after(144)) < 0.1, `${after(30)} at 30 fps, ${after(144)} at 144`);
 });
 
-test('walking rocks the charm without slamming it to its stop, and a long stall swings it no further', () => {
-  const sw = createSwing();
-  let walked = 0, most = 0;
-  for (let i = 0; i < 60 * 5; i++) {
-    walked += 3 / 60; // walking pace, the hands swaying as hud.js sways them
-    swingCharm(sw, 1 / 60, 0, Math.sin((walked / 0.9) * Math.PI) * 3, 0);
-    if (i > 120) most = Math.max(most, Math.abs(sw.angle));
+test('walking rocks the charm without slamming it to its stop, at any pace, and a long stall swings it no further', () => {
+  // Walking, and walking with Snowshoes or Hare's foot, whose steps come as often as it swings.
+  for (const pace of [3, 3.6, 3.75]) {
+    const sw = createSwing();
+    let walked = 0, most = 0;
+    for (let i = 0; i < 60 * 6; i++) {
+      walked += pace / 60; // the hands sway as hud.js sways them
+      swingCharm(sw, 1 / 60, 0, Math.sin((walked / 0.9) * Math.PI) * 3, 0);
+      if (i > 120) most = Math.max(most, Math.abs(sw.angle));
+    }
+    assert.ok(most > 0.15 && most < 0.6, `at ${pace} cells a second it rocks, never reaching its stop: ${most}`);
   }
-  assert.ok(most > 0.15 && most < 0.6, `it rocks, about 20 degrees each way: ${most}`);
-  const still = createSwing();
-  swingCharm(still, 1 / 60, 0, 0, 0);
-  swingCharm(still, 5, 0, 0, 0);
-  assert.ok(Math.abs(still.angle) < 1e-9, `a five-second stall with nothing moving leaves it hanging straight: ${still.angle}`);
+  const mid = createSwing();
+  swingCharm(mid, 1 / 60, 0, 0, 0);
+  mid.angle = 0.5;
+  swingCharm(mid, 5, 0, 0, 0);
+  assert.ok(Math.abs(mid.angle) <= 0.5, `a five-second stall mid-swing flings it no further: ${mid.angle}`);
 });
 
 test('swung, the charm is drawn turned that way; with reduced motion it hangs straight', () => {

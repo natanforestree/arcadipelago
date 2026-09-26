@@ -190,6 +190,24 @@ test('charms: the first one of the session gets a banner, after the Embers one; 
   assert.deepEqual([g.banner.text, g.banner.sub], [CHARM_LIST[EYE].name, CHARM_LIST[EYE].gives]);
 });
 
+test('charms: a charm taken before its teaching banner could show means that banner never comes', () => {
+  const g = createGame({ storage: memoryStorage(), map, seed: 1 });
+  g.newNight();
+  const s = g.state;
+  s.night.phase = 'lull';
+  s.night.t = 1e9;
+  g.charmDue = true; // one dropped while another banner was showing
+  g.banner.t = 3;
+  Object.assign(s.charms[0], { id: WOLF, x: s.player.x, y: s.player.y, until: 1, settled: true });
+  g.tick(intents());
+  g.tick(intents({ take: 1 }));
+  assert.equal(g.banner.text, CHARM_LIST[WOLF].name);
+  g.banner.t = 0.5;
+  g.tick(intents());
+  assert.equal(g.banner.text, CHARM_LIST[WOLF].name, 'no "A charm" after it');
+  assert.equal(g.charmDue, false);
+});
+
 test('"Embers come to you" and ?embers= reach each new night', () => {
   const g = createGame({ storage: memoryStorage(), map, debug: { embers: 40 } });
   g.gentle = true;

@@ -53,8 +53,9 @@ const LEAVING = CHARM_LIST.map((c) => `E to take it, leaving ${c.name}`);
 // the swinging dies away; turn: radians it leans for each radian a second you turn; step: radians for
 // each pixel a second the hands sway; kick: radians a second a shot throws it, for each radian of the
 // gun's kick. It swings no further than its pendant is drawn (HANG_MOST).
-// Your steps come about as often as it swings, so their push is kept small: walking rocks it about 20 degrees.
-const SWING = { spring: 160, damping: 2.4, turn: 0.12, step: 0.004, kick: 30 };
+// Your steps come about as often as it swings (with Snowshoes or Hare's foot, just as often), so their
+// push is kept small and the swinging well damped: walking rocks it about 15 degrees.
+const SWING = { spring: 160, damping: 5, turn: 0.12, step: 0.004, kick: 30 };
 
 const shown = { name: '', drop: 0 };
 // Which of n frames a countdown from `whole` to 0 is at, `t` left.

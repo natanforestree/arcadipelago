@@ -125,6 +125,8 @@ export const PERKS = {
 // something; you wear one at a time (charms.js).
 export const CHARMS = {
   drop: { crawler: 0, gaunt: 0.1, leaper: 1 / 15, mother: 1 }, // the chance a kill drops one
+  motherAt: 0.5, // the Mother drops hers when her health first falls to this share, not as she dies
+  beside: 0.25, // a charm lands this far from its ember, towards you
   reach: 0.8, // how close you stand to read one and take it
   flicker: 3, // the lull's last seconds, when charms on the snow flicker before they go
   drift: 3, // cells a second towards you, with "Embers come to you"

@@ -80,7 +80,12 @@ export function createGame({ storage, map, seed = Date.now(), debug = {} }) {
         else if (e.type === 'emberDrop' && !game.taught) game.embersDue = true;
         else if (e.type === 'upgrade') show(UPGRADE_LIST[e.a].name, UPGRADE_LIST[e.a].line, 2.5);
         else if (e.type === 'charmDrop' && !game.charmTaught) game.charmDue = true;
-        else if (e.type === 'charm') show(CHARM_LIST[e.a].name, CHARM_LIST[e.a].gives, 2.5);
+        else if (e.type === 'charm') {
+          // Taking one teaches it better than the banner could, so that banner never comes after.
+          game.charmDue = false;
+          game.charmTaught = true;
+          show(CHARM_LIST[e.a].name, CHARM_LIST[e.a].gives, 2.5);
+        }
       }
       // The first ember's banner waits for whatever banner is showing to fade, so it never cuts off
       // the night's opening line.

@@ -10,8 +10,9 @@
 // All of them head straight for you when they can see you nearby, and follow the flow field when they
 // can't. Flare light halves their speed. They push each other apart, and never into you. One set alight
 // (Dragon's breath) burns for a few seconds. Killed, by a shot or by fire, each drops an ember, and
-// sometimes a charm. The charms you wear change them: Grave salt slows them in your lantern's light,
-// Crow's feather makes their embers worth more, and Red thread heals you for each kill.
+// sometimes a charm (the Mother drops hers when she's half dead). The charms you wear change them:
+// Grave salt slows them in your lantern's light, Crow's feather makes their embers worth more, and Red
+// thread heals you for each kill.
 import { CREATURES, MAX_CREATURES, FLARE, NIGHT, EMBERS, BURN, PERKS, CHARMS } from './tuning.js';
 import { moveBody, pushOutOfCircle, separate } from './collide.js';
 import { canSee } from './raycast.js';
@@ -104,15 +105,25 @@ function kill(state, c) {
   if (state.charm === THREAD && p.health > 0) p.health = Math.min(state.maxHealth, p.health + CHARMS.thread.heal);
 }
 
+// The Mother drops her charm the moment her health first falls to CHARMS.motherAt of it, not as she
+// dies: she's usually the last to fall, and a charm dropped then would lie untaken at dawn. `before`
+// is her health before this blow or burn.
+const MOTHER_AT = CREATURES.mother.health * CHARMS.motherAt;
+function wounded(state, c, before) {
+  if (c.kind === MOTHER && before > MOTHER_AT && c.hp <= MOTHER_AT && c.hp > 0) dropCharm(state, 'mother', c.x, c.y);
+}
+
 // Damages a creature; flare light makes it hurt more. Returns true if this killed it.
 export function damageCreature(state, c, amount) {
   if (!c.alive || c.dying) return false;
   if (inFlare(state, c.x, c.y)) amount *= FLARE.damage;
+  const before = c.hp;
   c.hp -= amount;
   c.flinch = T[c.kind].flinch;
   c.hurtT = 0.1;
   const killed = c.hp <= 0;
   if (killed) kill(state, c);
+  else wounded(state, c, before);
   emit(state, 'hit', c.x, c.y, c.kind, killed ? 1 : 0);
   return killed;
 }
@@ -168,6 +179,7 @@ function update(state, c, dt) {
   }
   // Burning: quiet damage (flare light makes it worse); only a kill is heard.
   if (c.burnT > 0) {
+    const before = c.hp;
     c.burnT -= dt;
     c.hp -= BURN.dps * dt * (inFlare(state, c.x, c.y) ? FLARE.damage : 1);
     if (c.hp <= 0) {
@@ -175,6 +187,7 @@ function update(state, c, dt) {
       emit(state, 'hit', c.x, c.y, c.kind, 1);
       return;
     }
+    wounded(state, c, before);
   }
   const dx = p.x - c.x, dy = p.y - c.y, d = Math.sqrt(dx * dx + dy * dy);
   const touch = d - c.radius - p.radius; // gap between the two circles
