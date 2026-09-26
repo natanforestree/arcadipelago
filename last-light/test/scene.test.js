@@ -1,11 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createScene, buildFrame, creatureFrame, sceneEvents } from '../src/scene.js';
+import { createScene, buildFrame, creatureFrame, sceneEvents, charmShine } from '../src/scene.js';
 import { spawnCreature, igniteCreature, CRAWLER, LEAPER, GAUNT } from '../src/creatures.js';
 import { dropEmber } from '../src/embers.js';
 import { createLightmap, lightAt } from '../src/lightmap.js';
 import { emit } from '../src/events.js';
-import { LIGHT, EMBERS } from '../src/tuning.js';
+import { LIGHT, EMBERS, CHARMS } from '../src/tuning.js';
+import { wearCharm, WOLF, EYE, SALT } from '../src/charms.js';
 import { fakeArt } from './fake-art.js';
 import { quietState } from './helpers.js';
 
@@ -146,6 +147,10 @@ test('an ember on the snow is a glowing sprite, bigger for more value, that ligh
   assert.equal(sprite.glow, 15);
   assert.ok(Math.abs(sprite.height - art.sprites.ember.height * 1.5) < 1e-9, 'a 3-ember is half as big again');
   assert.ok(lightAt(lm, 30.5, 26.5) > dark + 0.2, 'it lights the snow');
+  // Crow's feather makes a gaunt's ember worth 4: bigger still.
+  dropEmber(s, 31.25, 26.5, 4);
+  const big = buildFrame(scene, s, lm, view()).sprites.find((x) => x.x === 31.25);
+  assert.ok(big.height > art.sprites.ember.height * 1.5 && big.height < art.sprites.ember.height * 2, `${big.height}`);
   e.t = EMBERS.flicker * 0.2;
   let dimmest = 15;
   for (let i = 0; i < 20; i++) {
@@ -185,4 +190,60 @@ test('a burning creature is lit by its fire, and throws sparks', () => {
   const rising = f.sparks.filter((p) => p.t > 0);
   assert.ok(rising.length >= 2, `${rising.length} sparks`);
   assert.ok(rising.every((p) => Math.abs(p.x - 30.5) < 0.5 && p.z > 0));
+});
+
+test('a charm on the snow glints: a sprite that lights a little snow, flickering in the lull\'s last seconds', () => {
+  const art = fakeArt();
+  const scene = createScene(art);
+  const s = quietState();
+  const lm = createLightmap(s.map);
+  buildFrame(scene, s, lm, view());
+  const dark = lightAt(lm, 30.5, 26.5);
+  Object.assign(s.charms[0], { id: SALT, x: 30.5, y: 26.5, until: 1 });
+  let f = buildFrame(scene, s, lm, view());
+  const sprite = f.sprites.slice(0, f.spriteCount).find((x) => x.x === 30.5 && x.y === 26.5);
+  assert.ok(art.sprites.charm.frames.includes(sprite.frame));
+  assert.equal(sprite.glow, 15);
+  assert.ok(sprite.lift > 0, 'it hovers');
+  assert.ok(lightAt(lm, 30.5, 26.5) > dark + 0.1, 'it lights the snow');
+  s.night.phase = 'lull';
+  s.night.t = CHARMS.flicker + 1;
+  assert.equal(charmShine(s, s.charms[0], 0.1), 1);
+  s.night.t = CHARMS.flicker - 1;
+  const shines = new Set();
+  for (let i = 0; i < 20; i++) shines.add(charmShine(s, s.charms[0], i * 0.037));
+  assert.ok(shines.has(1) && [...shines].some((v) => v < 1), 'it flickers before the wave takes it');
+  s.charms[0].id = -1;
+  f = buildFrame(scene, s, lm, view());
+  assert.ok(!f.sprites.slice(0, f.spriteCount).some((x) => x.x === 30.5), 'gone once it is taken');
+});
+
+test("the charm you wear sets the lantern's reach: Wolf's tooth shrinks it, and the Mother's eye all but puts it out", () => {
+  const art = fakeArt();
+  const scene = createScene(art);
+  const reach = (charm) => {
+    const s = quietState();
+    if (charm >= 0) wearCharm(s, charm);
+    const lm = createLightmap(s.map);
+    buildFrame(scene, s, lm, view());
+    return lightAt(lm, s.player.x, s.player.y + 3);
+  };
+  const plain = reach(-1), wolf = reach(WOLF), eye = reach(EYE);
+  assert.ok(wolf < plain - 0.1, `${wolf} vs ${plain}`);
+  assert.ok(eye < wolf, `${eye} vs ${wolf}`);
+});
+
+test("the Mother's eye: every creature's eyes glow at full strength at any distance, marked to show through walls", () => {
+  const art = fakeArt();
+  const scene = createScene(art);
+  const s = quietState();
+  spawnCreature(s, CRAWLER, 19.5, 22.5);
+  spawnCreature(s, CRAWLER, 19.5, 20.5 + LIGHT.eyes.dark + 1);
+  s.pickups[0].active = true;
+  let f = buildFrame(scene, s, createLightmap(s.map), view());
+  assert.deepEqual(f.sprites.slice(0, 2).map((x) => [x.glow, x.xray]), [[15, false], [0, false]]);
+  wearCharm(s, EYE);
+  f = buildFrame(scene, s, createLightmap(s.map), view());
+  assert.deepEqual(f.sprites.slice(0, 2).map((x) => [x.glow, x.xray]), [[15, true], [15, true]]);
+  assert.ok(f.sprites.slice(2, f.spriteCount).every((x) => !x.xray), 'only the after-eaters');
 });

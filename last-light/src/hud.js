@@ -1,10 +1,12 @@
 // Everything drawn over the world with the canvas 2D context, at internal resolution: the guns and
-// lantern in your hands, the crosshair and hit tick, health, embers carried, ammo, flares, the hour,
-// the hurt glow, banners, the fire's offer, and the title, death and dawn screens. Text is Silkscreen.
+// lantern in your hands, with the charm you wear swinging from the gun, the crosshair and hit tick,
+// health, embers carried, ammo, flares, the hour, the hurt glow, banners, the fire's offer, the charm
+// you stand over, and the title, death and dawn screens. Text is Silkscreen.
 import { RIFLE, SHOTGUN, SWITCH_TIME, FLARE, FEEL, NIGHT } from './tuning.js';
 import { RIFLE_ID, steadyReady } from './weapons.js';
 import { hourLabel } from './night.js';
 import { UPGRADE_LIST, UPGRADE_COUNT, upgradeCost, anyUsable } from './upgrades.js';
+import { CHARM_LIST } from './charms.js';
 
 // Every frame of the hands art, and every HUD icon, the HUD draws.
 export const HAND_FRAMES = [
@@ -14,7 +16,14 @@ export const HAND_FRAMES = [
 ];
 // Each upgrade's icon is "up-" and its key.
 const UPGRADE_ICONS = UPGRADE_LIST.map((u) => `up-${u.key}`);
-export const HUD_ICONS = ['heart', 'round', 'roundEmpty', 'shell', 'shellEmpty', 'flare', 'crosshair', 'crosshairSteady', 'hitTick', 'ember', ...UPGRADE_ICONS];
+// Each charm's is "charm-" and its key.
+const CHARM_ICONS = CHARM_LIST.map((c) => `charm-${c.key}`);
+// Each charm's pendant, as it hangs from your gun, drawn turned to HANG_TURNS angles evenly from
+// -HANG_MOST to HANG_MOST radians (positive swings it right), about the top of its chain, HANG_PIVOT
+// pixels in from the left of each piece: "hang-", the charm's key, and the turn (art/last-light/hud.lua).
+export const HANG_TURNS = 11, HANG_MOST = 0.75, HANG_PIVOT = 22;
+const HANG_ICONS = CHARM_LIST.map((c) => Array.from({ length: HANG_TURNS }, (_, i) => `hang-${c.key}-${i}`));
+export const HUD_ICONS = ['heart', 'round', 'roundEmpty', 'shell', 'shellEmpty', 'flare', 'crosshair', 'crosshairSteady', 'hitTick', 'ember', ...UPGRADE_ICONS, ...CHARM_ICONS, ...HANG_ICONS.flat()];
 
 const FONTS = { 8: '8px Silkscreen, monospace', 16: '16px Silkscreen, monospace', 24: '24px Silkscreen, monospace' };
 const HOURS = ['9 PM', '10 PM', '11 PM', '12 AM', '1 AM', '2 AM', '3 AM', '4 AM', 'dawn'];
@@ -33,6 +42,18 @@ const fellText = (n) => `${n} after-eater${n === 1 ? '' : 's'} fell`;
 // The fire's lines, made once: what the next upgrade costs, and how many more embers it wants.
 const COSTS = Array.from({ length: UPGRADE_COUNT }, (_, n) => `Costs ${upgradeCost(n)} embers`);
 const WANTS = Array.from({ length: 61 }, (_, n) => `The fire wants ${n} more ember${n === 1 ? '' : 's'}`);
+// A charm's key line: what taking it costs you besides its price.
+const TAKE = 'E to take it';
+const LEAVING = CHARM_LIST.map((c) => `E to take it, leaving ${c.name}`);
+
+// The charm you wear hangs on its chain from the inner side of the gun in your hands, at the point each
+// gun frame gives (hands.json's `charms`). It swings as a damped pendulum: it leans away as you turn,
+// rocks with your steps, and jumps when you fire. With reduced motion it hangs still.
+// spring: how hard it swings back to where it leans (a swing about twice a second); damping: how fast
+// the swinging dies away; turn: radians it leans for each radian a second you turn; step: radians for
+// each pixel a second the hands sway; kick: radians a second a shot throws it, for each radian of the
+// gun's kick. It swings no further than its pendant is drawn (HANG_MOST).
+const SWING = { spring: 160, damping: 2.4, turn: 0.12, step: 0.02, kick: 30 };
 
 const shown = { name: '', drop: 0 };
 // Which of n frames a countdown from `whole` to 0 is at, `t` left.
@@ -73,6 +94,42 @@ export function gunFrame(gun) {
   return shown;
 }
 
+// A swing for the charm on your gun: its angle from hanging straight down (radians, positive to the
+// right) and how fast that's changing.
+export function createSwing() {
+  return { angle: 0, speed: 0, facing: 0, sway: 0, kick: 0, ready: false };
+}
+
+// Moves the swing on by dt seconds, from your facing now (radians), the hands' sideways sway (pixels)
+// and the gun's kick (radians). The first call only notes where things are.
+export function swingCharm(sw, dt, facing, sway, kick) {
+  if (!sw.ready || dt <= 0) {
+    sw.ready = true;
+    sw.facing = facing;
+    sw.sway = sway;
+    sw.kick = kick;
+    return sw;
+  }
+  const turn = Math.atan2(Math.sin(facing - sw.facing), Math.cos(facing - sw.facing)) / dt;
+  const step = (sway - sw.sway) / dt;
+  if (kick > sw.kick) sw.speed += (kick - sw.kick) * SWING.kick * (sw.angle < 0 ? -1 : 1);
+  sw.facing = facing;
+  sw.sway = sway;
+  sw.kick = kick;
+  const lean = Math.max(-HANG_MOST, Math.min(HANG_MOST, -turn * SWING.turn - step * SWING.step));
+  // In small steps, so it swings the same at any frame rate.
+  const n = Math.min(24, Math.ceil(dt * 240)), h = dt / n;
+  for (let i = 0; i < n; i++) {
+    sw.speed += (-SWING.spring * (sw.angle - lean) - SWING.damping * sw.speed) * h;
+    sw.angle += sw.speed * h;
+  }
+  if (sw.angle > HANG_MOST || sw.angle < -HANG_MOST) {
+    sw.angle = Math.max(-HANG_MOST, Math.min(HANG_MOST, sw.angle));
+    sw.speed = 0;
+  }
+  return sw;
+}
+
 // The lantern hand's frame: a two-frame flicker, or the throw while a flare leaves your hand.
 export function handFrame(gun, time) {
   const since = FLARE.cooldown - gun.flareT;
@@ -102,7 +159,9 @@ function text(ctx, str, x, y, color, px = 8, align = 'left') {
   ctx.fillText(str, x, y);
 }
 
-// info: { time, hitT (seconds since you last hit something), banner: { text, sub, t }, reducedMotion }
+// info: { time, hitT (seconds since you last hit something), banner: { text, sub, t }, reducedMotion,
+//        swing (from createSwing, for the charm on your gun), facing (radians), dt (seconds since the
+//        last frame) }
 export function drawHud(ctx, art, state, view, info) {
   const { w, h } = view, g = state.gun, p = state.player, ui = art.ui;
   // The hands, bobbing as you walk.
@@ -110,10 +169,15 @@ export function drawHud(ctx, art, state, view, info) {
   const phase = (p.walked / 0.9) * Math.PI;
   const bx = info.reducedMotion ? 0 : Math.sin(phase) * 3 * speed;
   const by = info.reducedMotion ? 0 : Math.abs(Math.cos(phase)) * 2 * speed;
+  if (info.swing) swingCharm(info.swing, info.dt ?? 0, info.facing ?? 0, bx, g.kick);
   if (state.night.phase !== 'dead') {
     frame(ctx, art, handFrame(g, info.time), w / 2 - bx, h + by);
-    const gf = gunFrame(g);
-    frame(ctx, art, gf.name, w / 2 + bx, h + by + gf.drop * 60 + g.kick * 120);
+    const gf = gunFrame(g), gx = w / 2 + bx, gy = h + by + gf.drop * 60 + g.kick * 120;
+    frame(ctx, art, gf.name, gx, gy);
+    if (state.charm >= 0) {
+      const angle = info.swing && !info.reducedMotion ? info.swing.angle : 0;
+      drawWorn(ctx, art, HANG_ICONS[state.charm], art.hands.charms[gf.name], gx, gy, angle);
+    }
   }
   // Crosshair and hit tick; the crosshair goes warm while Steady hands is ready with the rifle raised.
   const cross = info.hitT < 0.15 ? 'hitTick' : g.current === RIFLE_ID && steadyReady(state) ? 'crosshairSteady' : 'crosshair';
@@ -148,8 +212,9 @@ export function drawHud(ctx, art, state, view, info) {
   }
   x -= 8;
   for (let i = 0; i < g.flares; i++) x -= icon(ctx, art, 'flare', x - 5, hy) + 1;
-  // The hour, top centre.
+  // The hour, top centre, and under it the charm you're standing over.
   text(ctx, hourLabel(state.night), w / 2, 6, ui.dim, 8, 'center');
+  if (state.charmAt >= 0) drawCharm(ctx, art, state, w);
   // At the fire: its offer, or how many more embers it wants.
   if (state.choosing && state.offerN > 0) drawOffer(ctx, art, state, w, h);
   else if (state.atFire && anyUsable(state)) {
@@ -185,6 +250,30 @@ function drawOffer(ctx, art, state, w, h) {
   }
 }
 
+// The charm you wear, its pendant (`turns`, one name a turn) hanging at `angle` from the point `at` on
+// the gun drawn at (gx, gy).
+function drawWorn(ctx, art, turns, at, gx, gy, angle) {
+  if (!at) return;
+  const k = Math.round(((angle / HANG_MOST + 1) * (HANG_TURNS - 1)) / 2);
+  icon(ctx, art, turns[Math.max(0, Math.min(HANG_TURNS - 1, k))], Math.round(gx + at[0]) - HANG_PIVOT, Math.round(gy + at[1]));
+}
+
+// The charm you're standing over, under the hour, clear of the crosshair: its icon and name, what it
+// gives, what it takes (in red), and the key.
+function drawCharm(ctx, art, state, w) {
+  const ui = art.ui, id = state.charms[state.charmAt].id, c = CHARM_LIST[id];
+  const bw = Math.min(w - 16, 220), x = Math.round((w - bw) / 2), top = 18;
+  ctx.globalAlpha = 0.82;
+  ctx.fillStyle = ui.night;
+  ctx.fillRect(x - 6, top - 5, bw + 12, 48);
+  ctx.globalAlpha = 1;
+  icon(ctx, art, CHARM_ICONS[id], x, top);
+  text(ctx, c.name, x + 18, top, ui.text);
+  text(ctx, c.gives, x + 18, top + 10, ui.text);
+  text(ctx, c.takes, x + 18, top + 20, ui.hurt);
+  text(ctx, state.charm >= 0 ? LEAVING[state.charm] : TAKE, x + 18, top + 30, ui.dim);
+}
+
 // The upgrades a night bought, in order, as a row of icons centred at y.
 function drawTaken(ctx, art, w, y, taken, bought) {
   let x = Math.round(w / 2 - (bought * 14 - 2) / 2);
@@ -207,7 +296,7 @@ export function drawScreen(ctx, art, view, screen, info) {
     const best = info.best.dawns > 0 ? `Dawns seen: ${info.best.dawns}` : info.best.hour > 0 ? `Best night: ${HOURS[info.best.hour]}` : '';
     if (best) text(ctx, best, w / 2, h * 0.62 + 14, ui.dim, 8, 'center');
     text(ctx, 'WASD move  Mouse aim  Click shoot  R reload', w / 2, h - 30, ui.dim, 8, 'center');
-    text(ctx, '1/2 guns  F flare  Shift run  Esc pause  M mute', w / 2, h - 18, ui.dim, 8, 'center');
+    text(ctx, '1/2 guns  F flare  E charm  Shift run  Esc pause  M mute', w / 2, h - 18, ui.dim, 8, 'center');
   } else if (screen === 'dead') {
     text(ctx, "You didn't see the dawn", w / 2, h * 0.32, ui.hurt, 16, 'center');
     text(ctx, `It was ${NIGHT.hours[Math.min(info.reached, NIGHT.hours.length - 1)]}.  ${fellText(info.kills)}.`, w / 2, h * 0.32 + 24, ui.dim, 8, 'center');

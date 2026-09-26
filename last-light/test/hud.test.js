@@ -1,11 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { gunFrame, handFrame, drawHud, drawScreen } from '../src/hud.js';
+import { gunFrame, handFrame, drawHud, drawScreen, createSwing, swingCharm, HANG_TURNS, HANG_PIVOT } from '../src/hud.js';
 import { createGun, giveShotgun, RIFLE_ID, SHOTGUN_ID } from '../src/weapons.js';
 import { SWITCH_TIME, RIFLE, FLARE } from '../src/tuning.js';
 import { fakeArt, fakeContext, HANDS } from './fake-art.js';
 import { quietState } from './helpers.js';
 import { UPGRADE_LIST } from '../src/upgrades.js';
+import { CHARM_LIST, wearCharm, WOLF, SALT } from '../src/charms.js';
 
 test('the rifle: flash, idle, the lever working, reloading', () => {
   const g = createGun();
@@ -279,4 +280,88 @@ test('the dawn and death screens show the upgrades you took, in order', () => {
     const drawn = ctx.calls.images.filter((i) => i.img === art.hud.image).map((i) => i.args[0]);
     assert.deepEqual(drawn, ['up-reach', 'up-quickLever', 'up-dragon'].map(at), screen);
   }
+});
+
+test('standing over a charm: its icon, name, what it gives and what it takes (in red), and the key, under the hour', () => {
+  const s = quietState();
+  Object.assign(s.charms[2], { id: WOLF, x: 19.5, y: 20.6 });
+  s.charmAt = 2;
+  const art = fakeArt();
+  let d = hudOf(s);
+  const c = CHARM_LIST[WOLF];
+  for (const str of [c.name, c.gives, c.takes, 'E to take it']) assert.ok(d.texts.includes(str), str);
+  assert.ok(d.icons.includes('charm-wolf'));
+  const takes = d.drawn.filter((t) => t.str === c.takes);
+  assert.ok(takes.some((t) => t.color === art.ui.hurt), 'what it takes is red');
+  assert.ok(d.drawn.filter((t) => t.str === c.gives).every((t) => t.y < 270 / 2 - 8), 'clear of the crosshair');
+  wearCharm(s, SALT);
+  d = hudOf(s);
+  assert.ok(d.texts.includes("E to take it, leaving Grave salt"), d.texts.join('|'));
+  s.charmAt = -1;
+  assert.ok(!hudOf(s).texts.includes(c.name), 'nothing when you stand over none');
+});
+
+// Which pendant piece of the charm you wear is drawn, and where (its top-left), or null.
+function worn(s, info = {}) {
+  const art = fakeArt();
+  const ctx = fakeContext();
+  drawHud(ctx, art, s, { w: 480, h: 270 }, { time: 0, hitT: 9, banner: { t: 0 }, reducedMotion: false, ...info });
+  const byX = new Map(Object.entries(art.hud.icons).filter(([n]) => n.startsWith('hang-')).map(([n, r]) => [r[0], n]));
+  const drawn = ctx.calls.images.find((i) => i.img === art.hud.image && byX.has(i.args[0]));
+  return drawn ? { name: byX.get(drawn.args[0]), at: [drawn.args[4], drawn.args[5]] } : null;
+}
+const MIDDLE = (HANG_TURNS - 1) / 2;
+
+test('the charm you wear hangs from the gun in your hands, where its frame says, straight down when still', () => {
+  const s = quietState();
+  assert.equal(worn(s), null, 'nothing hangs without one');
+  wearCharm(s, SALT);
+  // The rifle is up and still: the fake art's charm point is (30, -40) from the bottom centre.
+  let w = worn(s);
+  assert.deepEqual(w, { name: `hang-salt-${MIDDLE}`, at: [240 + 30 - HANG_PIVOT, 270 - 40] });
+  s.gun.reloading = true;
+  s.gun.shotT = 9;
+  s.gun.loadT = 9;
+  w = worn(s);
+  assert.equal(w.at[1], 270 - 40 + 120, 'it goes down with the rifle to load');
+  s.night.phase = 'dead';
+  assert.equal(worn(s), null, 'and nothing once you are dead');
+});
+
+test('the charm swings: it leans away as you turn and settles back, a shot jolts it, and it swings alike at any frame rate', () => {
+  const sw = createSwing();
+  swingCharm(sw, 1 / 60, 0, 0, 0);
+  for (let i = 1; i <= 12; i++) swingCharm(sw, 1 / 60, i * 0.05, 0, 0); // turning right at 3 radians a second
+  assert.ok(sw.angle < -0.1, `turning right, it swings left: ${sw.angle}`);
+  for (let i = 0; i < 300; i++) swingCharm(sw, 1 / 60, 0.6, 0, 0);
+  assert.ok(Math.abs(sw.angle) < 0.01 && Math.abs(sw.speed) < 0.05, `it settles, hanging straight: ${sw.angle}`);
+  swingCharm(sw, 1 / 60, 0.6, 0, 0.035); // a rifle shot's kick
+  assert.ok(Math.abs(sw.speed) > 0.5, 'a shot jolts it');
+  const after = (fps) => {
+    const t = createSwing();
+    swingCharm(t, 1 / fps, 0, 0, 0);
+    for (let i = 1; i <= Math.round(0.4 * fps); i++) swingCharm(t, 1 / fps, Math.min(0.3, (i / fps) * 3), 0, 0);
+    return t.angle;
+  };
+  assert.ok(Math.abs(after(30) - after(144)) < 0.1, `${after(30)} at 30 fps, ${after(144)} at 144`);
+});
+
+test('swung, the charm is drawn turned that way; with reduced motion it hangs straight', () => {
+  const s = quietState();
+  wearCharm(s, SALT);
+  const swing = createSwing();
+  swing.ready = true;
+  swing.angle = 0.75;
+  assert.equal(worn(s, { swing }).name, `hang-salt-${HANG_TURNS - 1}`, 'swung all the way right');
+  swing.angle = -0.3;
+  assert.equal(worn(s, { swing }).name, `hang-salt-${MIDDLE - 2}`, 'a little to the left');
+  swing.angle = 0.75;
+  assert.equal(worn(s, { swing, reducedMotion: true }).name, `hang-salt-${MIDDLE}`);
+});
+
+test('the title screen lists E for charms', () => {
+  const art = fakeArt();
+  const ctx = fakeContext();
+  drawScreen(ctx, art, { w: 480, h: 270 }, 'title', { time: 0, best: { hour: 0, dawns: 0 } });
+  assert.ok(ctx.calls.texts.some((t) => t.str.includes('E charm')));
 });

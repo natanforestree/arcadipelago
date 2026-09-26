@@ -203,3 +203,19 @@ test('looking up outside, snow falls from the top of the view, not from partway 
   }
   assert.ok(bands[0] > bands[2] / 4, `top ${bands[0]}, middle ${bands[1]}, bottom ${bands[2]}`);
 });
+
+test("an xray sprite behind a wall shows its glowing pixels through it, and only those (the Mother's eye)", () => {
+  const { art, r, frame } = setup(room(), 0.5);
+  // A sprite two texels tall, column-major: a glowing eye over a body.
+  const f = { w: 1, h: 2, px: new Uint8Array([IDX.eye, IDX.body]) };
+  const column = () => Array.from({ length: view.h }, (_, y) => r.buffer[y * view.w + view.w / 2]);
+  const eye = art.shades.fade[(15 << 8) | IDX.eye];
+  const behind = (xray) => ({ sprites: [{ x: 12.5, y: 5.5, height: 0.8, frame: f, glow: 15, xray }], spriteCount: 1 });
+  r.draw(frame(behind(false)));
+  assert.ok(!column().includes(eye), 'hidden behind the wall');
+  r.draw(frame(behind(true)));
+  const col = column();
+  assert.ok(col.includes(eye), 'the eye shows through');
+  const body = new Set([15, 7, 8].map((l) => art.shades.table[(l << 8) | IDX.body]));
+  assert.ok(!col.some((v) => body.has(v)), 'the body stays hidden');
+});

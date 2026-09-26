@@ -1,16 +1,19 @@
 // Turns the game state into what the renderer draws this frame: the camera (blended between the last
 // two updates, looking where the mouse says, with the head bob and the gun's kick), the lights, and every sprite with its animation
 // frame. Embers glow on the snow, dimming and flickering as they cool, and light the ground round them;
-// a burning creature is lit by its fire and throws sparks. Allocates nothing per frame: the sprite list
-// is a fixed pool.
+// a burning creature is lit by its fire and throws sparks. A charm on the snow glints and lights a
+// little snow; the charm you wear can shrink your lantern, and with the Mother's eye every creature's
+// eyes glow at full strength and show through walls (`xray`). Allocates nothing per frame: the sprite
+// list is a fixed pool.
 //
 // art.sprites[name] = { height, stride?, ms?, frames: [{ w, h, px }], anims: { name: [frame indices] } },
 // with the animations SPRITE_ANIMS lists.
-import { VIEW, LIGHT, FEEL, CREATURES, EMBERS, PERKS } from './tuning.js';
+import { VIEW, LIGHT, FEEL, CREATURES, EMBERS, CHARMS } from './tuning.js';
 import { KINDS, LEAPER } from './creatures.js';
 import { beginLight, addLight, falloff } from './lightmap.js';
 import { ambientFor, skyLevelFor } from './night.js';
 import { createEffects, spray, spark, updateEffects } from './effects.js';
+import { lantern, EYE } from './charms.js';
 
 // Every sprite the game draws, and the animations each must have.
 export const SPRITE_ANIMS = {
@@ -23,6 +26,7 @@ export const SPRITE_ANIMS = {
   pine: ['idle'],
   flare: ['idle'],
   ember: ['idle'],
+  charm: ['idle'],
   'pickup-flare': ['idle'],
   'pickup-shells': ['idle'],
   'pickup-shotgun': ['idle'],
@@ -31,7 +35,7 @@ const MAX_SPRITES = 128;
 export const SPRAY_Z = [0.25, 0.7, 0.4, 1.3]; // where on each kind (crawler, gaunt, leaper, mother) the spray comes from
 const PICKUP_SPRITE = ['pickup-flare', 'pickup-shells', 'pickup-shotgun'];
 const SIDE_FROM = (50 * Math.PI) / 180, SIDE_TO = (130 * Math.PI) / 180;
-const EMBER_SIZE = [0, 1, 1.25, 1.5]; // an ember's height, times its sprite's, by value
+const EMBER_SIZE = [0, 1, 1.25, 1.5, 1.65]; // an ember's height, times its sprite's, by value (4 with Crow's feather)
 const FIRE = { full: 0.3, dark: 1.6, intensity: 0.6 }; // the light of a creature burning
 const SPARK_EVERY = 0.05; // seconds between sparks off each burning creature
 
@@ -40,7 +44,7 @@ export function createScene(art) {
     if (!art.sprites[name]) throw new Error(`no sprite "${name}"`);
     for (const a of anims) if (!art.sprites[name].anims[a]?.length) throw new Error(`sprite "${name}" has no "${a}" animation`);
   }
-  const sprites = Array.from({ length: MAX_SPRITES }, () => ({ x: 0, y: 0, height: 1, lift: 0, frame: null, flip: false, glow: 15 }));
+  const sprites = Array.from({ length: MAX_SPRITES }, () => ({ x: 0, y: 0, height: 1, lift: 0, frame: null, flip: false, glow: 15, xray: false }));
   return {
     art, sprites,
     frame: { x: 0, y: 0, facing: 0, pitch: 0, bob: 0, map: null, lightmap: null, skyLevel: 0, time: 0, sprites, spriteCount: 0, snow: true, drops: null, sparks: null },
@@ -96,7 +100,8 @@ export function creatureFrame(art, c, camX, camY, camRightX, camRightY, out) {
   return out;
 }
 
-function put(scene, sx, sy, spr, frame, lift, flip, glow, height = spr.height) {
+// xray: its glowing pixels show through walls (the eyes, with the Mother's eye).
+function put(scene, sx, sy, spr, frame, lift, flip, glow, height = spr.height, xray = false) {
   if (scene.count >= MAX_SPRITES) return;
   const s = scene.sprites[scene.count++];
   s.x = sx;
@@ -106,6 +111,7 @@ function put(scene, sx, sy, spr, frame, lift, flip, glow, height = spr.height) {
   s.lift = lift;
   s.flip = flip;
   s.glow = glow;
+  s.xray = xray;
 }
 
 const shown = { frame: null, flip: false };
@@ -136,12 +142,13 @@ export function buildFrame(scene, state, lightmap, view) {
   scene.shakeX = shake ? Math.round(Math.sin(t * 97) * shake) : 0;
   scene.shakeY = shake ? Math.round(Math.cos(t * 83) * shake) : 0;
 
-  // Lights: the sky, your lantern (flickering), burning flares, and the muzzle flash.
+  // Lights: the sky, your lantern (flickering; Wide wick and some charms change its reach), burning
+  // flares, and the muzzle flash.
   beginLight(lightmap, ambientFor(state.night));
   const L = LIGHT;
   const flick = 0.95 + 0.05 * Math.sin(t * 13.1) * Math.sin(t * 7.3);
-  const wick = state.perks.wick;
-  addLight(lightmap, x, y, wick ? PERKS.wick.full : L.lantern.full, wick ? PERKS.wick.dark : L.lantern.dark, L.lantern.intensity * flick);
+  const lamp = lantern(state);
+  addLight(lightmap, x, y, lamp.full, lamp.dark, lamp.intensity * flick);
   for (const fl of state.flares) {
     if (fl.t <= 0) continue;
     const dying = Math.min(1, fl.t); // fades over its last second
@@ -153,6 +160,12 @@ export function buildFrame(scene, state, lightmap, view) {
     if (e.t <= 0) continue;
     const E = EMBERS.light;
     addLight(lightmap, e.x, e.y, E.full, E.dark, E.intensity * Math.min(1.5, 0.75 + 0.25 * e.value) * emberWarmth(e, t));
+  }
+  // Each charm on the snow lights a little of it, flickering with the charm before the wave.
+  for (const c of state.charms) {
+    if (c.id < 0) continue;
+    const C = CHARMS.light;
+    addLight(lightmap, c.x, c.y, C.full, C.dark, C.intensity * charmShine(state, c, t));
   }
   // A burning creature is lit by its fire, and throws sparks.
   scene.sparkT += view.dt ?? 0;
@@ -168,13 +181,15 @@ export function buildFrame(scene, state, lightmap, view) {
   // Sprites.
   scene.count = 0;
   const rightX = -Math.sin(view.facing), rightY = Math.cos(view.facing);
+  const eye = state.charm === EYE;
   for (const c of state.creatures) {
     if (!c.alive) continue;
     const cx = lerp(c.px, c.x, view.alpha), cy = lerp(c.py, c.y, view.alpha);
     creatureFrame(art, c, x, y, rightX, rightY, shown);
     const ex = cx - x, ey = cy - y;
-    const glow = Math.round(15 * falloff(Math.sqrt(ex * ex + ey * ey), L.eyes.full, L.eyes.dark));
-    put(scene, cx, cy, art.sprites[KINDS[c.kind]], shown.frame, c.lift, shown.flip, glow);
+    const glow = eye ? 15 : Math.round(15 * falloff(Math.sqrt(ex * ex + ey * ey), L.eyes.full, L.eyes.dark));
+    const spr = art.sprites[KINDS[c.kind]];
+    put(scene, cx, cy, spr, shown.frame, c.lift, shown.flip, glow, spr.height, eye);
   }
   for (const prop of state.map.props) {
     const spr = art.sprites[prop.kind];
@@ -193,8 +208,22 @@ export function buildFrame(scene, state, lightmap, view) {
     const frame = loopFrame(emberSpr, 'idle', t + ((e.x * 1.37 + e.y) % 1));
     put(scene, e.x, e.y, emberSpr, frame, 0, false, Math.round(15 * emberWarmth(e, t)), emberSpr.height * EMBER_SIZE[e.value]);
   }
+  const charmSpr = art.sprites.charm;
+  for (const c of state.charms) {
+    if (c.id < 0) continue;
+    const frame = loopFrame(charmSpr, 'idle', t + c.id * 0.37);
+    put(scene, c.x, c.y, charmSpr, frame, 0.03 + 0.02 * Math.sin(t * 2.5 + c.id), false, Math.round(15 * charmShine(state, c, t)));
+  }
   f.spriteCount = scene.count;
   return f;
+}
+
+// How brightly a charm on the snow shines (0 to 1): fully, except in the lull's last seconds, when it
+// flickers before the next wave takes it.
+export function charmShine(state, c, t) {
+  const n = state.night;
+  if (n.phase !== 'lull' || n.t >= CHARMS.flicker) return 1;
+  return Math.sin(t * 29 + c.x * 5) > 0 ? 1 : 0.3;
 }
 
 // How warm an ember looks (0 to 1): full until its last seconds, then dimming, and flickering.

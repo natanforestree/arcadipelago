@@ -31,11 +31,16 @@ export function fakeArt() {
       pine: sprite(2.5, { idle: [0] }, 1),
       flare: sprite(0.2, { idle: [0, 1, 2] }, 3),
       ember: sprite(0.12, { idle: [0, 1, 2] }, 3),
+      charm: sprite(0.14, { idle: [0, 1, 2, 3, 3, 3] }, 4),
       'pickup-flare': sprite(0.2, { idle: [0] }, 1),
       'pickup-shells': sprite(0.2, { idle: [0] }, 1),
       'pickup-shotgun': sprite(0.2, { idle: [0] }, 1),
     },
-    hands: { image: { name: 'hands' }, frames: Object.fromEntries(HANDS.map((n, i) => [n, [i * 10, 0, 10, 10, -5, -10]])) },
+    hands: {
+      image: { name: 'hands' },
+      frames: Object.fromEntries(HANDS.map((n, i) => [n, [i * 10, 0, 10, 10, -5, -10]])),
+      charms: Object.fromEntries(HANDS.filter((n) => n.startsWith('rifle') || n.startsWith('shotgun')).map((n) => [n, [30, -40]])),
+    },
     hud: { image: { name: 'hud' }, icons: Object.fromEntries(ICONS.map((n, i) => [n, [i * 8, 0, 6, 8]])) },
     ui: { text: '#eeeeee', dim: '#888888', hurt: '#aa0000', night: '#05070c' },
   };

@@ -196,7 +196,8 @@ export function createRenderer(art, map) {
         }
       }
 
-      // Sprites, far to near, each column hidden behind nearer walls.
+      // Sprites, far to near, each column hidden behind nearer walls; an `xray` sprite's glowing pixels
+      // (the eyes, with the Mother's eye) show through them.
       const n = Math.min(f.spriteCount, order.length);
       let m = 0;
       for (let i = 0; i < n; i++) {
@@ -242,8 +243,10 @@ export function createRenderer(art, map) {
         }
         const px = F.px, fw = F.w, fh = F.h;
         const gpx = G === null ? null : G.px, gh = G === null ? 0 : G.h;
+        const xray = s.xray === true;
         for (let x = xa; x < xb; x++) {
-          if (depth >= zbuf[x]) continue;
+          const hidden = depth >= zbuf[x];
+          if (hidden && !xray) continue;
           let tx = (((x + 0.5 - left) / sw) * fw) | 0;
           if (tx >= fw) tx = fw - 1;
           if (s.flip) tx = fw - 1 - tx;
@@ -262,6 +265,7 @@ export function createRenderer(art, map) {
               buf[o] = fade[eyes | idx];
               continue;
             }
+            if (hidden) continue;
             let l = (light + BAYER[((y & 3) << 2) | (x & 3)]) | 0;
             if (l > TOP) l = TOP;
             buf[o] = table[(l << 8) | idx];

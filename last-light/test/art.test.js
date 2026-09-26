@@ -9,7 +9,7 @@ import { FLOORS, COLOR_SLACK } from '../src/assets.js';
 import { SPRITE_ANIMS, SPRAY_Z } from '../src/scene.js';
 import { KINDS } from '../src/creatures.js';
 import { CREATURES } from '../src/tuning.js';
-import { HAND_FRAMES, HUD_ICONS } from '../src/hud.js';
+import { HAND_FRAMES, HUD_ICONS, HANG_TURNS, HANG_PIVOT } from '../src/hud.js';
 import { UPGRADE_LIST } from '../src/upgrades.js';
 import { CHARM_LIST } from '../src/charms.js';
 
@@ -127,6 +127,12 @@ test("each charm's pendant: turned the same number of times, one hanging straigh
     assert.equal(turns(c.key), n, c.key);
     for (let i = 0; i < n; i++) assert.deepEqual(icons[`hang-${c.key}-${i}`].slice(2), size, `${c.key} ${i}`);
   }
+});
+
+test('the HUD hangs the pendants as they are drawn: as many turns, from the middle column', () => {
+  const { icons } = json('hud.json');
+  assert.ok(icons[`hang-wolf-${HANG_TURNS - 1}`] && !icons[`hang-wolf-${HANG_TURNS}`]);
+  assert.equal(icons['hang-wolf-0'][2], 2 * HANG_PIVOT + 1);
 });
 
 test('every gun frame says where a charm hangs from it, on the gun, below the crosshair', () => {
