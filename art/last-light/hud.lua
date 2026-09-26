@@ -1,8 +1,9 @@
 -- Last Light's HUD icons: health, rounds and shells (full and spent), flares, the crosshair (and its
 -- warm Steady hands variant), the hit tick, the ember counter's ember, one 12x12 icon for each of the
--- fire's upgrades ("up-" and its key in last-light/src/upgrades.js), and one 12x12 icon for each charm
--- ("charm-" and its key in last-light/src/charms.js), in last-light/assets/hud.png with each icon's
--- place in hud.json. Run from the repo root:
+-- fire's upgrades ("up-" and its key in last-light/src/upgrades.js), one 12x12 icon for each charm
+-- ("charm-" and its key in last-light/src/charms.js), and each charm's pendant as it hangs from your gun
+-- ("hang-", its key and a turn), in last-light/assets/hud.png with each icon's place in hud.json. Run
+-- from the repo root:
 --   aseprite -b --script art/last-light/hud.lua
 --
 -- Each icon is drawn from rows of characters, one colour each ('.' is empty). They're drawn over the
@@ -33,7 +34,7 @@ local function icon(rows)
   return b
 end
 
-L.writePieces("hud", {
+local pieces = {
   -- A heart, with a glint.
   { "heart", icon({
     ".HH.HH.",
@@ -407,5 +408,172 @@ L.writePieces("hud", {
     "............",
     "............",
   }) },
-})
+}
+
+-- The charms as they hang from your gun: each a charm on a short chain, bigger than its icon and
+-- outlined in the dark so it reads against the snow and the gun, lit from your lantern on the left.
+-- A pendant is drawn turned to HANG_TURNS angles, evenly from -HANG_MOST to HANG_MOST radians
+-- (positive swings it to the right), about the top of its chain, which sits HANG_PIVOT pixels from
+-- the left of each piece (hud.js swings it by choosing the turn).
+local HANG_TURNS, HANG_MOST, HANG_PIVOT = 11, 0.75, 22
+local HANG_W, HANG_H = 2 * HANG_PIVOT + 1, 25
+local CHAIN = { C.stone3, C.stone1, C.stone3, C.stone1, C.stone3 }
+local PENDANTS = {
+  { "wolf", {
+    ".....BBB.....",
+    "....BYBbB....",
+    "....bBbbb....",
+    "....PPPPp....",
+    "....PPPPpq...",
+    "....PPPPpq...",
+    "....PPPPpq...",
+    ".....PPPpq...",
+    ".....PPPpq...",
+    ".....PPPpq...",
+    "......PPpq...",
+    "......PPpq...",
+    ".......Ppq...",
+    "........pq...",
+    "........q....",
+  } },
+  { "thread", {
+    "......R......",
+    "......R......",
+    ".....RHR.....",
+    "....RRHHR....",
+    "...R.....R...",
+    "..R.......R..",
+    "..R.......R..",
+    "..R.......R..",
+    "...R.....R...",
+    "....RR.RR....",
+    ".....RHH.....",
+    "....RH.HR....",
+    "...RH...HR...",
+    "...H.....H...",
+  } },
+  { "crow", {
+    "......d......",
+    "......d......",
+    ".....ndK.....",
+    "....nKdKK....",
+    "....nKdKK....",
+    "...nKKdKKK...",
+    "...nKKdKKK...",
+    "...nKKdKKK...",
+    "...nKKdKKK...",
+    "....nKdKK....",
+    "....nKdKK....",
+    ".....KdK.....",
+    ".....KdK.....",
+    "......K......",
+  } },
+  { "salt", {
+    "......m......",
+    ".....mmm.....",
+    "....wwwww....",
+    "....mmmmm....",
+    ".....SSn.....",
+    "....SSSSn....",
+    "...SSSSSnn...",
+    "..SSwSSSSnn..",
+    "..SSSSSSSnn..",
+    "..SSSSSSnnn..",
+    "...SSSSnnn...",
+    "....nnnnn....",
+  } },
+  { "hare", {
+    ".....BBB.....",
+    "....BYBbB....",
+    "....m555m....",
+    "....55555m...",
+    "...555555m...",
+    "...5555555m..",
+    "...5555555m..",
+    "...555555mm..",
+    "...55555mmm..",
+    "....555mmm...",
+    "....55mmm....",
+    "....P.P.P....",
+  } },
+  { "eye", {
+    ".....kkk.....",
+    ".....k.k.....",
+    "....GGGGG....",
+    "..GGGyyyGGG..",
+    ".GGyyeeeyyGG.",
+    ".GyyekkkeyyG.",
+    ".GyyekkkeyyG.",
+    ".GGyyeeeyyGG.",
+    "..GGGyyyGGG..",
+    "....GGGGG....",
+  } },
+}
+
+-- A pendant upright: the chain, then the charm under it, outlined in the dark (the chain isn't).
+local function pendant(rows)
+  local body = L.buffer(#rows[1] + 2, #rows + 2)
+  for y, row in ipairs(rows) do
+    assert(#row == 13, "pendant row " .. y .. " is " .. #row .. " wide, not 13")
+    for x = 1, #row do
+      local ch = row:sub(x, x)
+      if ch ~= "." then body[y][x] = assert(KEY[ch], "no colour for '" .. ch .. "'") end
+    end
+  end
+  L.outline(body, C.void)
+  local b = L.buffer(body.w, #CHAIN + body.h - 1)
+  for y = 0, #CHAIN - 1 do b[y][7] = CHAIN[y + 1] end
+  for y = 0, body.h - 1 do
+    for x = 0, body.w - 1 do
+      if body[y][x] then b[#CHAIN + y - 1][x] = body[y][x] end
+    end
+  end
+  return b
+end
+
+-- The pendant `src` turned by angle a about the top of its chain, into a HANG_W x HANG_H piece. Each
+-- pixel takes the colour most of its 4x4 samples land on, or none if fewer than 5 land on the pendant,
+-- so thin lines (the chain, the thread) survive the turn.
+local function turned(src, a)
+  local b = L.buffer(HANG_W, HANG_H)
+  local c, s = math.cos(a), math.sin(a)
+  local cx = src.w / 2
+  for y = 0, HANG_H - 1 do
+    for x = 0, HANG_W - 1 do
+      local count, order, hit = {}, {}, 0
+      for j = 0, 3 do
+        for i = 0, 3 do
+          local dx, dy = x + (i + 0.5) / 4 - (HANG_PIVOT + 0.5), y + (j + 0.5) / 4
+          local sx, sy = math.floor(dx * c - dy * s + cx), math.floor(dx * s + dy * c)
+          local col = sy >= 0 and sy < src.h and sx >= 0 and sx < src.w and src[sy][sx] or nil
+          if col then
+            hit = hit + 1
+            if not count[col] then
+              count[col] = 0
+              order[#order + 1] = col
+            end
+            count[col] = count[col] + 1
+          end
+        end
+      end
+      if hit >= 5 then
+        local best = order[1]
+        for _, col in ipairs(order) do if count[col] > count[best] then best = col end end
+        b[y][x] = best
+      end
+    end
+  end
+  return b
+end
+
+local hangs = {}
+for _, p in ipairs(PENDANTS) do
+  local src = pendant(p[2])
+  assert(src.h <= HANG_H, p[1] .. "'s pendant is too long")
+  for i = 0, HANG_TURNS - 1 do
+    hangs[#hangs + 1] = { "hang-" .. p[1] .. "-" .. i, turned(src, -HANG_MOST + 2 * HANG_MOST * i / (HANG_TURNS - 1)) }
+  end
+end
+for _, h in ipairs(hangs) do pieces[#pieces + 1] = h end
+L.writePieces("hud", pieces)
 print("hud written")

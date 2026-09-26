@@ -8,8 +8,9 @@
 //   sprites.json   { sprites: { name: { x, y, w, h, count, height, stride?, ms?, anims: { anim: [frame...] } } } }
 //                  (each frame unpacks to { w, h, px, mips }; see buildMips)
 //                  sprites.png: each sprite's frames left to right from (x, y)
-//   hands.json     { frames: { name: [x, y, w, h, ox, oy] } }: (ox, oy) places the frame's top-left
-//                  relative to the bottom centre of the view
+//   hands.json     { frames: { name: [x, y, w, h, ox, oy] }, charms: { gun frame name: [x, y] } }:
+//                  (ox, oy) places the frame's top-left relative to the bottom centre of the view, and
+//                  a gun frame's charm point, where the charm you wear hangs, is on the same terms
 //   hud.json       { icons: { name: [x, y, w, h] } }
 import { buildShades } from './shade.js';
 
@@ -149,7 +150,7 @@ export function unpackArt(json, images, pixels) {
     flake: palette.names.flake,
     ichor: palette.names.ichor,
     spark: palette.names.spark,
-    hands: { image: images.hands, frames: json.hands.frames },
+    hands: { image: images.hands, frames: json.hands.frames, charms: json.hands.charms },
     hud: { image: images.hud, icons: json.hud.icons },
     ui: { text: color('ui'), dim: color('uiDim'), hurt: color('hurt'), night: color('night') },
   };

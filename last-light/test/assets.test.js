@@ -87,7 +87,7 @@ test('unpackArt: textures by name, the sky, sprite frames, named colours', () =>
     palette: { colors, glow: [3], names: { flake: 2, ichor: 1, ui: 2, uiDim: 1, hurt: 3, night: 1 } },
     textures: { size: 2, names: ['trunks', 'snow'] },
     sprites: { sprites: { well: { x: 0, y: 0, w: 1, h: 2, count: 2, height: 0.5, anims: { idle: [0, 1] } } } },
-    hands: { frames: {} },
+    hands: { frames: {}, charms: { 'rifle-idle': [41, -60] } },
     hud: { icons: {} },
   };
   const images = { textures: 'tex', sky: 'sky', sprites: 'spr', hands: 'hands', hud: 'hud' };
@@ -108,4 +108,5 @@ test('unpackArt: textures by name, the sky, sprite frames, named colours', () =>
   assert.equal(art.shades.emissive[3], 1);
   assert.deepEqual(art.ui, { text: '#202020', dim: '#101010', hurt: '#303030', night: '#101010' });
   assert.equal(art.flake, 2);
+  assert.deepEqual(art.hands.charms, { 'rifle-idle': [41, -60] }, 'where a charm hangs from each gun');
 });

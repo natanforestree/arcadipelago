@@ -117,6 +117,29 @@ test('the charm and its icons are the sizes the scene and the HUD expect', () =>
   for (const c of CHARM_LIST) assert.deepEqual(icons[`charm-${c.key}`].slice(2), [12, 12], c.key);
 });
 
+test("each charm's pendant: turned the same number of times, one hanging straight, each turn the same size", () => {
+  const { icons } = json('hud.json');
+  const turns = (key) => Object.keys(icons).filter((n) => n.startsWith(`hang-${key}-`)).length;
+  const n = turns('wolf'), size = icons['hang-wolf-0'].slice(2);
+  assert.ok(n >= 5 && n % 2 === 1, `${n} turns, the middle one hanging straight`);
+  assert.equal(size[0] % 2, 1, 'an odd width, so the chain hangs from the middle column');
+  for (const c of CHARM_LIST) {
+    assert.equal(turns(c.key), n, c.key);
+    for (let i = 0; i < n; i++) assert.deepEqual(icons[`hang-${c.key}-${i}`].slice(2), size, `${c.key} ${i}`);
+  }
+});
+
+test('every gun frame says where a charm hangs from it, on the gun, below the crosshair', () => {
+  const { frames, charms } = json('hands.json');
+  const guns = HAND_FRAMES.filter((n) => n.startsWith('rifle') || n.startsWith('shotgun'));
+  assert.deepEqual(Object.keys(charms).sort(), [...guns].sort());
+  for (const n of guns) {
+    const [x, y] = charms[n], f = frames[n];
+    assert.ok(x >= f[4] && x < f[4] + f[2] && y >= f[5] && y < 0, `${n}: ${x}, ${y} is inside the frame`);
+    assert.ok(y > -135 + 20 && x > 10, `${n}: clear of the crosshair`);
+  }
+});
+
 test('every hands frame and HUD icon, inside their sheets', () => {
   const hands = json('hands.json').frames, hud = json('hud.json').icons;
   const hs = pngSize('assets/hands.png'), is = pngSize('assets/hud.png');

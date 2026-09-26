@@ -10,7 +10,8 @@
 -- over the top, with alpha.
 --
 -- Each frame is cropped from a view-sized canvas, so its (ox, oy) is exact: where its top-left sits
--- relative to the bottom centre of the view. Every frame reaches the bottom of the view, and nothing
+-- relative to the bottom centre of the view. Each gun frame also has the point, on the same terms,
+-- where the charm you wear hangs from it (hud.js swings the charm from there). Every frame reaches the bottom of the view, and nothing
 -- comes within 5 px of the crosshair at any view height the game draws at (checked at the end).
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.-)[^/]+$") or ""
 local L = dofile(here .. "lib.lua")
@@ -379,8 +380,14 @@ local MUZZLE = { CX + 24, CY + 28 }
 local RIFLE_AT = V(0.13, 0.2, 0.38)
 local RIFLE_FWD = aimAt(RIFLE_AT, V(0, -0.024, 0.66), MUZZLE[1], MUZZLE[2])
 
+-- Where a charm hangs from each gun: on the inner side (towards the middle of the view) of its fore-end,
+-- clear of the receiver and your hand. The shotgun's swings down with its barrels when it's broken open.
+local RIFLE_CHARM = V(-0.0165, 0.004, 0.24)
+local SHOTGUN_CHARM = V(-0.0185, 0.002, 0.22)
+
 -- p: lever (0 shut to 1 open); case (a spent case flying, 0..1); fire. There's no loading pose: the
--- rifle goes down out of the view to load (hud.js), and the rounds are heard going in.
+-- rifle goes down out of the view to load (hud.js), and the rounds are heard going in. Returns the
+-- frame, where the charm hangs, and where the muzzle is.
 local function rifle(p)
   local g = aim(RIFLE_AT, RIFLE_FWD, 0, SIZE)
   local s = {}
@@ -432,7 +439,7 @@ local function rifle(p)
     local d = math.sqrt((ex - mx) ^ 2 + (ey - my) ^ 2)
     flash(b, mx, my, (ex - mx) / d, (ey - my) / d, 1.1)
   end
-  return b, { project(place(g, V(0, -0.024, 0.66))) }
+  return b, { project(place(g, RIFLE_CHARM)) }, { project(place(g, V(0, -0.024, 0.66))) }
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -448,7 +455,7 @@ local function mottle(q)
 end
 
 -- p: open (0 shut, 1 broken open), shells (0 none, 1 half in, 2 home), tip and lower (the snap
--- shut), fire.
+-- shut), fire. Returns the frame and where the charm hangs.
 local function shotgun(p)
   local fwd = SHOTGUN_FWD
   if p.tip then fwd = rot(fwd, V(1, 0, 0), p.tip) end
@@ -504,7 +511,7 @@ local function shotgun(p)
       flash(b, mx, my, (ex - mx) / d, (ey - my) / d, 1)
     end
   end
-  return b
+  return b, { project(place(bg, SHOTGUN_CHARM)) }
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -674,18 +681,25 @@ local function crop(b, name)
   return piece
 end
 
-local idle, muzzle = rifle({})
+-- A gun frame, cropped, noting where its charm hangs, relative to the bottom centre of the view.
+local charms = {}
+local function gun(name, b, at)
+  charms[name] = { math.floor(at[1] + 0.5) - VW / 2, math.floor(at[2] + 0.5) - VH }
+  return crop(b, name)
+end
+
+local idle, idleCharm, muzzle = rifle({})
 print(string.format("rifle muzzle at %.1f, %.1f from the crosshair", muzzle[1] - CX, muzzle[2] - CY))
 local pieces = {
-  crop(idle, "rifle-idle"),
-  crop(rifle({ fire = true }), "rifle-fire"),
-  crop(rifle({ lever = 0.5, case = 0.25 }), "rifle-lever-1"),
-  crop(rifle({ lever = 1, case = 0.8 }), "rifle-lever-2"),
-  crop(shotgun({}), "shotgun-idle"),
-  crop(shotgun({ fire = true }), "shotgun-fire"),
-  crop(shotgun({ open = 1, lower = 0.02 }), "shotgun-reload-1"),
-  crop(shotgun({ open = 1, lower = 0.02, shells = 1 }), "shotgun-reload-2"),
-  crop(shotgun({ shells = 2, tip = -0.06, lower = -0.01 }), "shotgun-reload-3"),
+  gun("rifle-idle", idle, idleCharm),
+  gun("rifle-fire", rifle({ fire = true })),
+  gun("rifle-lever-1", rifle({ lever = 0.5, case = 0.25 })),
+  gun("rifle-lever-2", rifle({ lever = 1, case = 0.8 })),
+  gun("shotgun-idle", shotgun({})),
+  gun("shotgun-fire", shotgun({ fire = true })),
+  gun("shotgun-reload-1", shotgun({ open = 1, lower = 0.02 })),
+  gun("shotgun-reload-2", shotgun({ open = 1, lower = 0.02, shells = 1 })),
+  gun("shotgun-reload-3", shotgun({ shells = 2, tip = -0.06, lower = -0.01 })),
   crop(lantern({ flick = 0 }), "lantern-1"),
   crop(lantern({ flick = 1 }), "lantern-2"),
   crop(throw({ back = true }), "throw-1"),
@@ -704,4 +718,4 @@ for h = LOW, HIGH do
   assert(clear[h][1] >= 5, string.format("at h %d, %s comes %d px from the crosshair", h, clear[h][2], clear[h][1]))
 end
 for _, pc in ipairs(pieces) do print(string.format("%-18s %3dx%-3d at %4d, %4d", pc[1], pc[2].w, pc[2].h, pc[3], pc[4])) end
-L.writePieces("hands", pieces)
+L.writePieces("hands", pieces, charms)

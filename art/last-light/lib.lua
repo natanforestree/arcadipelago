@@ -273,7 +273,8 @@ end
 -- A sheet of named pieces packed left to right: hands.png/.json ({ name, buffer, ox, oy } each, where
 -- (ox, oy) places the frame's top-left relative to the bottom centre of the view) or hud.png/.json
 -- ({ name, buffer } each). These are drawn as images, so they may use any colour and alpha.
-function M.writePieces(kind, pieces)
+-- `charms` (the hands only): where the charm you wear hangs from each gun frame.
+function M.writePieces(kind, pieces, charms)
   local width, height = 0, 0
   for _, p in ipairs(pieces) do
     width = width + p[2].w + 1
@@ -286,7 +287,7 @@ function M.writePieces(kind, pieces)
     x = x + p[2].w + 1
   end
   M.save(out, M.ART .. kind .. ".aseprite", M.ASSETS .. kind .. ".png")
-  M.writeText(M.ASSETS .. kind .. ".json", json.encode(kind == "hands" and { frames = meta } or { icons = meta }))
+  M.writeText(M.ASSETS .. kind .. ".json", json.encode(kind == "hands" and { frames = meta, charms = charms } or { icons = meta }))
   return out
 end
 
