@@ -346,6 +346,21 @@ test('the charm swings: it leans away as you turn and settles back, a shot jolts
   assert.ok(Math.abs(after(30) - after(144)) < 0.1, `${after(30)} at 30 fps, ${after(144)} at 144`);
 });
 
+test('walking rocks the charm without slamming it to its stop, and a long stall swings it no further', () => {
+  const sw = createSwing();
+  let walked = 0, most = 0;
+  for (let i = 0; i < 60 * 5; i++) {
+    walked += 3 / 60; // walking pace, the hands swaying as hud.js sways them
+    swingCharm(sw, 1 / 60, 0, Math.sin((walked / 0.9) * Math.PI) * 3, 0);
+    if (i > 120) most = Math.max(most, Math.abs(sw.angle));
+  }
+  assert.ok(most > 0.15 && most < 0.6, `it rocks, about 20 degrees each way: ${most}`);
+  const still = createSwing();
+  swingCharm(still, 1 / 60, 0, 0, 0);
+  swingCharm(still, 5, 0, 0, 0);
+  assert.ok(Math.abs(still.angle) < 1e-9, `a five-second stall with nothing moving leaves it hanging straight: ${still.angle}`);
+});
+
 test('swung, the charm is drawn turned that way; with reduced motion it hangs straight', () => {
   const s = quietState();
   wearCharm(s, SALT);

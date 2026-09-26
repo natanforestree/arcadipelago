@@ -53,7 +53,8 @@ const LEAVING = CHARM_LIST.map((c) => `E to take it, leaving ${c.name}`);
 // the swinging dies away; turn: radians it leans for each radian a second you turn; step: radians for
 // each pixel a second the hands sway; kick: radians a second a shot throws it, for each radian of the
 // gun's kick. It swings no further than its pendant is drawn (HANG_MOST).
-const SWING = { spring: 160, damping: 2.4, turn: 0.12, step: 0.02, kick: 30 };
+// Your steps come about as often as it swings, so their push is kept small: walking rocks it about 20 degrees.
+const SWING = { spring: 160, damping: 2.4, turn: 0.12, step: 0.004, kick: 30 };
 
 const shown = { name: '', drop: 0 };
 // Which of n frames a countdown from `whole` to 0 is at, `t` left.
@@ -111,14 +112,15 @@ export function swingCharm(sw, dt, facing, sway, kick) {
     return sw;
   }
   const turn = Math.atan2(Math.sin(facing - sw.facing), Math.cos(facing - sw.facing)) / dt;
-  const step = (sway - sw.sway) / dt;
+  const swayRate = (sway - sw.sway) / dt;
   if (kick > sw.kick) sw.speed += (kick - sw.kick) * SWING.kick * (sw.angle < 0 ? -1 : 1);
   sw.facing = facing;
   sw.sway = sway;
   sw.kick = kick;
-  const lean = Math.max(-HANG_MOST, Math.min(HANG_MOST, -turn * SWING.turn - step * SWING.step));
+  const lean = Math.max(-HANG_MOST, Math.min(HANG_MOST, -turn * SWING.turn - swayRate * SWING.step));
   // In small steps, so it swings the same at any frame rate.
-  const n = Math.min(24, Math.ceil(dt * 240)), h = dt / n;
+  const span = Math.min(dt, 0.1); // after a stall it swings on as if a tenth of a second had passed
+  const n = Math.ceil(span * 240), h = span / n;
   for (let i = 0; i < n; i++) {
     sw.speed += (-SWING.spring * (sw.angle - lean) - SWING.damping * sw.speed) * h;
     sw.angle += sw.speed * h;
