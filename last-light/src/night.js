@@ -1,13 +1,15 @@
 // The night: dusk, then one wave an hour from 9 PM to 4 AM, with a lull between. A wave's creatures
 // come out of the trails a few at a time, never more alive than the wave's cap, from trails away from
 // you. A wave ends when all of its creatures (and the Mother's brood) are dead. In a lull the stove
-// heals you, and supplies turn up: a flare, shells once you have the shotgun, and the shotgun itself
-// before 11 PM. Clearing 4 AM brings the dawn; running out of health ends the night.
+// heals you (not with Red thread, a charm), and supplies turn up: a flare, shells once you have the
+// shotgun, and the shotgun itself before 11 PM. Clearing 4 AM brings the dawn; running out of health
+// ends the night.
 import { NIGHT, SHOTGUN, SHELL_BOX, LIGHT, PERKS } from './tuning.js';
 import { spawnCreature, aliveCount, KINDS, MOTHER } from './creatures.js';
 import { nextRandom } from './rng.js';
 import { emit } from './events.js';
 import { giveShotgun, flareMax } from './weapons.js';
+import { THREAD } from './charms.js';
 
 export const LAST_WAVE = NIGHT.waves.length - 1;
 export const FLARE_PICKUP = 0, SHELLS_PICKUP = 1, SHOTGUN_PICKUP = 2;
@@ -121,7 +123,7 @@ export function updateNight(state, dt) {
   } else if (n.phase === 'lull') {
     const stove = state.stove;
     const sx = stove ? stove.x - p.x : 0, sy = stove ? stove.y - p.y : 0;
-    if (stove && Math.sqrt(sx * sx + sy * sy) <= NIGHT.stoveReach) {
+    if (stove && state.charm !== THREAD && Math.sqrt(sx * sx + sy * sy) <= NIGHT.stoveReach) {
       p.health = Math.min(state.maxHealth, p.health + NIGHT.stoveHeal * dt);
     }
     n.t -= dt;

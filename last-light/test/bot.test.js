@@ -7,6 +7,7 @@ import { DT, VIEW } from '../src/tuning.js';
 import { quietState } from './helpers.js';
 import { dropEmber } from '../src/embers.js';
 import { UPGRADE_LIST } from '../src/upgrades.js';
+import { CHARM_LIST, CHARM_COUNT } from '../src/charms.js';
 
 test('the bot looks down to shoot a crawler at its feet', () => {
   const s = quietState(); // on the porch, facing south
@@ -123,4 +124,14 @@ test('over whole nights (it cannot die), the bot buys 5 to 7 upgrades a night on
   }
   const avg = picks / 8;
   assert.ok(avg >= 5 && avg <= 7, `${avg} a night`);
+});
+
+test('wearing any charm, the bot (unable to die) still plays a whole night to the dawn, and never takes one', () => {
+  for (let charm = 0; charm < CHARM_COUNT; charm++) {
+    const s = createState({ seed: 3, god: true, charm });
+    const bot = createBot();
+    for (let i = 0; i < (20 * 60) / DT && s.night.phase !== 'dawn'; i++) step(s, botIntents(s, bot, DT));
+    assert.equal(s.night.phase, 'dawn', CHARM_LIST[charm].key);
+    assert.equal(s.charm, charm, 'still the one it started with');
+  }
 });

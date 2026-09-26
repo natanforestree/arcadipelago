@@ -10,12 +10,13 @@
 // carries on into the next creature), Steady hands (double damage after standing still), Slugs (one
 // heavy ball instead of pellets), Dragon's breath (the shotgun sets creatures burning), Magnesium
 // (flares burn twice as long) and Deep pockets (more flares). Quick lever and Deep magazine are the
-// gun's own `interval` and `rounds`.
-import { RIFLE, SHOTGUN, SWITCH_TIME, FLARE, FEEL, CREATURES, LIGHT, PLAYER, AIM, PERKS } from './tuning.js';
+// gun's own `interval` and `rounds`. Wolf's tooth (a charm, charms.js) makes rifle shots hit harder.
+import { RIFLE, SHOTGUN, SWITCH_TIME, FLARE, FEEL, CREATURES, LIGHT, PLAYER, AIM, PERKS, CHARMS } from './tuning.js';
 import { castRay, createHit } from './raycast.js';
 import { damageCreature, igniteCreature, KINDS } from './creatures.js';
 import { randomBetween } from './rng.js';
 import { emit } from './events.js';
+import { WOLF } from './charms.js';
 
 export const RIFLE_ID = 0, SHOTGUN_ID = 1;
 const HIT_R = KINDS.map((k) => CREATURES[k].hit);
@@ -108,7 +109,7 @@ function fire(state) {
     g.reloading = false;
     g.rifle--;
     g.cooldown = g.interval;
-    const damage = RIFLE.damage * (steadyReady(state) ? PERKS.steady.damage : 1);
+    const damage = RIFLE.damage * (steadyReady(state) ? PERKS.steady.damage : 1) * (state.charm === WOLF ? CHARMS.wolf.damage : 1);
     const first = traceShot(state, p.x, p.y, p.facing, RIFLE.range, p.pitch).creature;
     if (first) {
       damageCreature(state, first, damage);

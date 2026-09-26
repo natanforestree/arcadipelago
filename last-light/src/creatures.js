@@ -9,8 +9,10 @@
 //   mother   a slow, huge gaunt that also gives birth to crawlers (within the wave's cap)
 // All of them head straight for you when they can see you nearby, and follow the flow field when they
 // can't. Flare light halves their speed. They push each other apart, and never into you. One set alight
-// (Dragon's breath) burns for a few seconds. Killed, by a shot or by fire, each drops an ember.
-import { CREATURES, MAX_CREATURES, FLARE, NIGHT, EMBERS, BURN, PERKS } from './tuning.js';
+// (Dragon's breath) burns for a few seconds. Killed, by a shot or by fire, each drops an ember, and
+// sometimes a charm. The charms you wear change them: Grave salt slows them in your lantern's light,
+// Crow's feather makes their embers worth more, and Red thread heals you for each kill.
+import { CREATURES, MAX_CREATURES, FLARE, NIGHT, EMBERS, BURN, PERKS, CHARMS } from './tuning.js';
 import { moveBody, pushOutOfCircle, separate } from './collide.js';
 import { canSee } from './raycast.js';
 import { flowDir } from './flowfield.js';
@@ -18,6 +20,7 @@ import { nextRandom, randomBetween } from './rng.js';
 import { emit } from './events.js';
 import { hurtPlayer } from './player.js';
 import { dropEmber } from './embers.js';
+import { dropCharm, lantern, CROW, THREAD, SALT } from './charms.js';
 
 export const KINDS = ['crawler', 'gaunt', 'leaper', 'mother'];
 export const CRAWLER = 0, GAUNT = 1, LEAPER = 2, MOTHER = 3;
@@ -87,13 +90,18 @@ export function inFlare(state, x, y) {
   return false;
 }
 
-// It dies: the death animation starts, it counts, and it drops its ember.
+// It dies: the death animation starts, it counts, it drops its ember (worth more with Crow's feather)
+// and maybe a charm, and Red thread heals you.
 function kill(state, c) {
   c.dying = CREATURES.die;
   c.lift = 0;
   c.burnT = 0;
   state.stats.kills++;
-  dropEmber(state, c.x, c.y, EMBER[c.kind]);
+  const value = EMBER[c.kind];
+  dropEmber(state, c.x, c.y, value > 0 && state.charm === CROW ? value + CHARMS.crow.ember : value);
+  dropCharm(state, KINDS[c.kind], c.x, c.y);
+  const p = state.player;
+  if (state.charm === THREAD && p.health > 0) p.health = Math.min(state.maxHealth, p.health + CHARMS.thread.heal);
 }
 
 // Damages a creature; flare light makes it hurt more. Returns true if this killed it.
@@ -171,7 +179,7 @@ function update(state, c, dt) {
   const dx = p.x - c.x, dy = p.y - c.y, d = Math.sqrt(dx * dx + dy * dy);
   const touch = d - c.radius - p.radius; // gap between the two circles
   const sees = d < CREATURES.sightRange && canSee(state.map, c.x, c.y, p.x, p.y);
-  const slow = inFlare(state, c.x, c.y) ? FLARE.slow : 1;
+  const slow = (inFlare(state, c.x, c.y) ? FLARE.slow : 1) * (d <= saltReach ? CHARMS.salt.slow : 1);
   if (c.flinch > 0) {
     c.flinch -= dt;
     if (c.mode !== 'leap') return;
@@ -319,8 +327,12 @@ function bite(state, c, t, dt, dx, dy) {
   }
 }
 
+// With Grave salt, how far your lantern's clear light reaches (creatures inside it are slowed); -1 without.
+let saltReach = -1;
+
 export function updateCreatures(state, dt) {
   const cs = state.creatures, p = state.player;
+  saltReach = state.charm === SALT ? lantern(state).full : -1;
   for (const c of cs) if (c.alive) update(state, c, dt);
   // Push apart, then back out of walls and out of you.
   for (let i = 0; i < cs.length; i++) {

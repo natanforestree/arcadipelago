@@ -121,6 +121,22 @@ export const PERKS = {
   snowshoes: 1.2, // times your speed
 };
 
+// Cursed charms: an after-eater sometimes drops a charm where it dies. Each gives something and takes
+// something; you wear one at a time (charms.js).
+export const CHARMS = {
+  drop: { crawler: 0, gaunt: 0.1, leaper: 1 / 15, mother: 1 }, // the chance a kill drops one
+  reach: 0.8, // how close you stand to read one and take it
+  flicker: 3, // the lull's last seconds, when charms on the snow flicker before they go
+  drift: 3, // cells a second towards you, with "Embers come to you"
+  light: { full: 0.1, dark: 0.9, intensity: 0.3 },
+  wolf: { damage: 1.5, lantern: 0.6 }, // rifle damage x; lantern reach x
+  thread: { heal: 4 }, // health a kill
+  crow: { ember: 1, hurt: 4 / 3 }, // added to each ember; damage you take x
+  salt: { slow: 0.75, cool: 2 }, // speed x in your lantern's clear light; embers cool this many times as fast
+  hare: { speed: 1.25, health: 75 }, // your speed x; your most health
+  eye: { lantern: 0.3 }, // lantern reach x
+};
+
 export const NIGHT = {
   dusk: 6,
   lull: 20,
@@ -166,4 +182,5 @@ export const KEYS = {
   flare: ['KeyF'],
   mute: ['KeyM'],
   pick: ['Digit1', 'Digit2', 'Digit3'], // the fire's cards, in order (1 and 2 also switch guns away from it)
+  take: ['KeyE'], // the charm you're standing over
 };

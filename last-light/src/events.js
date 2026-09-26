@@ -22,6 +22,9 @@
 //   offer         the stove       how many cards
 //   upgrade       you             upgrade id
 //   alight        the creature    kind                 (set burning)
+//   charmDrop     where it fell   charm id
+//   charm         you             charm id             (you took it)
+//   charmOut      where it was    charm id             (it went at the next wave)
 //   wave          -               wave index
 //   lull          -               the next wave's index
 //   dawn / dead   -

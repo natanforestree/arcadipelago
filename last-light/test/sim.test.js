@@ -4,6 +4,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { createState, step } from '../src/sim.js';
 import { createBot, botIntents } from '../src/bot.js';
 import { igniteCreature } from '../src/creatures.js';
+import { CHARM_COUNT, SALT } from '../src/charms.js';
 import { DT } from '../src/tuning.js';
 
 // Everything that matters about a night, as one string.
@@ -42,18 +43,30 @@ test('no module calls Math.hypot: V8 allocates on every call, and distances run 
   assert.deepEqual(calling, []);
 });
 
-test('an update allocates nothing that lasts, with embers, burning and choosing in play: the pools keep their objects', () => {
-  const s = createState({ seed: 3, god: true });
+test('an update allocates nothing that lasts, with embers, burning, choosing and charms in play: the pools keep their objects', () => {
+  const s = createState({ seed: 3, god: true, charm: SALT });
   const bot = createBot();
   const creatures = s.creatures, events = s.events, first = s.creatures[0], flares = s.flares;
   const embers = s.embers, ember = s.embers[0], offer = s.offer, taken = s.taken, perks = s.perks;
-  let burnSeen = false;
+  const charms = s.charms, charm = s.charms[0];
+  let burnSeen = false, swaps = 0;
+  const every = Math.round(7 / DT);
   for (let i = 0; i < 90 / DT; i++) {
     if (i % Math.round(5 / DT) === 0) {
       const c = s.creatures.find((c) => c.alive && !c.dying);
       if (c) igniteCreature(s, c);
     }
-    step(s, botIntents(s, bot, DT));
+    // Every 7 s a charm turns up at your feet, and two updates later you take it.
+    if (i % every === 0) {
+      const slot = s.charms.find((c) => c.id < 0);
+      let id = 0;
+      while (id === s.charm || s.charms.some((c) => c.id === id)) id = (id + 1) % CHARM_COUNT;
+      Object.assign(slot, { id, x: s.player.x, y: s.player.y, until: s.night.wave + 1, settled: true });
+    }
+    const it = botIntents(s, bot, DT);
+    it.take = i % every === 2 ? 1 : 0;
+    step(s, it);
+    for (let k = 0; k < s.eventCount; k++) if (s.events[k].type === 'charm') swaps++;
     if (s.creatures.some((c) => c.burnT > 0)) burnSeen = true;
   }
   assert.equal(s.creatures, creatures);
@@ -65,6 +78,9 @@ test('an update allocates nothing that lasts, with embers, burning and choosing 
   assert.equal(s.offer, offer);
   assert.equal(s.taken, taken);
   assert.equal(s.perks, perks);
+  assert.equal(s.charms, charms);
+  assert.equal(s.charms[0], charm);
   assert.ok(s.bought > 0, 'the bot bought something in 90 s, so choosing ran too');
   assert.ok(burnSeen, 'burning ran too');
+  assert.ok(swaps >= 5, `charms were taken and swapped: ${swaps}`);
 });

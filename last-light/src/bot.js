@@ -3,7 +3,8 @@
 // shotgun to close quarters, throws a flare into a crowd, reloads in quiet moments, and in a lull goes
 // for supplies and then warms up at the stove. It fetches embers in plain sight that it can reach safely before they
 // cool (walking to one while it shoots, when the nearest creature isn't close), and at the fire takes
-// the card it likes best. It produces the same intents as the keyboard and mouse.
+// the card it likes best. It never takes a charm (its `take` stays 0), so its nights are the same with
+// or without them. It produces the same intents as the keyboard and mouse.
 import { canSee } from './raycast.js';
 import { KINDS, MOTHER } from './creatures.js';
 import { SHOTGUN_ID, RIFLE_ID, flareMax } from './weapons.js';
@@ -15,7 +16,7 @@ const HIT_R = KINDS.map((k) => TUNED[k].hit);
 const HEIGHT = KINDS.map((k) => TUNED[k].height);
 
 export function createBot() {
-  return { facing: null, pitch: 0, out: { pick: 0, facing: 0, pitch: 0, forward: 0, strafe: 0, run: false, fire: false, flare: 0, reload: 0, weapon: 0, weaponStep: 0 } };
+  return { facing: null, pitch: 0, out: { pick: 0, take: 0, facing: 0, pitch: 0, forward: 0, strafe: 0, run: false, fire: false, flare: 0, reload: 0, weapon: 0, weaponStep: 0 } };
 }
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));

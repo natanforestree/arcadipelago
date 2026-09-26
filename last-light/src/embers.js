@@ -2,8 +2,9 @@
 // glow on the snow and cool in EMBERS.life seconds; you walk to them to take them, and spend them at
 // the stove in a lull (upgrades.js). A fixed pool: a new ember in a full pool takes the place of the
 // one closest to going out. With "Embers come to you" (state.gentle) they drift to you instead.
-import { EMBERS } from './tuning.js';
+import { EMBERS, CHARMS } from './tuning.js';
 import { emit } from './events.js';
+import { SALT } from './charms.js';
 
 // An ember is on the snow while t (seconds left) is above 0.
 export function createEmbers(n = EMBERS.max) {
@@ -37,10 +38,11 @@ export function emberCount(state) {
 }
 
 // Takes the embers you're close enough to (Long reach widens it), drifts them to you in gentle mode,
-// and cools the rest.
+// and cools the rest (twice as fast with Grave salt).
 export function updateEmbers(state, dt) {
   const p = state.player, perks = state.perks;
   const reach = perks.reach ? EMBERS.longReach : EMBERS.reach;
+  const cool = dt * (state.charm === SALT ? CHARMS.salt.cool : 1);
   for (const e of state.embers) {
     if (e.t <= 0) continue;
     let dx = p.x - e.x, dy = p.y - e.y, d = Math.sqrt(dx * dx + dy * dy);
@@ -59,7 +61,7 @@ export function updateEmbers(state, dt) {
       e.t = 0;
       continue;
     }
-    e.t -= dt;
+    e.t -= cool;
     if (e.t <= 0) {
       e.t = 0;
       emit(state, 'emberOut', e.x, e.y);

@@ -147,6 +147,17 @@ test("keys 1 to 3 are the fire's cards too: 1 and 2 still give their gun, 3 only
   assert.equal(input.sample().pick, 0);
 });
 
+test('E takes a charm: a press counts once, and a pause forgets it', () => {
+  const { win, input } = setup();
+  win.fire('keydown', { code: 'KeyE' });
+  assert.equal(input.sample().take, 1);
+  assert.equal(input.sample().take, 0, 'a press counts once');
+  win.fire('keyup', { code: 'KeyE' });
+  win.fire('keydown', { code: 'KeyE' });
+  input.releaseAll();
+  assert.equal(input.sample().take, 0);
+});
+
 test('the wheel steps weapons, once per fling', () => {
   const { win, input } = setup();
   win.fire('wheel', { deltaY: 5, timeStamp: 1000 });

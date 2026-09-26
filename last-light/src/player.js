@@ -1,9 +1,10 @@
 // You: a circle that walks and runs with snappy acceleration, slides along walls and round props,
 // and remembers where it was last update so the renderer can blend between the two. It also keeps how
 // long you've stood still (Steady hands reads it).
-import { PLAYER, FEEL, PERKS } from './tuning.js';
+import { PLAYER, FEEL, PERKS, CHARMS } from './tuning.js';
 import { moveBody, pushOutOfCircle } from './collide.js';
 import { emit } from './events.js';
+import { CROW } from './charms.js';
 
 const ACCEL = PLAYER.run / PLAYER.accelTime;
 const DECEL = PLAYER.run / PLAYER.stopTime;
@@ -51,10 +52,12 @@ export function movePlayer(map, p, intents, dt, speed = 1) {
   p.stillT = moved < PERKS.steady.speed * dt ? p.stillT + dt : 0;
 }
 
-// Something hit you for `amount`, from (x, y). With ?god you never drop below 1.
+// Something hit you for `amount` (a third more with Crow's feather), from (x, y). With ?god you never
+// drop below 1.
 export function hurtPlayer(state, amount, x, y) {
   const p = state.player;
   if (p.health <= 0) return;
+  if (state.charm === CROW) amount *= CHARMS.crow.hurt;
   p.health -= amount;
   if (state.god && p.health < 1) p.health = 1;
   state.hurt = FEEL.hurtTime;
