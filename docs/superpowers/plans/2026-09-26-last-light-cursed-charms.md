@@ -2,14 +2,14 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** After-eaters sometimes drop a charm that gives you something and takes something. You stand over it to read it, E takes it, and you wear one at a time, so taking one leaves yours on the snow.
+**Goal:** After-eaters sometimes drop a charm that gives you something and takes something. You stand over it to read it, E takes it, and you wear one at a time, so taking one leaves yours on the snow. The charm you wear hangs from your gun, swinging.
 
 **Architecture:**
 - **The rules** live in the simulation, like everything else in Last Light:
   - `charms.js` holds the six charms, the slots on the snow, dropping, reading and taking, and `lantern(state)`;
   - each charm's effect is read from `state.charm` where it matters (weapons, creatures, embers, the player, the night and the scene).
-- **Showing it:** the scene draws charms on the snow and their light, and the Mother's eye marks creatures `xray`, which the renderer draws through walls. The HUD draws the reading and the worn charm.
-- **The page:** sounds, banners and `?charm=`.
+- **Showing it:** the scene draws charms on the snow and their light, and the Mother's eye marks creatures `xray`, which the renderer draws through walls. The HUD draws the reading, and the charm you wear hanging from the gun in your hands: a pendant drawn turned to 11 angles (the art), chosen by a damped pendulum the HUD runs each frame.
+- **The page:** sounds, banners, `?charm=`, and the swing handed to the HUD.
 
 **Tech stack:** plain ES modules, no build step, no dependencies; Node 22 `node --test`; art from Lua scripts through Aseprite's CLI; Web Audio for sound.
 
@@ -37,18 +37,21 @@
 
 ## How this plan was made, and how to work it
 
-- **Tested before it was written.** The code in this plan was built and tested as a working prototype first. Then each task's end state was replayed on a clean copy of `main`, in order, with these results:
+- **Tested before it was written.** The code in this plan was built and tested as a working prototype first. Then each task's end state was replayed in order, with these results:
 
   | After task | Tests passing |
   |---|---|
-  | 1 | 252 |
+  | 1 | 252 (on a clean copy of `main`) |
   | 2 | 253 |
-  | 3 | 260 |
-  | 4 | 262 |
+  | 3 | 255 (on the branch after Task 2, with Task 1's review fixes) |
+  | 4 | 265 |
+  | 5 | 267 |
+
+- **Amended after Task 2.** Nathan asked for the charm you wear to hang from the side of your gun, as weapon charms do in shooters (his reference: The Finals). Tasks 1 and 2 were built by then and keep their text. Task 3 (the art for it) is new, and Tasks 4 and 5 (once Tasks 3 and 4) were rebuilt from the amended prototype, replayed on top of the branch as it stood after Task 2.
 
 - **File blocks are whole files.** Every block headed "(the full file now)" or "(new, the full file)" is the complete file, byte for byte, ending with one newline. Write it exactly; the controller may give you a script that writes a task's blocks.
-- **Three files are edited, not rewritten:** `art/last-light/sprites.lua` and `art/last-light/hud.lua` (Task 2), and `README.md` (Task 4). Their edits are exact find-and-replace pairs, each found exactly once in the file.
-- **Generated art is committed.** Task 2 regenerates art files: run the art loop and commit what it writes. Only the files that task lists should change.
+- **Some files are edited, not rewritten:** `art/last-light/sprites.lua` and `hud.lua` (Task 2), `art/last-light/lib.lua`, `hands.lua` and `hud.lua` (Task 3), and `README.md` (Task 5). Their edits are exact find-and-replace pairs, each found exactly once in the file, applied in order.
+- **Generated art is committed.** Tasks 2 and 3 regenerate art files: run the art loop and commit what it writes. Only the files each task lists should change.
 
 ## Rulings made while planning
 
@@ -69,6 +72,18 @@ These are recorded as ruling, reason, and cost if wrong.
 - **The charms' random stream is seeded with `seed ^ 0x5bd1e995`.**
   - Why: any fixed mix keeps it apart from the night's own stream, so the night's draws never change.
   - Cost if wrong: none.
+- **The charm you wear hangs from your gun; the corner icon is gone** (the amendment). The spec is updated.
+  - Why: Nathan asked for it, with a reference picture; "attach it to your gun" was the pitch.
+  - Cost if wrong: the corner icon is one line to bring back.
+- **Each gun frame's charm point is projected from the gun's model** in `hands.lua` (on the inner side of each gun's fore-end), not measured by hand.
+  - Why: the shotgun's fore-end swings down with its barrels on the reload frames, and a point on the model follows it exactly.
+  - Cost if wrong: two points in `hands.lua`.
+- **Pendants are drawn turned, 11 ways, rather than turned by the canvas.**
+  - Why: pixel art turned at run time comes out ragged; drawn turned in the Lua, with each pixel taking the colour most of its samples land on, every pixel stays a palette colour and thin lines (the chain, the thread) survive.
+  - Cost if wrong: `hud.png` grows by 66 pieces (about 3,000 pixels wide, mostly empty).
+- **The swing is the HUD's, per frame, not the simulation's.**
+  - Why: it's for show, like the sparks and the spray; it takes the frame's time, so it's the same at any frame rate (in steps of at most 1/240 s), and holds still while paused.
+  - Cost if wrong: none for play.
 
 ## Review Focus
 
@@ -77,8 +92,10 @@ These are situations the spec implies but the main tests don't reach, most likel
 1. **Taking a charm unread:** pressing E in the same update you reach a charm must not take it. This is Task 1's charms test ("E takes the charm you read, once it was showing").
 2. **Swapping back:** after a swap you stand over the charm you left; E again takes it back, and your new one lies there instead. This is Task 1's charms test ("taking one leaves the one you wore at your feet").
 3. **Hare's foot's cap:** taking it brings your health down to 75 at once, the stove heals only to 75, and taking another charm lets it heal to 100. This is Task 1's charms test.
-4. **Crow's feather's biggest ember:** a gaunt's ember worth 4 is drawn, bigger than a 3. This is Task 3's scene test.
+4. **Crow's feather's biggest ember:** a gaunt's ember worth 4 is drawn, bigger than a 3. This is Task 4's scene test.
 5. **A pause between pressing E and the next update:** the press is forgotten, like the fire's keys. This is Task 1's input test.
+6. **Frame rate:** the charm on your gun swings alike at 30 and 144 frames a second. This is Task 4's HUD test.
+7. **Reloading and dying:** the charm goes down with the rifle when it loads, and isn't drawn once you're dead. This is Task 4's HUD test.
 
 ## File structure
 
@@ -96,10 +113,11 @@ These are situations the spec implies but the main tests don't reach, most likel
 | `last-light/src/input.js` | 1 | E gives `take` |
 | `last-light/src/bot.js` | 1 | Its intents carry `take: 0` |
 | `art/last-light/sprites.lua`, `hud.lua` (+ generated assets) | 2 | The charm sprite; the six charm icons |
-| `last-light/src/scene.js`, `render.js` | 3 | Charms on the snow and their light; the lantern from `lantern(state)`; `xray` eyes; an ember worth 4 |
-| `last-light/src/hud.js` | 3 | The reading, the worn charm, "E charm" on the title screen |
-| `last-light/bench.js` | 3 | Charms on the snow and `xray` creatures in the busy frame |
-| `last-light/src/audio.js`, `game.js`, `main.js`, `README.md` | 4 | Sounds, banners, `?charm=`, docs |
+| `art/last-light/lib.lua`, `hands.lua`, `hud.lua` (+ generated assets), `last-light/src/assets.js` | 3 | Each gun frame's charm point (`hands.json`'s `charms`); the six pendants, turned; the loader passes the points on |
+| `last-light/src/scene.js`, `render.js` | 4 | Charms on the snow and their light; the lantern from `lantern(state)`; `xray` eyes; an ember worth 4 |
+| `last-light/src/hud.js` | 4 | The reading; the charm on your gun and its swing; "E charm" on the title screen |
+| `last-light/bench.js` | 4 | Charms on the snow and `xray` creatures in the busy frame |
+| `last-light/src/audio.js`, `game.js`, `main.js`, `README.md` | 5 | Sounds, banners, `?charm=`, the swing handed to the HUD, docs |
 
 ---
 
@@ -3108,20 +3126,859 @@ git add art/last-light last-light/assets last-light/test/art.test.js
 git commit -m "Last Light: a charm on the snow, and an icon for each charm"
 ```
 
-## Task 3: Showing it: charms on the snow, the Mother's eye, and the reading
+## Task 3: The art: a charm on your gun
+
+**Files:**
+- Modify:
+  - `art/last-light/lib.lua` (two edits)
+  - `art/last-light/hands.lua` (edits)
+  - `art/last-light/hud.lua` (edits)
+  - `last-light/src/assets.js` (a full replacement)
+  - `last-light/test/assets.test.js`, `last-light/test/art.test.js` (full replacements)
+- Regenerated by the art loop:
+  - `last-light/assets/hands.json` (the images don't change)
+  - `art/last-light/hud.aseprite`, `last-light/assets/hud.json`, `last-light/assets/hud.png`
+
+**Interfaces:**
+- **Consumes:** `CHARM_LIST` from Task 1 (the pendants' keys); Task 2's `hud.lua`.
+- **Produces:**
+  - `hands.json` gains `charms`: for each gun frame (`rifle-*`, `shotgun-*`), `[x, y]`, where the charm hangs from it, relative to the bottom centre of the view (the same terms as a frame's `(ox, oy)`);
+  - `art.hands.charms` from `unpackArt` (assets.js);
+  - HUD pieces `hang-<key>-<turn>` for each charm and turn 0 to 10: 45×25, the pendant turned to `-0.75 + 0.15 × turn` radians about the top of its chain, which is at column 22 of the top row.
+
+- [ ] **Step 1: Write the failing tests**
+
+`last-light/test/assets.test.js` (the full file now):
+```js
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { indexPixels, cut, unpackArt, buildMips, COLOR_SLACK } from '../src/assets.js';
+
+// A column-major frame (index x * h + y), as sprites are stored, from rows of digits (0 is clear).
+function frameOf(rows) {
+  const h = rows.length, w = rows[0].length, px = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) px[x * h + y] = Number(rows[y][x]);
+  return { w, h, px };
+}
+const rowsOf = (f) => Array.from({ length: f.h }, (_, y) => Array.from({ length: f.w }, (_, x) => f.px[x * f.h + y]).join(''));
+
+// RGBA for a w x h image from a function of (x, y) giving "#rrggbb" or null (transparent).
+function rgba(w, h, at) {
+  const data = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const c = at(x, y);
+      if (!c) continue;
+      const i = (y * w + x) * 4;
+      data[i] = parseInt(c.slice(1, 3), 16);
+      data[i + 1] = parseInt(c.slice(3, 5), 16);
+      data[i + 2] = parseInt(c.slice(5, 7), 16);
+      data[i + 3] = 255;
+    }
+  }
+  return { w, h, data };
+}
+
+test('pixels become palette indices, transparent is 0, and a stray colour is named', () => {
+  const colors = ['#000000', '#ffffff'];
+  const idx = indexPixels(rgba(2, 1, (x) => (x ? '#ffffff' : null)), colors, 't');
+  assert.deepEqual([...idx], [0, 2]);
+  assert.throws(() => indexPixels(rgba(1, 1, () => '#123456'), colors, 'sky.png'), /sky\.png: the pixel at 0,0 is #123456/);
+});
+
+// One pixel's RGBA readback, for the noise tests.
+const px = (r, g, b, a = 255) => ({ w: 1, h: 1, data: Uint8ClampedArray.from([r, g, b, a]) });
+
+test('readback noise: a colour off by up to 2 in each channel is still its palette colour', () => {
+  // The palette's closest two colours, 5 apart in red.
+  const colors = ['#4e3324', '#4a2e22'];
+  assert.equal(COLOR_SLACK, 2);
+  assert.deepEqual([...indexPixels(px(0x4e + 2, 0x33 - 2, 0x24 + 1), colors, 't')], [1]);
+  assert.deepEqual([...indexPixels(px(0x4e - 2, 0x33 + 1, 0x24 - 2), colors, 't')], [1]);
+  assert.deepEqual([...indexPixels(px(0x4a + 2, 0x2e + 2, 0x22 - 1), colors, 't')], [2]);
+  assert.deepEqual([...indexPixels(px(0x4a - 1, 0x2e - 2, 0x22 + 2), colors, 't')], [2]);
+});
+
+test('readback noise: alpha under half is clear, and half or more is opaque', () => {
+  const colors = ['#000000', '#ffffff'];
+  assert.deepEqual([...indexPixels(px(255, 255, 255, 100), colors, 't')], [0]);
+  assert.deepEqual([...indexPixels(px(255, 255, 255, 1), colors, 't')], [0]);
+  assert.deepEqual([...indexPixels(px(255, 255, 255, 128), colors, 't')], [2]);
+  assert.deepEqual([...indexPixels(px(254, 253, 255, 200), colors, 't')], [2]);
+});
+
+test('a colour further off than noise is still an art bug, and is named', () => {
+  const colors = ['#4e3324', '#4a2e22'];
+  assert.throws(() => indexPixels(px(0x4e + 10, 0x33, 0x24), colors, 'sprites.png'), /sprites\.png: the pixel at 0,0 is #583324/);
+  assert.throws(() => indexPixels(px(0x4e, 0x33 + 3, 0x24), colors, 'sky.png'), /isn't in the palette/);
+});
+
+test('cut: rows for floors, columns for walls and sprites', () => {
+  const img = Uint8Array.from([1, 2, 3, 4]); // 2x2
+  assert.deepEqual([...cut(img, 2, 0, 0, 2, 2, false)], [1, 2, 3, 4]);
+  assert.deepEqual([...cut(img, 2, 0, 0, 2, 2, true)], [1, 3, 2, 4]);
+});
+
+test('mips: each level halves the frame, sides rounded up; a glowing texel wins its 2x2 block, else its first opaque texel', () => {
+  const emissive = new Uint8Array(256);
+  emissive[9] = 1;
+  // 5x3. Blocks, reading across then down: [1 2 / 4 0] keeps 1; [0 8 / 9 0] keeps the glow 9 over the
+  // 8 before it; [3 / 5] keeps 3; [0 0] stays clear; [0 7] keeps 7; [6] keeps 6.
+  const f = frameOf(['12083', '40905', '00076']);
+  const mips = buildMips(f, emissive);
+  assert.deepEqual(mips.map((m) => [m.w, m.h]), [[3, 2], [2, 1], [1, 1]]);
+  assert.deepEqual(rowsOf(mips[0]), ['193', '076']);
+  assert.deepEqual(rowsOf(mips[1]), ['93']);
+  assert.deepEqual(rowsOf(mips[2]), ['9']);
+  assert.deepEqual(rowsOf(f), ['12083', '40905', '00076'], 'the frame itself is untouched');
+});
+
+test('unpackArt: textures by name, the sky, sprite frames, named colours', () => {
+  const colors = ['#101010', '#202020', '#303030'];
+  const json = {
+    palette: { colors, glow: [3], names: { flake: 2, ichor: 1, ui: 2, uiDim: 1, hurt: 3, night: 1 } },
+    textures: { size: 2, names: ['trunks', 'snow'] },
+    sprites: { sprites: { well: { x: 0, y: 0, w: 1, h: 2, count: 2, height: 0.5, anims: { idle: [0, 1] } } } },
+    hands: { frames: {}, charms: { 'rifle-idle': [41, -60] } },
+    hud: { icons: {} },
+  };
+  const images = { textures: 'tex', sky: 'sky', sprites: 'spr', hands: 'hands', hud: 'hud' };
+  const pixels = (img) =>
+    ({
+      tex: rgba(4, 2, (x, y) => colors[(x + y) % 2]),
+      sky: rgba(3, 1, () => colors[2]),
+      spr: rgba(2, 2, (x, y) => (x === 0 ? colors[y] : null)),
+    })[img];
+  const art = unpackArt(json, images, pixels);
+  assert.deepEqual(Object.keys(art.walls), ['trunks']);
+  assert.deepEqual(Object.keys(art.floors), ['snow']);
+  assert.deepEqual([...art.walls.trunks], [1, 2, 2, 1]);
+  assert.deepEqual([art.sky.w, art.sky.h, art.sky.px[0]], [3, 1, 3]);
+  assert.deepEqual([...art.sprites.well.frames[0].px], [1, 2]);
+  assert.deepEqual([...art.sprites.well.frames[1].px], [0, 0]);
+  assert.deepEqual(art.sprites.well.frames[0].mips.map((m) => [m.w, m.h, ...m.px]), [[1, 1, 1], [1, 1, 1], [1, 1, 1]]);
+  assert.equal(art.shades.emissive[3], 1);
+  assert.deepEqual(art.ui, { text: '#202020', dim: '#101010', hurt: '#303030', night: '#101010' });
+  assert.equal(art.flake, 2);
+  assert.deepEqual(art.hands.charms, { 'rifle-idle': [41, -60] }, 'where a charm hangs from each gun');
+});
+```
+
+`last-light/test/art.test.js` (the full file now):
+```js
+// Checks the committed art (last-light/assets/, written by the scripts in art/last-light/) against
+// everything the code expects: every texture the map uses, every sprite and animation the scene draws,
+// every frame and icon the HUD draws, and image sizes that hold them.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync, existsSync } from 'node:fs';
+import { WALLS } from '../src/map.js';
+import { FLOORS, COLOR_SLACK } from '../src/assets.js';
+import { SPRITE_ANIMS, SPRAY_Z } from '../src/scene.js';
+import { KINDS } from '../src/creatures.js';
+import { CREATURES } from '../src/tuning.js';
+import { HAND_FRAMES, HUD_ICONS } from '../src/hud.js';
+import { UPGRADE_LIST } from '../src/upgrades.js';
+import { CHARM_LIST } from '../src/charms.js';
+
+const file = (f) => new URL(`../${f}`, import.meta.url);
+const json = (f) => JSON.parse(readFileSync(file(`assets/${f}`), 'utf8'));
+// A PNG's width and height, from its header.
+function pngSize(f) {
+  const b = readFileSync(file(f));
+  assert.equal(b.toString('ascii', 1, 4), 'PNG', `${f} is a PNG`);
+  return [b.readUInt32BE(16), b.readUInt32BE(20)];
+}
+const inside = (rect, [w, h]) => rect[0] >= 0 && rect[1] >= 0 && rect[0] + rect[2] <= w && rect[1] + rect[3] <= h;
+
+test('the palette: up to 255 colours, with glow indices and the named colours the game uses', () => {
+  const p = json('palette.json');
+  assert.ok(p.colors.length > 0 && p.colors.length <= 255);
+  for (const c of p.colors) assert.match(c, /^#[0-9a-f]{6}$/);
+  assert.equal(new Set(p.colors).size, p.colors.length, 'no colour twice');
+  for (const i of p.glow) assert.ok(i >= 1 && i <= p.colors.length);
+  for (const n of ['flake', 'ichor', 'spark', 'ui', 'uiDim', 'hurt', 'night']) assert.ok(p.names[n] >= 1 && p.names[n] <= p.colors.length, n);
+  assert.ok(p.glow.includes(p.names.spark), 'sparks glow');
+});
+
+test('no two palette colours are close enough for readback noise to land between them', () => {
+  const rgb = json('palette.json').colors.map((c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16)));
+  for (let i = 0; i < rgb.length; i++) {
+    for (let j = i + 1; j < rgb.length; j++) {
+      const apart = Math.max(...[0, 1, 2].map((k) => Math.abs(rgb[i][k] - rgb[j][k])));
+      assert.ok(apart > 2 * COLOR_SLACK, `colours ${i + 1} and ${j + 1} are only ${apart} apart`);
+    }
+  }
+});
+
+test('a texture for every wall kind and floor, 32x32 each, side by side', () => {
+  const t = json('textures.json');
+  assert.equal(t.size, 32);
+  const need = new Set([...FLOORS]);
+  for (const k of Object.values(WALLS)) (need.add(k.ns), need.add(k.ew));
+  for (const n of need) assert.ok(t.names.includes(n), `texture ${n}`);
+  assert.deepEqual(pngSize('assets/textures.png'), [32 * t.names.length, 32]);
+});
+
+test('the sky is a wide panorama', () => {
+  const [w, h] = pngSize('assets/sky.png');
+  assert.ok(w >= 512 && h >= 64 && h <= 256, `${w}x${h}`);
+});
+
+test('every sprite, with every animation, inside sprites.png', () => {
+  const { sprites } = json('sprites.json');
+  const size = pngSize('assets/sprites.png');
+  for (const [name, anims] of Object.entries(SPRITE_ANIMS)) {
+    const s = sprites[name];
+    assert.ok(s, `sprite ${name}`);
+    assert.ok(s.height > 0 && s.count > 0, name);
+    assert.ok(inside([s.x, s.y, s.w * s.count, s.h], size), `${name} fits in sprites.png`);
+    for (const a of anims) {
+      assert.ok(s.anims[a]?.length > 0, `${name}.${a}`);
+      for (const f of s.anims[a]) assert.ok(f >= 0 && f < s.count, `${name}.${a} frame ${f}`);
+    }
+    if (['crawler', 'gaunt', 'leaper', 'mother'].includes(name)) {
+      assert.equal(s.anims.walk.length, 4, `${name} walks in 4 frames`);
+      assert.ok(s.stride > 0, `${name} has a stride`);
+    }
+  }
+});
+
+// Against the 1.0-unit walls (a doorway's height; a window's top sits at about 0.75): a crawler comes
+// about knee-high, its back (4/5 up its frame) under the window sill; a gaunt's head (0.82 up its
+// frame) stands a little above a man's, under the doorway's top; the Mother towers over the cabin.
+test('creature sizes: a crawler about knee-high, a gaunt a little taller than you, the Mother towering', () => {
+  const { sprites } = json('sprites.json');
+  assert.ok(sprites.crawler.height <= 0.4, `crawler ${sprites.crawler.height}`);
+  assert.ok(sprites.gaunt.height > 1 && sprites.gaunt.height <= 1.15, `gaunt ${sprites.gaunt.height}`);
+  assert.ok(sprites.mother.height >= 2, `mother ${sprites.mother.height}`);
+  const order = ['crawler', 'leaper', 'gaunt', 'mother'].map((k) => sprites[k].height);
+  assert.deepEqual(order, [...order].sort((a, b) => a - b), 'crawler < leaper < gaunt < mother');
+});
+
+test('a shot sees each creature as tall as it is drawn', () => {
+  const { sprites } = json('sprites.json');
+  for (const k of KINDS) assert.equal(CREATURES[k].height, sprites[k].height, k);
+});
+
+// A hit's spray comes out of the body: above the legs, below the eyes.
+test("a hit's spray comes from a creature's body, a third to three quarters of the way up it", () => {
+  const { sprites } = json('sprites.json');
+  KINDS.forEach((k, i) => {
+    const up = SPRAY_Z[i] / sprites[k].height;
+    assert.ok(up >= 0.35 && up <= 0.75, `${k}: spray at ${SPRAY_Z[i]} is ${up.toFixed(2)} of its ${sprites[k].height} height`);
+  });
+});
+
+test('the ember and the new icons are the sizes the scene and the HUD expect', () => {
+  const { sprites } = json('sprites.json');
+  assert.deepEqual([sprites.ember.w, sprites.ember.h, sprites.ember.count, sprites.ember.height], [10, 6, 3, 0.12]);
+  const { icons } = json('hud.json');
+  for (const n of ['ember', 'crosshairSteady']) assert.deepEqual(icons[n].slice(2), [7, 7], n);
+  for (const u of UPGRADE_LIST) assert.deepEqual(icons[`up-${u.key}`].slice(2), [12, 12], u.key);
+});
+
+test('the charm and its icons are the sizes the scene and the HUD expect', () => {
+  const { sprites } = json('sprites.json');
+  assert.deepEqual([sprites.charm.w, sprites.charm.h, sprites.charm.count, sprites.charm.height], [8, 9, 4, 0.14]);
+  const { icons } = json('hud.json');
+  for (const c of CHARM_LIST) assert.deepEqual(icons[`charm-${c.key}`].slice(2), [12, 12], c.key);
+});
+
+test("each charm's pendant: turned the same number of times, one hanging straight, each turn the same size", () => {
+  const { icons } = json('hud.json');
+  const turns = (key) => Object.keys(icons).filter((n) => n.startsWith(`hang-${key}-`)).length;
+  const n = turns('wolf'), size = icons['hang-wolf-0'].slice(2);
+  assert.ok(n >= 5 && n % 2 === 1, `${n} turns, the middle one hanging straight`);
+  assert.equal(size[0] % 2, 1, 'an odd width, so the chain hangs from the middle column');
+  for (const c of CHARM_LIST) {
+    assert.equal(turns(c.key), n, c.key);
+    for (let i = 0; i < n; i++) assert.deepEqual(icons[`hang-${c.key}-${i}`].slice(2), size, `${c.key} ${i}`);
+  }
+});
+
+test('every gun frame says where a charm hangs from it, on the gun, below the crosshair', () => {
+  const { frames, charms } = json('hands.json');
+  const guns = HAND_FRAMES.filter((n) => n.startsWith('rifle') || n.startsWith('shotgun'));
+  assert.deepEqual(Object.keys(charms).sort(), [...guns].sort());
+  for (const n of guns) {
+    const [x, y] = charms[n], f = frames[n];
+    assert.ok(x >= f[4] && x < f[4] + f[2] && y >= f[5] && y < 0, `${n}: ${x}, ${y} is inside the frame`);
+    assert.ok(y > -135 + 20 && x > 10, `${n}: clear of the crosshair`);
+  }
+});
+
+test('every hands frame and HUD icon, inside their sheets', () => {
+  const hands = json('hands.json').frames, hud = json('hud.json').icons;
+  const hs = pngSize('assets/hands.png'), is = pngSize('assets/hud.png');
+  for (const n of HAND_FRAMES) assert.ok(hands[n] && hands[n].length === 6 && inside(hands[n], hs), n);
+  for (const n of HUD_ICONS) assert.ok(hud[n] && inside(hud[n], is), n);
+});
+
+test('the tab icon is 48x48', () => {
+  assert.ok(existsSync(file('icon.png')));
+  assert.deepEqual(pngSize('icon.png'), [48, 48]);
+});
+```
+
+- [ ] **Step 2: Run them to see them fail**
+
+Run: `cd last-light && node --test test/assets.test.js test/art.test.js`
+Expected: FAIL: `unpackArt` doesn't pass `charms` on, `hands.json` has no `charms`, and `hud.json` has no `hang-` pieces.
+
+- [ ] **Step 3: The loader (`last-light/src/assets.js`)**
+
+`last-light/src/assets.js` (the full file now):
+```js
+// Loads the art that the scripts in art/last-light/ write to last-light/assets/, and unpacks the
+// world's images (textures, sky, sprites) into palette indices for the renderer. The guns in your
+// hands and the HUD icons stay as images, drawn with the canvas.
+//
+//   palette.json   { colors: ["#rrggbb", ...] (index 1 up), glow: [indices], names: { flake, ichor, spark, ui, uiDim, hurt, night } }
+//   textures.json  { size: 32, names: [...] }, textures.png: the tiles side by side in that order
+//   sky.png        the panorama; its bottom row sits on the horizon, and it wraps round
+//   sprites.json   { sprites: { name: { x, y, w, h, count, height, stride?, ms?, anims: { anim: [frame...] } } } }
+//                  (each frame unpacks to { w, h, px, mips }; see buildMips)
+//                  sprites.png: each sprite's frames left to right from (x, y)
+//   hands.json     { frames: { name: [x, y, w, h, ox, oy] }, charms: { gun frame name: [x, y] } }:
+//                  (ox, oy) places the frame's top-left relative to the bottom centre of the view, and
+//                  a gun frame's charm point, where the charm you wear hangs, is on the same terms
+//   hud.json       { icons: { name: [x, y, w, h] } }
+import { buildShades } from './shade.js';
+
+export const FLOORS = new Set(['snow', 'planks', 'rafters']);
+const JSON_FILES = ['palette', 'textures', 'sprites', 'hands', 'hud'];
+const IMAGE_FILES = ['textures', 'sky', 'sprites', 'hands', 'hud'];
+
+export async function loadJson(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`${url}: ${r.status}`);
+  return r.json();
+}
+
+export function loadImage(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`couldn't load ${url}`));
+    img.src = url;
+  });
+}
+
+export function imagePixels(img) {
+  const c = document.createElement('canvas');
+  c.width = img.width;
+  c.height = img.height;
+  const x = c.getContext('2d', { willReadFrequently: true });
+  x.drawImage(img, 0, 0);
+  return { w: img.width, h: img.height, data: x.getImageData(0, 0, img.width, img.height).data };
+}
+
+// Some browsers add a little noise when a canvas is read back (Firefox's and Brave's fingerprinting
+// guards), so a colour within this much of a palette colour in every channel is taken as that colour.
+// The palette's closest two colours are 5 apart, so that's never ambiguous (art.test.js checks it).
+export const COLOR_SLACK = 2;
+
+// The palette index (1 up) of the colour within COLOR_SLACK of (r, g, b) in every channel, or 0.
+function nearIndex(rgbs, r, g, b) {
+  for (let k = 0; k < rgbs.length; k++) {
+    const c = rgbs[k];
+    if (Math.abs((c >> 16) - r) <= COLOR_SLACK && Math.abs(((c >> 8) & 255) - g) <= COLOR_SLACK && Math.abs((c & 255) - b) <= COLOR_SLACK) return k + 1;
+  }
+  return 0;
+}
+
+// RGBA pixels to palette indices (0 where transparent: alpha under half, which also absorbs noise).
+// A colour not in the palette, even allowing for noise, is an art bug, and is reported with where it is.
+export function indexPixels({ w, h, data }, colors, name) {
+  const rgbs = colors.map((hex) => parseInt(hex.slice(1), 16));
+  const lookup = new Map(rgbs.map((rgb, i) => [rgb, i + 1]));
+  const out = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) {
+    if (data[i * 4 + 3] < 128) continue;
+    const r = data[i * 4], g = data[i * 4 + 1], b = data[i * 4 + 2];
+    const rgb = (r << 16) | (g << 8) | b;
+    const idx = lookup.get(rgb) ?? nearIndex(rgbs, r, g, b);
+    if (idx === 0) {
+      throw new Error(`${name}: the pixel at ${i % w},${Math.floor(i / w)} is #${rgb.toString(16).padStart(6, '0')}, which isn't in the palette`);
+    }
+    out[i] = idx;
+  }
+  return out;
+}
+
+// The w x h piece of an indexed image at (x, y), row by row, or column by column if `columns`.
+export function cut(indexed, imgW, x, y, w, h, columns) {
+  const out = new Uint8Array(w * h);
+  for (let yy = 0; yy < h; yy++) {
+    for (let xx = 0; xx < w; xx++) out[columns ? xx * h + yy : yy * w + xx] = indexed[(y + yy) * imgW + x + xx];
+  }
+  return out;
+}
+
+// Far off, a sprite is drawn smaller than its frame, and sampling one texel per pixel skips some: a
+// 1-texel eye would blink out. So each sprite frame carries `mips`, for the renderer to sample from
+// instead: the frame halved, then halved again (1/2, 1/4, 1/8, each side rounded up). In each 2x2
+// block a glowing texel wins, so the eyes survive every halving; otherwise the block keeps its first
+// opaque texel reading across then down (top-left, top-right, bottom-left, bottom-right), or stays
+// clear. Frames are column-major (index x * h + y), like `cut(..., true)` makes them.
+export const MIP_LEVELS = 3;
+
+function halve(f, emissive) {
+  const w = Math.ceil(f.w / 2), h = Math.ceil(f.h / 2), px = new Uint8Array(w * h);
+  for (let x = 0; x < w; x++) {
+    for (let y = 0; y < h; y++) {
+      let opaque = 0, glow = 0;
+      for (let k = 0; k < 4 && glow === 0; k++) {
+        const sx = 2 * x + (k & 1), sy = 2 * y + (k >> 1);
+        if (sx >= f.w || sy >= f.h) continue;
+        const v = f.px[sx * f.h + sy];
+        if (emissive[v]) glow = v;
+        else if (opaque === 0) opaque = v;
+      }
+      px[x * h + y] = glow || opaque;
+    }
+  }
+  return { w, h, px };
+}
+
+export function buildMips(frame, emissive, levels = MIP_LEVELS) {
+  const mips = [];
+  for (let i = 0, f = frame; i < levels; i++) mips.push((f = halve(f, emissive)));
+  return mips;
+}
+
+// json: { palette, textures, sprites, hands, hud }; images: { textures, sky, sprites, hands, hud };
+// pixels(image) -> { w, h, data (RGBA) }.
+export function unpackArt(json, images, pixels) {
+  const { palette } = json;
+  const shades = buildShades(palette.colors, new Set(palette.glow));
+  const tex = pixels(images.textures);
+  const texIdx = indexPixels(tex, palette.colors, 'textures.png');
+  const size = json.textures.size;
+  const walls = {}, floors = {};
+  json.textures.names.forEach((name, i) => {
+    const floor = FLOORS.has(name);
+    (floor ? floors : walls)[name] = cut(texIdx, tex.w, i * size, 0, size, size, !floor);
+  });
+  const skyPx = pixels(images.sky);
+  const sky = { w: skyPx.w, h: skyPx.h, px: indexPixels(skyPx, palette.colors, 'sky.png') };
+  const spr = pixels(images.sprites);
+  const sprIdx = indexPixels(spr, palette.colors, 'sprites.png');
+  const sprites = {};
+  for (const [name, s] of Object.entries(json.sprites.sprites)) {
+    sprites[name] = {
+      height: s.height, stride: s.stride, ms: s.ms, anims: s.anims,
+      frames: Array.from({ length: s.count }, (_, i) => {
+        const f = { w: s.w, h: s.h, px: cut(sprIdx, spr.w, s.x + i * s.w, s.y, s.w, s.h, true) };
+        f.mips = buildMips(f, shades.emissive);
+        return f;
+      }),
+    };
+  }
+  const color = (n) => palette.colors[palette.names[n] - 1];
+  return {
+    palette, shades, walls, floors, sky, sprites,
+    flake: palette.names.flake,
+    ichor: palette.names.ichor,
+    spark: palette.names.spark,
+    hands: { image: images.hands, frames: json.hands.frames, charms: json.hands.charms },
+    hud: { image: images.hud, icons: json.hud.icons },
+    ui: { text: color('ui'), dim: color('uiDim'), hurt: color('hurt'), night: color('night') },
+  };
+}
+
+export async function loadArt(base = new URL('../assets/', import.meta.url), io = { json: loadJson, image: loadImage, pixels: imagePixels }) {
+  const at = (f) => new URL(f, base).href;
+  const jsons = await Promise.all(JSON_FILES.map((f) => io.json(at(`${f}.json`))));
+  const imgs = await Promise.all(IMAGE_FILES.map((f) => io.image(at(`${f}.png`))));
+  const json = Object.fromEntries(JSON_FILES.map((f, i) => [f, jsons[i]]));
+  const images = Object.fromEntries(IMAGE_FILES.map((f, i) => [f, imgs[i]]));
+  return unpackArt(json, images, io.pixels);
+}
+```
+
+- [ ] **Step 4: Writing the charm points (edits to `art/last-light/lib.lua`)**
+
+**Edit 1.** Find:
+```lua
+function M.writePieces(kind, pieces)
+```
+Replace with:
+```lua
+-- `charms` (the hands only): where the charm you wear hangs from each gun frame.
+function M.writePieces(kind, pieces, charms)
+```
+
+**Edit 2.** Find:
+```lua
+  M.writeText(M.ASSETS .. kind .. ".json", json.encode(kind == "hands" and { frames = meta } or { icons = meta }))
+```
+Replace with:
+```lua
+  M.writeText(M.ASSETS .. kind .. ".json", json.encode(kind == "hands" and { frames = meta, charms = charms } or { icons = meta }))
+```
+
+- [ ] **Step 5: Each gun frame's charm point (edits to `art/last-light/hands.lua`)**
+
+**Edit 1.** Find:
+```lua
+-- relative to the bottom centre of the view. Every frame reaches the bottom of the view, and nothing
+```
+Replace with:
+```lua
+-- relative to the bottom centre of the view. Each gun frame also has the point, on the same terms,
+-- where the charm you wear hangs from it (hud.js swings the charm from there). Every frame reaches the bottom of the view, and nothing
+```
+
+**Edit 2.** Find:
+```lua
+local RIFLE_FWD = aimAt(RIFLE_AT, V(0, -0.024, 0.66), MUZZLE[1], MUZZLE[2])
+
+```
+Replace with:
+```lua
+local RIFLE_FWD = aimAt(RIFLE_AT, V(0, -0.024, 0.66), MUZZLE[1], MUZZLE[2])
+
+-- Where a charm hangs from each gun: on the inner side (towards the middle of the view) of its fore-end,
+-- clear of the receiver and your hand. The shotgun's swings down with its barrels when it's broken open.
+local RIFLE_CHARM = V(-0.0165, 0.004, 0.24)
+local SHOTGUN_CHARM = V(-0.0185, 0.002, 0.22)
+
+```
+
+**Edit 3.** Find:
+```lua
+-- rifle goes down out of the view to load (hud.js), and the rounds are heard going in.
+```
+Replace with:
+```lua
+-- rifle goes down out of the view to load (hud.js), and the rounds are heard going in. Returns the
+-- frame, where the charm hangs, and where the muzzle is.
+```
+
+**Edit 4.** Find:
+```lua
+  return b, { project(place(g, V(0, -0.024, 0.66))) }
+```
+Replace with:
+```lua
+  return b, { project(place(g, RIFLE_CHARM)) }, { project(place(g, V(0, -0.024, 0.66))) }
+```
+
+**Edit 5.** Find:
+```lua
+-- shut), fire.
+```
+Replace with:
+```lua
+-- shut), fire. Returns the frame and where the charm hangs.
+```
+
+**Edit 6.** Find:
+```lua
+      flash(b, mx, my, (ex - mx) / d, (ey - my) / d, 1)
+    end
+  end
+  return b
+```
+Replace with:
+```lua
+      flash(b, mx, my, (ex - mx) / d, (ey - my) / d, 1)
+    end
+  end
+  return b, { project(place(bg, SHOTGUN_CHARM)) }
+```
+
+**Edit 7.** Find:
+```lua
+local idle, muzzle = rifle({})
+```
+Replace with:
+```lua
+-- A gun frame, cropped, noting where its charm hangs, relative to the bottom centre of the view.
+local charms = {}
+local function gun(name, b, at)
+  charms[name] = { math.floor(at[1] + 0.5) - VW / 2, math.floor(at[2] + 0.5) - VH }
+  return crop(b, name)
+end
+
+local idle, idleCharm, muzzle = rifle({})
+```
+
+**Edit 8.** Find:
+```lua
+  crop(idle, "rifle-idle"),
+  crop(rifle({ fire = true }), "rifle-fire"),
+  crop(rifle({ lever = 0.5, case = 0.25 }), "rifle-lever-1"),
+  crop(rifle({ lever = 1, case = 0.8 }), "rifle-lever-2"),
+  crop(shotgun({}), "shotgun-idle"),
+  crop(shotgun({ fire = true }), "shotgun-fire"),
+  crop(shotgun({ open = 1, lower = 0.02 }), "shotgun-reload-1"),
+  crop(shotgun({ open = 1, lower = 0.02, shells = 1 }), "shotgun-reload-2"),
+  crop(shotgun({ shells = 2, tip = -0.06, lower = -0.01 }), "shotgun-reload-3"),
+```
+Replace with:
+```lua
+  gun("rifle-idle", idle, idleCharm),
+  gun("rifle-fire", rifle({ fire = true })),
+  gun("rifle-lever-1", rifle({ lever = 0.5, case = 0.25 })),
+  gun("rifle-lever-2", rifle({ lever = 1, case = 0.8 })),
+  gun("shotgun-idle", shotgun({})),
+  gun("shotgun-fire", shotgun({ fire = true })),
+  gun("shotgun-reload-1", shotgun({ open = 1, lower = 0.02 })),
+  gun("shotgun-reload-2", shotgun({ open = 1, lower = 0.02, shells = 1 })),
+  gun("shotgun-reload-3", shotgun({ shells = 2, tip = -0.06, lower = -0.01 })),
+```
+
+**Edit 9.** Find:
+```lua
+L.writePieces("hands", pieces)
+```
+Replace with:
+```lua
+L.writePieces("hands", pieces, charms)
+```
+
+- [ ] **Step 6: The pendants (edits to `art/last-light/hud.lua`)**
+
+**Edit 1.** Find:
+```lua
+-- fire's upgrades ("up-" and its key in last-light/src/upgrades.js), and one 12x12 icon for each charm
+-- ("charm-" and its key in last-light/src/charms.js), in last-light/assets/hud.png with each icon's
+-- place in hud.json. Run from the repo root:
+```
+Replace with:
+```lua
+-- fire's upgrades ("up-" and its key in last-light/src/upgrades.js), one 12x12 icon for each charm
+-- ("charm-" and its key in last-light/src/charms.js), and each charm's pendant as it hangs from your gun
+-- ("hang-", its key and a turn), in last-light/assets/hud.png with each icon's place in hud.json. Run
+-- from the repo root:
+```
+
+**Edit 2.** Find:
+```lua
+L.writePieces("hud", {
+```
+Replace with:
+```lua
+local pieces = {
+```
+
+**Edit 3.** Find:
+```lua
+})
+```
+Replace with:
+```lua
+}
+
+-- The charms as they hang from your gun: each a charm on a short chain, bigger than its icon and
+-- outlined in the dark so it reads against the snow and the gun, lit from your lantern on the left.
+-- A pendant is drawn turned to HANG_TURNS angles, evenly from -HANG_MOST to HANG_MOST radians
+-- (positive swings it to the right), about the top of its chain, which sits HANG_PIVOT pixels from
+-- the left of each piece (hud.js swings it by choosing the turn).
+local HANG_TURNS, HANG_MOST, HANG_PIVOT = 11, 0.75, 22
+local HANG_W, HANG_H = 2 * HANG_PIVOT + 1, 25
+local CHAIN = { C.stone3, C.stone1, C.stone3, C.stone1, C.stone3 }
+local PENDANTS = {
+  { "wolf", {
+    ".....BBB.....",
+    "....BYBbB....",
+    "....bBbbb....",
+    "....PPPPp....",
+    "....PPPPpq...",
+    "....PPPPpq...",
+    "....PPPPpq...",
+    ".....PPPpq...",
+    ".....PPPpq...",
+    ".....PPPpq...",
+    "......PPpq...",
+    "......PPpq...",
+    ".......Ppq...",
+    "........pq...",
+    "........q....",
+  } },
+  { "thread", {
+    "......R......",
+    "......R......",
+    ".....RHR.....",
+    "....RRHHR....",
+    "...R.....R...",
+    "..R.......R..",
+    "..R.......R..",
+    "..R.......R..",
+    "...R.....R...",
+    "....RR.RR....",
+    ".....RHH.....",
+    "....RH.HR....",
+    "...RH...HR...",
+    "...H.....H...",
+  } },
+  { "crow", {
+    "......d......",
+    "......d......",
+    ".....ndK.....",
+    "....nKdKK....",
+    "....nKdKK....",
+    "...nKKdKKK...",
+    "...nKKdKKK...",
+    "...nKKdKKK...",
+    "...nKKdKKK...",
+    "....nKdKK....",
+    "....nKdKK....",
+    ".....KdK.....",
+    ".....KdK.....",
+    "......K......",
+  } },
+  { "salt", {
+    "......m......",
+    ".....mmm.....",
+    "....wwwww....",
+    "....mmmmm....",
+    ".....SSn.....",
+    "....SSSSn....",
+    "...SSSSSnn...",
+    "..SSwSSSSnn..",
+    "..SSSSSSSnn..",
+    "..SSSSSSnnn..",
+    "...SSSSnnn...",
+    "....nnnnn....",
+  } },
+  { "hare", {
+    ".....BBB.....",
+    "....BYBbB....",
+    "....m555m....",
+    "....55555m...",
+    "...555555m...",
+    "...5555555m..",
+    "...5555555m..",
+    "...555555mm..",
+    "...55555mmm..",
+    "....555mmm...",
+    "....55mmm....",
+    "....P.P.P....",
+  } },
+  { "eye", {
+    ".....kkk.....",
+    ".....k.k.....",
+    "....GGGGG....",
+    "..GGGyyyGGG..",
+    ".GGyyeeeyyGG.",
+    ".GyyekkkeyyG.",
+    ".GyyekkkeyyG.",
+    ".GGyyeeeyyGG.",
+    "..GGGyyyGGG..",
+    "....GGGGG....",
+  } },
+}
+
+-- A pendant upright: the chain, then the charm under it, outlined in the dark (the chain isn't).
+local function pendant(rows)
+  local body = L.buffer(#rows[1] + 2, #rows + 2)
+  for y, row in ipairs(rows) do
+    assert(#row == 13, "pendant row " .. y .. " is " .. #row .. " wide, not 13")
+    for x = 1, #row do
+      local ch = row:sub(x, x)
+      if ch ~= "." then body[y][x] = assert(KEY[ch], "no colour for '" .. ch .. "'") end
+    end
+  end
+  L.outline(body, C.void)
+  local b = L.buffer(body.w, #CHAIN + body.h - 1)
+  for y = 0, #CHAIN - 1 do b[y][7] = CHAIN[y + 1] end
+  for y = 0, body.h - 1 do
+    for x = 0, body.w - 1 do
+      if body[y][x] then b[#CHAIN + y - 1][x] = body[y][x] end
+    end
+  end
+  return b
+end
+
+-- The pendant `src` turned by angle a about the top of its chain, into a HANG_W x HANG_H piece. Each
+-- pixel takes the colour most of its 4x4 samples land on, or none if fewer than 5 land on the pendant,
+-- so thin lines (the chain, the thread) survive the turn.
+local function turned(src, a)
+  local b = L.buffer(HANG_W, HANG_H)
+  local c, s = math.cos(a), math.sin(a)
+  local cx = src.w / 2
+  for y = 0, HANG_H - 1 do
+    for x = 0, HANG_W - 1 do
+      local count, order, hit = {}, {}, 0
+      for j = 0, 3 do
+        for i = 0, 3 do
+          local dx, dy = x + (i + 0.5) / 4 - (HANG_PIVOT + 0.5), y + (j + 0.5) / 4
+          local sx, sy = math.floor(dx * c - dy * s + cx), math.floor(dx * s + dy * c)
+          local col = sy >= 0 and sy < src.h and sx >= 0 and sx < src.w and src[sy][sx] or nil
+          if col then
+            hit = hit + 1
+            if not count[col] then
+              count[col] = 0
+              order[#order + 1] = col
+            end
+            count[col] = count[col] + 1
+          end
+        end
+      end
+      if hit >= 5 then
+        local best = order[1]
+        for _, col in ipairs(order) do if count[col] > count[best] then best = col end end
+        b[y][x] = best
+      end
+    end
+  end
+  return b
+end
+
+local hangs = {}
+for _, p in ipairs(PENDANTS) do
+  local src = pendant(p[2])
+  assert(src.h <= HANG_H, p[1] .. "'s pendant is too long")
+  for i = 0, HANG_TURNS - 1 do
+    hangs[#hangs + 1] = { "hang-" .. p[1] .. "-" .. i, turned(src, -HANG_MOST + 2 * HANG_MOST * i / (HANG_TURNS - 1)) }
+  end
+end
+for _, h in ipairs(hangs) do pieces[#pieces + 1] = h end
+L.writePieces("hud", pieces)
+```
+
+- [ ] **Step 7: Build the art, and check only the expected files changed**
+
+Run the art loop from the repo root:
+`for s in textures sky sprites hands hud icon; do /Applications/Aseprite.app/Contents/MacOS/aseprite -b --script art/last-light/$s.lua; done`
+
+Then `git status --short` should list exactly `art/last-light/lib.lua`, `hands.lua`, `hud.lua`, `hud.aseprite`, `last-light/assets/hands.json`, `hud.json`, `hud.png`, `last-light/src/assets.js` and the two test files. `hands.png` and `hands.aseprite` don't change. Run the loop a second time: nothing more changes.
+
+- [ ] **Step 8: Run the tests to see them pass**
+
+Run: `cd last-light && npm test`
+Expected: PASS, 255 tests.
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add art/last-light last-light/assets last-light/src/assets.js last-light/test
+git commit -m "Last Light: where a charm hangs from each gun, and each charm's pendant"
+```
+
+## Task 4: Showing it: charms on the snow and on your gun, the Mother's eye, and the reading
 
 **Files:**
 - Modify, each as a full replacement:
   - `last-light/src/scene.js`, `render.js`, `hud.js`
-  - `last-light/test/fake-art.js`, `scene.test.js`, `render.test.js`, `hud.test.js`
+  - `last-light/test/fake-art.js`, `scene.test.js`, `render.test.js`, `hud.test.js`, `art.test.js`
   - `last-light/bench.js`
 
 **Interfaces:**
-- **Consumes:** from Task 1, `lantern(state)`, `EYE`, `CHARM_LIST`, `CHARMS.light`, `CHARMS.flicker`, `state.charms`, `state.charm`, `state.charmAt`; from Task 2, the `charm` sprite and the `charm-*` icons.
+- **Consumes:** from Task 1, `lantern(state)`, `EYE`, `CHARM_LIST`, `CHARMS.light`, `CHARMS.flicker`, `state.charms`, `state.charm`, `state.charmAt`; from Task 2, the `charm` sprite and the `charm-*` icons; from Task 3, `art.hands.charms` and the `hang-*` pieces.
 - **Produces:**
   - `scene.js`: `SPRITE_ANIMS.charm = ['idle']`; each sprite has `xray` (true only for after-eaters with the Mother's eye); `charmShine(state, c, t)` (0 to 1).
   - `render.js`: a sprite with `xray === true` draws its glowing pixels even where a nearer wall hides it, and nothing else there.
-  - `hud.js`: `HUD_ICONS` ends with the six `charm-` icons; the reading under the hour; the worn charm's icon beside the embers.
+  - `hud.js`:
+    - `HUD_ICONS` ends with the six `charm-` icons and every `hang-` piece;
+    - `HANG_TURNS = 11`, `HANG_MOST = 0.75`, `HANG_PIVOT = 22`;
+    - `createSwing()` → `{ angle, speed, facing, sway, kick, ready }`, and `swingCharm(swing, dt, facing, sway, kick)`;
+    - `drawHud`'s `info` takes `swing`, `facing` and `dt` (all optional);
+    - the reading under the hour; the charm you wear hanging from your gun.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -3165,7 +4022,11 @@ export function fakeArt() {
       'pickup-shells': sprite(0.2, { idle: [0] }, 1),
       'pickup-shotgun': sprite(0.2, { idle: [0] }, 1),
     },
-    hands: { image: { name: 'hands' }, frames: Object.fromEntries(HANDS.map((n, i) => [n, [i * 10, 0, 10, 10, -5, -10]])) },
+    hands: {
+      image: { name: 'hands' },
+      frames: Object.fromEntries(HANDS.map((n, i) => [n, [i * 10, 0, 10, 10, -5, -10]])),
+      charms: Object.fromEntries(HANDS.filter((n) => n.startsWith('rifle') || n.startsWith('shotgun')).map((n) => [n, [30, -40]])),
+    },
     hud: { image: { name: 'hud' }, icons: Object.fromEntries(ICONS.map((n, i) => [n, [i * 8, 0, 6, 8]])) },
     ui: { text: '#eeeeee', dim: '#888888', hurt: '#aa0000', night: '#05070c' },
   };
@@ -3672,7 +4533,7 @@ test("an xray sprite behind a wall shows its glowing pixels through it, and only
 ```js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { gunFrame, handFrame, drawHud, drawScreen } from '../src/hud.js';
+import { gunFrame, handFrame, drawHud, drawScreen, createSwing, swingCharm, HANG_TURNS, HANG_PIVOT } from '../src/hud.js';
 import { createGun, giveShotgun, RIFLE_ID, SHOTGUN_ID } from '../src/weapons.js';
 import { SWITCH_TIME, RIFLE, FLARE } from '../src/tuning.js';
 import { fakeArt, fakeContext, HANDS } from './fake-art.js';
@@ -3973,11 +4834,62 @@ test('standing over a charm: its icon, name, what it gives and what it takes (in
   assert.ok(!hudOf(s).texts.includes(c.name), 'nothing when you stand over none');
 });
 
-test('the charm you wear shows beside your embers', () => {
+// Which pendant piece of the charm you wear is drawn, and where (its top-left), or null.
+function worn(s, info = {}) {
+  const art = fakeArt();
+  const ctx = fakeContext();
+  drawHud(ctx, art, s, { w: 480, h: 270 }, { time: 0, hitT: 9, banner: { t: 0 }, reducedMotion: false, ...info });
+  const byX = new Map(Object.entries(art.hud.icons).filter(([n]) => n.startsWith('hang-')).map(([n, r]) => [r[0], n]));
+  const drawn = ctx.calls.images.find((i) => i.img === art.hud.image && byX.has(i.args[0]));
+  return drawn ? { name: byX.get(drawn.args[0]), at: [drawn.args[4], drawn.args[5]] } : null;
+}
+const MIDDLE = (HANG_TURNS - 1) / 2;
+
+test('the charm you wear hangs from the gun in your hands, where its frame says, straight down when still', () => {
   const s = quietState();
-  assert.ok(!hudOf(s).icons.some((n) => n.startsWith('charm-')));
+  assert.equal(worn(s), null, 'nothing hangs without one');
   wearCharm(s, SALT);
-  assert.ok(hudOf(s).icons.includes('charm-salt'));
+  // The rifle is up and still: the fake art's charm point is (30, -40) from the bottom centre.
+  let w = worn(s);
+  assert.deepEqual(w, { name: `hang-salt-${MIDDLE}`, at: [240 + 30 - HANG_PIVOT, 270 - 40] });
+  s.gun.reloading = true;
+  s.gun.shotT = 9;
+  s.gun.loadT = 9;
+  w = worn(s);
+  assert.equal(w.at[1], 270 - 40 + 120, 'it goes down with the rifle to load');
+  s.night.phase = 'dead';
+  assert.equal(worn(s), null, 'and nothing once you are dead');
+});
+
+test('the charm swings: it leans away as you turn and settles back, a shot jolts it, and it swings alike at any frame rate', () => {
+  const sw = createSwing();
+  swingCharm(sw, 1 / 60, 0, 0, 0);
+  for (let i = 1; i <= 12; i++) swingCharm(sw, 1 / 60, i * 0.05, 0, 0); // turning right at 3 radians a second
+  assert.ok(sw.angle < -0.1, `turning right, it swings left: ${sw.angle}`);
+  for (let i = 0; i < 300; i++) swingCharm(sw, 1 / 60, 0.6, 0, 0);
+  assert.ok(Math.abs(sw.angle) < 0.01 && Math.abs(sw.speed) < 0.05, `it settles, hanging straight: ${sw.angle}`);
+  swingCharm(sw, 1 / 60, 0.6, 0, 0.035); // a rifle shot's kick
+  assert.ok(Math.abs(sw.speed) > 0.5, 'a shot jolts it');
+  const after = (fps) => {
+    const t = createSwing();
+    swingCharm(t, 1 / fps, 0, 0, 0);
+    for (let i = 1; i <= Math.round(0.4 * fps); i++) swingCharm(t, 1 / fps, Math.min(0.3, (i / fps) * 3), 0, 0);
+    return t.angle;
+  };
+  assert.ok(Math.abs(after(30) - after(144)) < 0.1, `${after(30)} at 30 fps, ${after(144)} at 144`);
+});
+
+test('swung, the charm is drawn turned that way; with reduced motion it hangs straight', () => {
+  const s = quietState();
+  wearCharm(s, SALT);
+  const swing = createSwing();
+  swing.ready = true;
+  swing.angle = 0.75;
+  assert.equal(worn(s, { swing }).name, `hang-salt-${HANG_TURNS - 1}`, 'swung all the way right');
+  swing.angle = -0.3;
+  assert.equal(worn(s, { swing }).name, `hang-salt-${MIDDLE - 2}`, 'a little to the left');
+  swing.angle = 0.75;
+  assert.equal(worn(s, { swing, reducedMotion: true }).name, `hang-salt-${MIDDLE}`);
 });
 
 test('the title screen lists E for charms', () => {
@@ -3988,10 +4900,173 @@ test('the title screen lists E for charms', () => {
 });
 ```
 
+`last-light/test/art.test.js` (the full file now):
+```js
+// Checks the committed art (last-light/assets/, written by the scripts in art/last-light/) against
+// everything the code expects: every texture the map uses, every sprite and animation the scene draws,
+// every frame and icon the HUD draws, and image sizes that hold them.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync, existsSync } from 'node:fs';
+import { WALLS } from '../src/map.js';
+import { FLOORS, COLOR_SLACK } from '../src/assets.js';
+import { SPRITE_ANIMS, SPRAY_Z } from '../src/scene.js';
+import { KINDS } from '../src/creatures.js';
+import { CREATURES } from '../src/tuning.js';
+import { HAND_FRAMES, HUD_ICONS, HANG_TURNS, HANG_PIVOT } from '../src/hud.js';
+import { UPGRADE_LIST } from '../src/upgrades.js';
+import { CHARM_LIST } from '../src/charms.js';
+
+const file = (f) => new URL(`../${f}`, import.meta.url);
+const json = (f) => JSON.parse(readFileSync(file(`assets/${f}`), 'utf8'));
+// A PNG's width and height, from its header.
+function pngSize(f) {
+  const b = readFileSync(file(f));
+  assert.equal(b.toString('ascii', 1, 4), 'PNG', `${f} is a PNG`);
+  return [b.readUInt32BE(16), b.readUInt32BE(20)];
+}
+const inside = (rect, [w, h]) => rect[0] >= 0 && rect[1] >= 0 && rect[0] + rect[2] <= w && rect[1] + rect[3] <= h;
+
+test('the palette: up to 255 colours, with glow indices and the named colours the game uses', () => {
+  const p = json('palette.json');
+  assert.ok(p.colors.length > 0 && p.colors.length <= 255);
+  for (const c of p.colors) assert.match(c, /^#[0-9a-f]{6}$/);
+  assert.equal(new Set(p.colors).size, p.colors.length, 'no colour twice');
+  for (const i of p.glow) assert.ok(i >= 1 && i <= p.colors.length);
+  for (const n of ['flake', 'ichor', 'spark', 'ui', 'uiDim', 'hurt', 'night']) assert.ok(p.names[n] >= 1 && p.names[n] <= p.colors.length, n);
+  assert.ok(p.glow.includes(p.names.spark), 'sparks glow');
+});
+
+test('no two palette colours are close enough for readback noise to land between them', () => {
+  const rgb = json('palette.json').colors.map((c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16)));
+  for (let i = 0; i < rgb.length; i++) {
+    for (let j = i + 1; j < rgb.length; j++) {
+      const apart = Math.max(...[0, 1, 2].map((k) => Math.abs(rgb[i][k] - rgb[j][k])));
+      assert.ok(apart > 2 * COLOR_SLACK, `colours ${i + 1} and ${j + 1} are only ${apart} apart`);
+    }
+  }
+});
+
+test('a texture for every wall kind and floor, 32x32 each, side by side', () => {
+  const t = json('textures.json');
+  assert.equal(t.size, 32);
+  const need = new Set([...FLOORS]);
+  for (const k of Object.values(WALLS)) (need.add(k.ns), need.add(k.ew));
+  for (const n of need) assert.ok(t.names.includes(n), `texture ${n}`);
+  assert.deepEqual(pngSize('assets/textures.png'), [32 * t.names.length, 32]);
+});
+
+test('the sky is a wide panorama', () => {
+  const [w, h] = pngSize('assets/sky.png');
+  assert.ok(w >= 512 && h >= 64 && h <= 256, `${w}x${h}`);
+});
+
+test('every sprite, with every animation, inside sprites.png', () => {
+  const { sprites } = json('sprites.json');
+  const size = pngSize('assets/sprites.png');
+  for (const [name, anims] of Object.entries(SPRITE_ANIMS)) {
+    const s = sprites[name];
+    assert.ok(s, `sprite ${name}`);
+    assert.ok(s.height > 0 && s.count > 0, name);
+    assert.ok(inside([s.x, s.y, s.w * s.count, s.h], size), `${name} fits in sprites.png`);
+    for (const a of anims) {
+      assert.ok(s.anims[a]?.length > 0, `${name}.${a}`);
+      for (const f of s.anims[a]) assert.ok(f >= 0 && f < s.count, `${name}.${a} frame ${f}`);
+    }
+    if (['crawler', 'gaunt', 'leaper', 'mother'].includes(name)) {
+      assert.equal(s.anims.walk.length, 4, `${name} walks in 4 frames`);
+      assert.ok(s.stride > 0, `${name} has a stride`);
+    }
+  }
+});
+
+// Against the 1.0-unit walls (a doorway's height; a window's top sits at about 0.75): a crawler comes
+// about knee-high, its back (4/5 up its frame) under the window sill; a gaunt's head (0.82 up its
+// frame) stands a little above a man's, under the doorway's top; the Mother towers over the cabin.
+test('creature sizes: a crawler about knee-high, a gaunt a little taller than you, the Mother towering', () => {
+  const { sprites } = json('sprites.json');
+  assert.ok(sprites.crawler.height <= 0.4, `crawler ${sprites.crawler.height}`);
+  assert.ok(sprites.gaunt.height > 1 && sprites.gaunt.height <= 1.15, `gaunt ${sprites.gaunt.height}`);
+  assert.ok(sprites.mother.height >= 2, `mother ${sprites.mother.height}`);
+  const order = ['crawler', 'leaper', 'gaunt', 'mother'].map((k) => sprites[k].height);
+  assert.deepEqual(order, [...order].sort((a, b) => a - b), 'crawler < leaper < gaunt < mother');
+});
+
+test('a shot sees each creature as tall as it is drawn', () => {
+  const { sprites } = json('sprites.json');
+  for (const k of KINDS) assert.equal(CREATURES[k].height, sprites[k].height, k);
+});
+
+// A hit's spray comes out of the body: above the legs, below the eyes.
+test("a hit's spray comes from a creature's body, a third to three quarters of the way up it", () => {
+  const { sprites } = json('sprites.json');
+  KINDS.forEach((k, i) => {
+    const up = SPRAY_Z[i] / sprites[k].height;
+    assert.ok(up >= 0.35 && up <= 0.75, `${k}: spray at ${SPRAY_Z[i]} is ${up.toFixed(2)} of its ${sprites[k].height} height`);
+  });
+});
+
+test('the ember and the new icons are the sizes the scene and the HUD expect', () => {
+  const { sprites } = json('sprites.json');
+  assert.deepEqual([sprites.ember.w, sprites.ember.h, sprites.ember.count, sprites.ember.height], [10, 6, 3, 0.12]);
+  const { icons } = json('hud.json');
+  for (const n of ['ember', 'crosshairSteady']) assert.deepEqual(icons[n].slice(2), [7, 7], n);
+  for (const u of UPGRADE_LIST) assert.deepEqual(icons[`up-${u.key}`].slice(2), [12, 12], u.key);
+});
+
+test('the charm and its icons are the sizes the scene and the HUD expect', () => {
+  const { sprites } = json('sprites.json');
+  assert.deepEqual([sprites.charm.w, sprites.charm.h, sprites.charm.count, sprites.charm.height], [8, 9, 4, 0.14]);
+  const { icons } = json('hud.json');
+  for (const c of CHARM_LIST) assert.deepEqual(icons[`charm-${c.key}`].slice(2), [12, 12], c.key);
+});
+
+test("each charm's pendant: turned the same number of times, one hanging straight, each turn the same size", () => {
+  const { icons } = json('hud.json');
+  const turns = (key) => Object.keys(icons).filter((n) => n.startsWith(`hang-${key}-`)).length;
+  const n = turns('wolf'), size = icons['hang-wolf-0'].slice(2);
+  assert.ok(n >= 5 && n % 2 === 1, `${n} turns, the middle one hanging straight`);
+  assert.equal(size[0] % 2, 1, 'an odd width, so the chain hangs from the middle column');
+  for (const c of CHARM_LIST) {
+    assert.equal(turns(c.key), n, c.key);
+    for (let i = 0; i < n; i++) assert.deepEqual(icons[`hang-${c.key}-${i}`].slice(2), size, `${c.key} ${i}`);
+  }
+});
+
+test('the HUD hangs the pendants as they are drawn: as many turns, from the middle column', () => {
+  const { icons } = json('hud.json');
+  assert.ok(icons[`hang-wolf-${HANG_TURNS - 1}`] && !icons[`hang-wolf-${HANG_TURNS}`]);
+  assert.equal(icons['hang-wolf-0'][2], 2 * HANG_PIVOT + 1);
+});
+
+test('every gun frame says where a charm hangs from it, on the gun, below the crosshair', () => {
+  const { frames, charms } = json('hands.json');
+  const guns = HAND_FRAMES.filter((n) => n.startsWith('rifle') || n.startsWith('shotgun'));
+  assert.deepEqual(Object.keys(charms).sort(), [...guns].sort());
+  for (const n of guns) {
+    const [x, y] = charms[n], f = frames[n];
+    assert.ok(x >= f[4] && x < f[4] + f[2] && y >= f[5] && y < 0, `${n}: ${x}, ${y} is inside the frame`);
+    assert.ok(y > -135 + 20 && x > 10, `${n}: clear of the crosshair`);
+  }
+});
+
+test('every hands frame and HUD icon, inside their sheets', () => {
+  const hands = json('hands.json').frames, hud = json('hud.json').icons;
+  const hs = pngSize('assets/hands.png'), is = pngSize('assets/hud.png');
+  for (const n of HAND_FRAMES) assert.ok(hands[n] && hands[n].length === 6 && inside(hands[n], hs), n);
+  for (const n of HUD_ICONS) assert.ok(hud[n] && inside(hud[n], is), n);
+});
+
+test('the tab icon is 48x48', () => {
+  assert.ok(existsSync(file('icon.png')));
+  assert.deepEqual(pngSize('icon.png'), [48, 48]);
+});
+```
+
 - [ ] **Step 2: Run them to see them fail**
 
 Run: `cd last-light && npm test`
-Expected: FAIL: the scene has no `charmShine`, charms aren't drawn, eyes don't show through walls, and the HUD shows no reading.
+Expected: FAIL: the scene has no `charmShine`, charms aren't drawn, eyes don't show through walls, the HUD shows no reading and nothing hangs from the gun, and `hud.js` has no `HANG_TURNS`.
 
 - [ ] **Step 3: Write the code**
 
@@ -4548,9 +5623,9 @@ export function createRenderer(art, map) {
 `last-light/src/hud.js` (the full file now):
 ```js
 // Everything drawn over the world with the canvas 2D context, at internal resolution: the guns and
-// lantern in your hands, the crosshair and hit tick, health, embers carried, the charm you wear, ammo,
-// flares, the hour, the hurt glow, banners, the fire's offer, the charm you stand over, and the title,
-// death and dawn screens. Text is Silkscreen.
+// lantern in your hands, with the charm you wear swinging from the gun, the crosshair and hit tick,
+// health, embers carried, ammo, flares, the hour, the hurt glow, banners, the fire's offer, the charm
+// you stand over, and the title, death and dawn screens. Text is Silkscreen.
 import { RIFLE, SHOTGUN, SWITCH_TIME, FLARE, FEEL, NIGHT } from './tuning.js';
 import { RIFLE_ID, steadyReady } from './weapons.js';
 import { hourLabel } from './night.js';
@@ -4567,7 +5642,12 @@ export const HAND_FRAMES = [
 const UPGRADE_ICONS = UPGRADE_LIST.map((u) => `up-${u.key}`);
 // Each charm's is "charm-" and its key.
 const CHARM_ICONS = CHARM_LIST.map((c) => `charm-${c.key}`);
-export const HUD_ICONS = ['heart', 'round', 'roundEmpty', 'shell', 'shellEmpty', 'flare', 'crosshair', 'crosshairSteady', 'hitTick', 'ember', ...UPGRADE_ICONS, ...CHARM_ICONS];
+// Each charm's pendant, as it hangs from your gun, drawn turned to HANG_TURNS angles evenly from
+// -HANG_MOST to HANG_MOST radians (positive swings it right), about the top of its chain, HANG_PIVOT
+// pixels in from the left of each piece: "hang-", the charm's key, and the turn (art/last-light/hud.lua).
+export const HANG_TURNS = 11, HANG_MOST = 0.75, HANG_PIVOT = 22;
+const HANG_ICONS = CHARM_LIST.map((c) => Array.from({ length: HANG_TURNS }, (_, i) => `hang-${c.key}-${i}`));
+export const HUD_ICONS = ['heart', 'round', 'roundEmpty', 'shell', 'shellEmpty', 'flare', 'crosshair', 'crosshairSteady', 'hitTick', 'ember', ...UPGRADE_ICONS, ...CHARM_ICONS, ...HANG_ICONS.flat()];
 
 const FONTS = { 8: '8px Silkscreen, monospace', 16: '16px Silkscreen, monospace', 24: '24px Silkscreen, monospace' };
 const HOURS = ['9 PM', '10 PM', '11 PM', '12 AM', '1 AM', '2 AM', '3 AM', '4 AM', 'dawn'];
@@ -4589,6 +5669,15 @@ const WANTS = Array.from({ length: 61 }, (_, n) => `The fire wants ${n} more emb
 // A charm's key line: what taking it costs you besides its price.
 const TAKE = 'E to take it';
 const LEAVING = CHARM_LIST.map((c) => `E to take it, leaving ${c.name}`);
+
+// The charm you wear hangs on its chain from the inner side of the gun in your hands, at the point each
+// gun frame gives (hands.json's `charms`). It swings as a damped pendulum: it leans away as you turn,
+// rocks with your steps, and jumps when you fire. With reduced motion it hangs still.
+// spring: how hard it swings back to where it leans (a swing about twice a second); damping: how fast
+// the swinging dies away; turn: radians it leans for each radian a second you turn; step: radians for
+// each pixel a second the hands sway; kick: radians a second a shot throws it, for each radian of the
+// gun's kick. It swings no further than its pendant is drawn (HANG_MOST).
+const SWING = { spring: 160, damping: 2.4, turn: 0.12, step: 0.02, kick: 30 };
 
 const shown = { name: '', drop: 0 };
 // Which of n frames a countdown from `whole` to 0 is at, `t` left.
@@ -4629,6 +5718,42 @@ export function gunFrame(gun) {
   return shown;
 }
 
+// A swing for the charm on your gun: its angle from hanging straight down (radians, positive to the
+// right) and how fast that's changing.
+export function createSwing() {
+  return { angle: 0, speed: 0, facing: 0, sway: 0, kick: 0, ready: false };
+}
+
+// Moves the swing on by dt seconds, from your facing now (radians), the hands' sideways sway (pixels)
+// and the gun's kick (radians). The first call only notes where things are.
+export function swingCharm(sw, dt, facing, sway, kick) {
+  if (!sw.ready || dt <= 0) {
+    sw.ready = true;
+    sw.facing = facing;
+    sw.sway = sway;
+    sw.kick = kick;
+    return sw;
+  }
+  const turn = Math.atan2(Math.sin(facing - sw.facing), Math.cos(facing - sw.facing)) / dt;
+  const step = (sway - sw.sway) / dt;
+  if (kick > sw.kick) sw.speed += (kick - sw.kick) * SWING.kick * (sw.angle < 0 ? -1 : 1);
+  sw.facing = facing;
+  sw.sway = sway;
+  sw.kick = kick;
+  const lean = Math.max(-HANG_MOST, Math.min(HANG_MOST, -turn * SWING.turn - step * SWING.step));
+  // In small steps, so it swings the same at any frame rate.
+  const n = Math.min(24, Math.ceil(dt * 240)), h = dt / n;
+  for (let i = 0; i < n; i++) {
+    sw.speed += (-SWING.spring * (sw.angle - lean) - SWING.damping * sw.speed) * h;
+    sw.angle += sw.speed * h;
+  }
+  if (sw.angle > HANG_MOST || sw.angle < -HANG_MOST) {
+    sw.angle = Math.max(-HANG_MOST, Math.min(HANG_MOST, sw.angle));
+    sw.speed = 0;
+  }
+  return sw;
+}
+
 // The lantern hand's frame: a two-frame flicker, or the throw while a flare leaves your hand.
 export function handFrame(gun, time) {
   const since = FLARE.cooldown - gun.flareT;
@@ -4658,7 +5783,9 @@ function text(ctx, str, x, y, color, px = 8, align = 'left') {
   ctx.fillText(str, x, y);
 }
 
-// info: { time, hitT (seconds since you last hit something), banner: { text, sub, t }, reducedMotion }
+// info: { time, hitT (seconds since you last hit something), banner: { text, sub, t }, reducedMotion,
+//        swing (from createSwing, for the charm on your gun), facing (radians), dt (seconds since the
+//        last frame) }
 export function drawHud(ctx, art, state, view, info) {
   const { w, h } = view, g = state.gun, p = state.player, ui = art.ui;
   // The hands, bobbing as you walk.
@@ -4666,10 +5793,15 @@ export function drawHud(ctx, art, state, view, info) {
   const phase = (p.walked / 0.9) * Math.PI;
   const bx = info.reducedMotion ? 0 : Math.sin(phase) * 3 * speed;
   const by = info.reducedMotion ? 0 : Math.abs(Math.cos(phase)) * 2 * speed;
+  if (info.swing) swingCharm(info.swing, info.dt ?? 0, info.facing ?? 0, bx, g.kick);
   if (state.night.phase !== 'dead') {
     frame(ctx, art, handFrame(g, info.time), w / 2 - bx, h + by);
-    const gf = gunFrame(g);
-    frame(ctx, art, gf.name, w / 2 + bx, h + by + gf.drop * 60 + g.kick * 120);
+    const gf = gunFrame(g), gx = w / 2 + bx, gy = h + by + gf.drop * 60 + g.kick * 120;
+    frame(ctx, art, gf.name, gx, gy);
+    if (state.charm >= 0) {
+      const angle = info.swing && !info.reducedMotion ? info.swing.angle : 0;
+      drawWorn(ctx, art, HANG_ICONS[state.charm], art.hands.charms[gf.name], gx, gy, angle);
+    }
   }
   // Crosshair and hit tick; the crosshair goes warm while Steady hands is ready with the rifle raised.
   const cross = info.hitT < 0.15 ? 'hitTick' : g.current === RIFLE_ID && steadyReady(state) ? 'crosshairSteady' : 'crosshair';
@@ -4693,7 +5825,6 @@ export function drawHud(ctx, art, state, view, info) {
   text(ctx, num(p.health), hx + hw + 3, hy + 1, p.health <= FEEL.lowHealth ? ui.hurt : ui.text);
   const ew = icon(ctx, art, 'ember', hx + 42, hy);
   text(ctx, num(state.carried), hx + 42 + ew + 3, hy + 1, ui.text);
-  if (state.charm >= 0) icon(ctx, art, CHARM_ICONS[state.charm], hx + 76, hy - 3);
   // Ammo and flares, bottom right.
   let x = w - 6;
   if (g.current === RIFLE_ID) {
@@ -4741,6 +5872,14 @@ function drawOffer(ctx, art, state, w, h) {
     text(ctx, u.name, x + 30, y, ui.text);
     text(ctx, u.line, x + 30, y + 10, ui.dim);
   }
+}
+
+// The charm you wear, its pendant (`turns`, one name a turn) hanging at `angle` from the point `at` on
+// the gun drawn at (gx, gy).
+function drawWorn(ctx, art, turns, at, gx, gy, angle) {
+  if (!at) return;
+  const k = Math.round(((angle / HANG_MOST + 1) * (HANG_TURNS - 1)) / 2);
+  icon(ctx, art, turns[Math.max(0, Math.min(HANG_TURNS - 1, k))], Math.round(gx + at[0]) - HANG_PIVOT, Math.round(gy + at[1]));
 }
 
 // The charm you're standing over, under the hour, clear of the crosshair: its icon and name, what it
@@ -4876,16 +6015,16 @@ time('in the cabin looking up', 19.5, 16.5, VIEW.maxPitch);
 - [ ] **Step 4: Run the tests and the benchmark**
 
 Run: `cd last-light && npm test && npm run bench`
-Expected: PASS, 260 tests; each of the benchmark's three lines under 4 ms (the prototype measured 2.96, 3.54 and 2.72 ms; this machine varies by about 20%).
+Expected: PASS, 265 tests; each of the benchmark's three lines under 4 ms (the prototype measured 3.15, 3.73 and 2.88 ms; this machine varies by about 20%).
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add last-light/src last-light/test last-light/bench.js
-git commit -m "Last Light: charms on the snow, the Mother's eye, and reading a charm"
+git commit -m "Last Light: charms on the snow and on your gun, the Mother's eye, and reading a charm"
 ```
 
-## Task 4: The page: sounds, banners, and ?charm
+## Task 5: The page: sounds, banners, the swing, and ?charm
 
 **Files:**
 - Modify, each as a full replacement:
@@ -4894,11 +6033,12 @@ git commit -m "Last Light: charms on the snow, the Mother's eye, and reading a c
 - Modify: `README.md` (two edits)
 
 **Interfaces:**
-- **Consumes:** the events from Task 1, `CHARM_LIST`, `createState({ charm })`.
+- **Consumes:** the events from Task 1, `CHARM_LIST`, `createState({ charm })`; `createSwing` from Task 4.
 - **Produces:**
   - sounds for `charmDrop`, `charm` and `charmOut`;
   - banners: "A charm" / "Something glints where it fell." the first time in a session (after the Embers banner, if both are due); a charm's name and what it gives when you take it;
-  - `createGame({ debug: { charm } })`, and `?charm=<key>` in the page's URL.
+  - `createGame({ debug: { charm } })`, and `?charm=<key>` in the page's URL;
+  - the page hands the HUD a swing, your facing, and the frame's time (0 while paused).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -5809,7 +6949,7 @@ import { chooseView } from './view.js';
 import { createRenderer } from './render.js';
 import { createLightmap, bakeStatic } from './lightmap.js';
 import { createScene, buildFrame, sceneEvents } from './scene.js';
-import { drawHud, drawScreen } from './hud.js';
+import { drawHud, drawScreen, createSwing } from './hud.js';
 import { createBot, botIntents } from './bot.js';
 import { createState } from './sim.js';
 import { CHARM_LIST } from './charms.js';
@@ -5996,7 +7136,7 @@ async function boot() {
   const perf = { frameMs: 0, updates: 0 };
   if (anyDebug) window.__lastlightPerf = perf;
   const frameView = { facing: 0, pitch: 0, alpha: 0, time: 0, dt: 0, reducedMotion: false, h: 0, focal: 0 };
-  const hudInfo = { time: 0, hitT: 0, banner: game.banner, reducedMotion: false };
+  const hudInfo = { time: 0, hitT: 0, banner: game.banner, reducedMotion: false, swing: createSwing(), facing: 0, dt: 0 };
   const screenInfo = { time: 0, best: game.best, reached: 0, kills: 0, taken: null, bought: 0 };
   const loop = (now) => {
     try {
@@ -6046,6 +7186,8 @@ async function boot() {
       hudInfo.time = time;
       hudInfo.hitT = game.hitT;
       hudInfo.reducedMotion = frameView.reducedMotion;
+      hudInfo.facing = facing;
+      hudInfo.dt = game.screen === 'playing' ? dt : 0; // paused, the charm on your gun holds still
       drawHud(octx, art, s, view, hudInfo);
     } else if (game.screen !== 'paused') {
       screenInfo.time = time;
@@ -6093,26 +7235,26 @@ Replace with:
 - [ ] **Step 5: Run the tests to see them pass**
 
 Run: `cd last-light && npm test`
-Expected: PASS, 262 tests.
+Expected: PASS, 267 tests.
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add last-light/src last-light/test README.md
-git commit -m "Last Light: sounds and banners for charms, and ?charm"
+git commit -m "Last Light: sounds and banners for charms, the swing on the page, and ?charm"
 ```
 
-## Task 5: Release (the controller does this; there's no implementer)
+## Task 6: Release (the controller does this; there's no implementer)
 
 - The final whole-branch review, its fixes, and a scoped re-review.
 - The checks:
   - `cd last-light && npm test` and `npm run bench`;
   - `cd site && npm test`;
   - the art loop leaves the tree clean;
-  - a browser check: `?debug=bot&god&speed=20&seed=2` plays to dawn with no console errors, and `?charm=eye` and a charm's reading look right.
+  - a browser check: `?debug=bot&god&speed=20&seed=2` plays to dawn with no console errors, and `?charm=eye`, a charm's reading and the charm swinging on each gun look right.
 - Merge to `main`: fetch and merge `origin/main` first, fast-forward only, never force. Push, and check that GitHub Pages builds the new commit.
 
 ## Self-review notes (for the executor)
 
-- Spec coverage: §1's six charms are Task 1 (rules) and Task 3 (the lantern and the eyes on screen). §2's dropping, fading, reading, taking and gentle drift are Task 1, the reading on screen is Task 3, and the teaching banner is Task 4. §3's display is Task 3, the sound is Task 4, and the art is Task 2. §5's tests are spread across the tasks as listed there.
-- Types: `state.charm` and slot ids are numbers (-1 for none) throughout. `dropCharm` takes a kind's name ('gaunt'), not its index.
+- Spec coverage: §1's six charms are Task 1 (rules) and Task 4 (the lantern and the eyes on screen). §2's dropping, fading, reading, taking and gentle drift are Task 1, the reading on screen is Task 4, and the teaching banner is Task 5. §3's display is Task 4 (the charm on your gun too, with its art in Task 3 and the page's part in Task 5), the sound is Task 5, and the art is Tasks 2 and 3. §5's tests are spread across the tasks as listed there.
+- Types: `state.charm` and slot ids are numbers (-1 for none) throughout. `dropCharm` takes a kind's name ('gaunt'), not its index. A charm point is `[x, y]` relative to the bottom centre of the view, like a frame's `(ox, oy)`.
