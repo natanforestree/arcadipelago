@@ -27,6 +27,7 @@ const PEOPLE = {
   commuter: { body: '#3b3f4a', legs: '#2a2c33', head: '#e0b48a', h: 31 },
 };
 const ICON_TIME = 1.6; // seconds a reaction shows over a head
+const GOLD_PULSE = 8; // speed (rad/s) the callback's gold frame pulses at
 const RULE_WORDS = { offKey: 'off key' }; // the ?debug view's words for rules, where they differ from their names
 
 // Your last notes tagged by shape: notes completing the same shape share a letter; '-' completes none.
@@ -187,6 +188,14 @@ export function createRenderer(g) {
       const x = 58 + i * 36, y = 4;
       const lit = scene.gold && i === n - 1;
       px(x, y, 30, 16, lit ? '#5a4520' : '#1b143099');
+      if (lit) {
+        // a pulsing gold frame around the idea that just came back
+        const w = 1 + (Math.sin(t * GOLD_PULSE) > 0 ? 1 : 0);
+        px(x, y, 30, w, C.gold);
+        px(x, y + 16 - w, 30, w, C.gold);
+        px(x, y, w, 16, C.gold);
+        px(x + 30 - w, y, w, 16, C.gold);
+      }
       const idea = listen.strip[i];
       if (!idea) continue;
       let p = 0;
@@ -194,12 +203,14 @@ export function createRenderer(g) {
       const lo = Math.min(...ys), hi = Math.max(...ys), span = Math.max(1, hi - lo);
       ys.forEach((v, k) => px(x + 3 + k * 7, y + 12 - Math.round(((v - lo) / span) * 9), 3, 2, lit ? C.gold : '#ffe9a8'));
     }
+    text('they remember', 163, 22, C.grey, 'center'); // labels the strip for a first-time player; 163 is its centre (58..268)
     if (scene.gold) {
-      // the gold arc from the old idea down to your guitar
+      // the gold arc from the old idea down to your guitar, and a word popping up beside it, both fading together
       const k = Math.min(1, (t - scene.gold.t) / 0.5);
       const x0 = 58 + (n - 1) * 36 + 15, y0 = 20, [x1, y1] = GUITAR;
       g.globalAlpha = 1 - Math.max(0, (t - scene.gold.t) / GOLD);
-      for (let s = 0; s <= k; s += 0.04) px(x0 + (x1 - x0) * s, y0 + (y1 - y0) * s - Math.sin(Math.PI * s) * 20, 2, 2, C.gold);
+      for (let s = 0; s <= k; s += 0.04) px(x0 + (x1 - x0) * s, y0 + (y1 - y0) * s - Math.sin(Math.PI * s) * 20, 3, 3, C.gold);
+      text('callback!', x0, y0 + 10, C.gold, 'center');
       g.globalAlpha = 1;
     }
   }

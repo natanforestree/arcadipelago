@@ -52,7 +52,19 @@ test('a set in full swing draws everyone, their reactions, the trail and the str
   assert.ok(g.texts.includes('zzz') && g.texts.includes('?'), 'reactions over heads');
   assert.ok(g.texts.some((s) => s.startsWith('delay 12ms  key 18ms')), 'the debug panel');
   assert.ok(g.texts.includes('repeat') || g.texts.includes('taste') || g.texts.includes(''), 'last rules under people');
+  assert.ok(g.texts.includes('they remember'), 'the strip is labelled for a first-time player');
+  assert.ok(g.texts.includes('callback!'), 'a callback pops up by the lit box');
   assert.ok(g.rects.every(([x, y]) => x > -40 && x < W + 40 && y > -40 && y < H + 40));
+});
+
+test('the callback popup only shows while the gold moment is active', () => {
+  const g = fakeContext();
+  const set = runSet(1, goodSet(1));
+  const scene = createScene();
+  scene.gold = null;
+  createRenderer(g)(view({ set, scene, t: set.t }));
+  assert.ok(g.texts.includes('they remember'), 'the strip is still labelled with no callback live');
+  assert.ok(!g.texts.includes('callback!'), 'no popup without a live callback');
 });
 
 test('waiting for the first note, and paused', () => {
