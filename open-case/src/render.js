@@ -28,6 +28,8 @@ const PEOPLE = {
 };
 const ICON_TIME = 1.6; // seconds a reaction shows over a head
 const GOLD_PULSE = 8; // speed (rad/s) the callback's gold frame pulses at
+const DEBUG_PANEL_TOP = 32; // clears "they remember" (drawn at y 22, ~8px tall) with a couple of px to spare
+const CALLBACK_MARGIN = 4; // px the "callback!" popup keeps clear of both canvas edges
 const RULE_WORDS = { offKey: 'off key' }; // the ?debug view's words for rules, where they differ from their names
 
 // Your last notes tagged by shape: notes completing the same shape share a letter; '-' completes none.
@@ -211,9 +213,15 @@ export function createRenderer(g) {
       g.globalAlpha = 1 - Math.max(0, (t - scene.gold.t) / GOLD);
       for (let s = 0; s <= k; s += 0.04) px(x0 + (x1 - x0) * s, y0 + (y1 - y0) * s - Math.sin(Math.PI * s) * 20, 3, 3, C.gold);
       // the word, on the side of the box away from the guitar so the arc (which only moves from the box
-      // towards x1) never crosses it; a 1px dark shadow keeps it crisp over the sky
-      const rightOfGuitar = x0 > x1;
-      const wx = rightOfGuitar ? boxX + 33 : boxX - 3, align = rightOfGuitar ? 'left' : 'right';
+      // towards x1) never crosses it; clamped so it also stays CALLBACK_MARGIN clear of both canvas
+      // edges (the rightmost box otherwise runs the word off the right side); a 1px dark shadow keeps
+      // it crisp over the sky
+      const rightOfGuitar = x0 > x1, align = rightOfGuitar ? 'left' : 'right';
+      g.font = FONT;
+      const ww = g.measureText('callback!').width;
+      const wx = rightOfGuitar
+        ? Math.min(boxX + 33, W - CALLBACK_MARGIN - ww - 1) // -1 leaves room for the shadow's +1px offset
+        : Math.max(boxX - 3, CALLBACK_MARGIN + ww);
       text('callback!', wx + 1, 9, C.dim, align);
       text('callback!', wx, 8, C.gold, align);
       g.globalAlpha = 1;
@@ -266,8 +274,8 @@ export function createRenderer(g) {
       `shapes ${shapeTags(l.shapes.slice(-16))}`,
       `delay ${info.reported == null ? '?' : info.reported.toFixed(0)}ms  key ${info.measured == null ? '?' : info.measured.toFixed(0)}ms`,
     ];
-    px(W - 132, 24, 130, lines.length * 9 + 4, C.panel);
-    lines.forEach((s, i) => text(s, W - 129, 26 + i * 9));
+    px(W - 132, DEBUG_PANEL_TOP, 130, lines.length * 9 + 4, C.panel);
+    lines.forEach((s, i) => text(s, W - 129, DEBUG_PANEL_TOP + 2 + i * 9));
   }
 
   // view: { screen: 'title' | 'ready' | 'playing' | 'paused' | 'over', set, scene, keys, t (set time),
