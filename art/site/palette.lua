@@ -36,7 +36,7 @@ return {
   shooting = "#fff6dc",
 
   -- The hover glow round each island.
-  glow = { snake = "#fff4c2", marrow = "#ffd9b8", unfinished = "#ffe8b0", ["last-light"] = "#ffd7a0" },
+  glow = { snake = "#fff4c2", marrow = "#ffd9b8", unfinished = "#ffe8b0", ["last-light"] = "#ffd7a0", ["open-case"] = "#ffe2a8" },
 
   -- Snake: copied from art/snake-icon.lua (the card icon), plus a rock ramp for the underside.
   snake = {
@@ -87,6 +87,23 @@ return {
     wood = { "#4a3324", "#6e4c30", "#8f663f", "#b58a58" },
     rope = "#c9a46a",
     lantern = { "#3a2a1c", "#ffb347", "#ffd98a", "#fff4d0" }, -- frame, flame dark -> bright
+  },
+
+  -- Open Case: copied from open-case/src/render.js (the park's grass and path, the crate, the guitar,
+  -- the open case and its coins, the lamp), plus earth, stone and raw timber for the scaffolding.
+  openCase = {
+    outline = "#2a1f2e",
+    g1 = "#2a4234", g2 = "#34503f", g3 = "#46684f", g4 = "#5f8a5e", -- grass, dark -> light
+    d1 = "#3a2a2e", d2 = "#5a3f3c", d3 = "#7a5a4e", -- earth
+    rock = { "#4a4050", "#6b6070", "#8f8494" },
+    pave = { "#6b5a51", "#7d6a5f", "#9a8676" },
+    wood = { "#6e4a2a", "#9b6a3c", "#c08850" }, -- the crate
+    guitar = { "#8a5528", "#c8843f", "#e8a868" }, neck = "#5a3a22",
+    caseOut = "#2b2027", caseIn = "#7a2e3a", caseIn2 = "#9a3e4a",
+    coin = { "#c99a2e", "#ffd35a", "#fff4c2" },
+    pole = "#2b2733", lamp = { "#ffb347", "#ffd98a", "#fff4d0" },
+    note = "#ffe9a8",
+    timber = { "#4a3324", "#8f663f", "#b58a58" }, rope = "#c9a46a",
   },
 
   -- The sign: a wooden board round a parchment panel, hung on rope.

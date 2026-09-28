@@ -10,7 +10,7 @@ const GAMES = {
 const BASE = 'https://example.test/site/';
 
 // Loaders that record every URL asked for and hand back a stand-in named after it.
-function fakeIo(failing) {
+function fakeIo(failing, games = GAMES) {
   const asked = [];
   const answer = (url, value) => {
     asked.push(url.slice(BASE.length));
@@ -20,7 +20,7 @@ function fakeIo(failing) {
   return {
     asked,
     io: {
-      json: (url) => answer(url, url.endsWith('games.json') ? GAMES : { name: url.slice(BASE.length) }),
+      json: (url) => answer(url, url.endsWith('games.json') ? games : { name: url.slice(BASE.length) }),
       image: (url) => answer(url, { src: url.slice(BASE.length) }),
     },
   };
@@ -48,4 +48,11 @@ test('it loads games.json and every picture and data file the scene needs', asyn
 test('a file that fails to load fails the whole load', async () => {
   const { io } = fakeIo(`${BASE}assets/island-snake.png`);
   await assert.rejects(loadScene(new URL(BASE), io), /island-snake\.png/);
+});
+
+test('without an unfinished island, it loads only the games\' islands', async () => {
+  const { asked, io } = fakeIo(undefined, { games: GAMES.games });
+  const art = await loadScene(new URL(BASE), io);
+  assert.equal(asked.some((a) => a.includes('island-unfinished')), false);
+  assert.deepEqual(Object.keys(art.metas), ['island-snake']);
 });

@@ -9,7 +9,7 @@ Little browser games, hosted on GitHub Pages at https://natanforestree.github.io
    `<li><a href="./pong/" data-game="pong"><strong>Pong</strong> <span class="blurb">…</span> <span class="controls">…</span></a></li>`.
    Browsers that can't show the scene show this list, and the scene writes these words on the island's sign.
 3. Paint its island: copy `art/site/island-snake.lua` to `art/site/island-pong.lua` and repaint it in the game's own style, copying the colours you borrow into `art/site/palette.lua`. Change the copy's `I.write("snake", …)` to the new game's id (otherwise it overwrites Snake's art), and add a `glow.pong` colour in `palette.lua`. Keep it 96–140 px wide.
-4. Add it to `site/games.json` with its id, `"island": "island-pong"`, a bob, and a spot in both layouts. Find it a spot in both layouts, moving the other islands if needed; the tests say what overlaps or runs off the stage.
+4. Add it to `site/games.json` with its id, `"island": "island-pong"`, a bob, and a spot in both layouts. The scaffolding island ("unfinished") is optional; take it out of games.json if a new game needs its spot. Find it a spot in both layouts, moving the other islands if needed; the tests say what overlaps or runs off the stage.
 5. Rebuild the site art (see "The games page") and run the tests: `cd site && npm test`. They check that every link has an island and that nothing overlaps.
 6. Commit and push to `main`. Pages redeploys automatically (about a minute).
 
@@ -74,3 +74,22 @@ That writes the editable `art/snake-icon.aseprite` and the `snake/icon.png` the 
   ```
 
   To review the art, `aseprite -b --script art/last-light/style-test.lua` writes `art/last-light/preview-style.png`. Previews aren't committed.
+
+## Open Case
+
+`open-case/` is a busking game, a work in progress. You improvise on the computer keyboard, laid out like GarageBand's Musical Typing, over a lo-fi loop, and passers-by stop, stay and tip according to what you play. Repeating yourself bores them, off-key notes on strong beats make them frown, and an earlier idea brought back changed earns a coin. The band gains layers as the crowd grows. The design spec is `docs/superpowers/specs/2026-09-28-open-case-design.md`.
+
+- Tests (Node 22, no dependencies): `cd open-case && npm test`. The headline test plays a scripted honest set against a random bot and a lick bot over ten seeds.
+- Debug:
+  - `?sound` is the sound check: the loop with a switch per layer, and the guitar on the keys.
+  - `?debug` shows each listener's interest and the last rule they heard, and a corner panel with the audio delay. On the end card it adds Run the bots and the test log.
+  - `?seed=N` fixes the passers-by.
+  - `?bot=random` or `?bot=lick` plays a whole set by itself.
+- Tuning: the rules, the crowd, the tips and the feel are in `open-case/src/tuning.js`; the synth's voicing is in `open-case/src/audio.js`, and a few view timings are in `scene.js` and `render.js`.
+- Art: the game is drawn in code for now. The tab icon and a style sample have scripts in `art/open-case/`, and `palette.lua` holds their colours. The style sample shows the look Nathan picked for the repaint: flat colour, no outlines, no dithering.
+
+  ```sh
+  for s in icon style-sample; do /Applications/Aseprite.app/Contents/MacOS/aseprite -b --script art/open-case/$s.lua; done
+  ```
+
+  The style sample writes `art/open-case/preview-style.png` and `preview-oldman.gif`. Previews aren't committed.
