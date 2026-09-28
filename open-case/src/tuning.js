@@ -10,6 +10,7 @@ export const GROOVE = {
   setBars: 60, // 15 times round the 4-bar loop: 3 minutes
   ahead: 0.2, // seconds of band scheduled ahead of the audio clock
   layerLead: 0.25, // seconds before a bar line that its layers are decided (more than `ahead`)
+  applause: 1, // seconds of applause after the band's fade, before the end card
 };
 
 export const PLAY = {

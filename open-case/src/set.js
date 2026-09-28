@@ -84,7 +84,7 @@ export function stepSet(set, dt = DT) {
     set.phase = 'ending';
     c.open = false;
     endTips(c);
-    set.overAt = t + BAR + 1; // a bar's fade, then a moment of applause
+    set.overAt = t + BAR + GROOVE.applause; // a bar's fade, then applause
     set.events.push({ type: 'end' });
   } else if (set.phase === 'ending' && t >= set.overAt) {
     set.phase = 'over';
