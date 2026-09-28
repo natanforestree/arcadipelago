@@ -3,18 +3,32 @@ import assert from 'node:assert/strict';
 import { createAudio, pluckSamples } from '../src/audio.js';
 import { fakeAudioContext } from './fake-audio.js';
 import { BAR, timeOf16th } from '../src/groove.js';
-import { PLAY, GROOVE } from '../src/tuning.js';
+import { PLAY, GROOVE, LAYERS } from '../src/tuning.js';
 
 function memoryStorage() {
   const m = new Map();
   return { get: (k) => (m.has(k) ? m.get(k) : null), set: (k, v) => m.set(k, String(v)) };
 }
 
-// Runs fn with a fake AudioContext installed; fn gets a function returning the context made.
+// Runs fn with a fake AudioContext installed; fn gets a function returning the context made. The
+// context's createGain is wrapped to remember every gain node in the order audio.js makes them
+// (master, band, then each of LAYERS, then the stand-in percussion bus), so a test can read a bus's
+// level the same way it reads any other recorded node — ctx().busGain(id).gain.value.
 function withAudio(fn) {
   let ctx;
   globalThis.AudioContext = function () {
     ctx = fakeAudioContext();
+    const gains = [];
+    const createGain = ctx.createGain;
+    ctx.createGain = () => {
+      const g = createGain();
+      gains.push(g);
+      return g;
+    };
+    ctx.busGain = (id) => {
+      const i = LAYERS.findIndex((l) => l.id === id);
+      return gains[2 + (i < 0 ? LAYERS.length : i)];
+    };
     return ctx;
   };
   try {
@@ -142,14 +156,14 @@ test('the stand-in percussion bus is the drums’ inverse: on while they are out
     const audio = createAudio(memoryStorage());
     audio.start();
     audio.startBand(0);
-    assert.equal(audio.bus.drums.gain.value, 0);
-    assert.equal(audio.bus.perc.gain.value, 1, 'the drums are off, so the percussion starts on');
+    assert.equal(ctx().busGain('drums').gain.value, 0);
+    assert.equal(ctx().busGain('perc').gain.value, 1, 'the drums are off, so the percussion starts on');
     audio.setLayer('drums', true, 1);
-    assert.equal(audio.bus.drums.gain.value, 1);
-    assert.equal(audio.bus.perc.gain.value, 0, 'the drums joined, so the percussion fades out');
+    assert.equal(ctx().busGain('drums').gain.value, 1);
+    assert.equal(ctx().busGain('perc').gain.value, 0, 'the drums joined, so the percussion fades out');
     audio.setLayer('drums', false, 2);
-    assert.equal(audio.bus.drums.gain.value, 0);
-    assert.equal(audio.bus.perc.gain.value, 1, 'the crowd emptied: the percussion comes back');
+    assert.equal(ctx().busGain('drums').gain.value, 0);
+    assert.equal(ctx().busGain('perc').gain.value, 1, 'the crowd emptied: the percussion comes back');
   }));
 
 test('the stand-in percussion lands alongside the hats, on the off-beat 8ths', () =>

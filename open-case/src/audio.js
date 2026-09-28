@@ -365,10 +365,6 @@ export function createAudio(storage) {
     get started() {
       return !!ctx;
     },
-    // The layer and stand-in percussion buses, for tests to check a bus's level directly.
-    get bus() {
-      return bus;
-    },
     get muted() {
       return muted;
     },
