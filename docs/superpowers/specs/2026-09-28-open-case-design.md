@@ -96,6 +96,8 @@ GarageBand's Musical Typing layout, so a GarageBand user's fingers already know 
 - **The 2-bar hold.** A layer only drops out after the crowd has stayed below its number for 2 whole bars, and then it drops on a bar line. So a single person hesitating doesn't make the music flicker.
 - **Every layer is a slot.** In this build each is filled by code. Later a slot can hold an audio file instead, so Nathan's GarageBand stems can drop in with a small card giving their tempo, key and chords. The slot interface is built for that now; the loading of audio files is not.
 
+**Update (2026-09-28):** at Nathan's request, a soft percussion part (a shaker on the 8ths, finger snaps on 2 and 4, a low tap on 1) plays whenever the drums are out (at the start, and if the crowd empties), and fades when they join.
+
 ### Your guitar
 
 - A clean, warm guitar tone made with a plucked-string synth, through the same dusty filter as the band but a little brighter, so it sits in the beat and still stands out.

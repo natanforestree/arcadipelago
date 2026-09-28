@@ -14,6 +14,17 @@ const MUTE_KEY = 'open-case-muted', VOLUME_KEY = 'open-case-volume';
 const PICK = [0.35, 0.55, 0.8, 1]; // loudness by pick strength 1-4
 const BRIGHT = [0.2, 0.35, 0.55, 0.8]; // the pick's brightness by strength
 const BAND_LEVEL = 0.55; // the band bus's level under the guitar
+// The percussion standing in for the drums: on only while the drums slot is off. Lo-fi and soft, not
+// a metronome: a shaker, a finger snap and a low tap, not a beeping tone.
+const PERC_SHAKER_HZ = 7000; // the shaker: bright but soft noise
+const PERC_SHAKER_LEVEL = 0.24;
+const PERC_SHAKER_ATTACK = 0.015; // a soft attack, so it swishes rather than clicks
+const PERC_SNAP_HZ = 2400; // the finger snap: a crisp noise band...
+const PERC_SNAP_TONE_HZ = 1200; // ...with a touch of tone
+const PERC_SNAP_LEVEL = 0.32;
+const PERC_TAP_HZ = 95; // the low tap: a soft thud, like a hand on the guitar's body
+const PERC_TAP_DROP_HZ = 55; // ...its pitch dropping quickly
+const PERC_TAP_LEVEL = 0.4;
 
 // A plucked string's samples: up to `seconds` of a string at `hz`, picked at strength 1-4, cut short
 // once it's inaudible. Karplus-Strong with an all-pass for exact tuning; the loop loses enough each
@@ -97,6 +108,11 @@ export function createAudio(storage) {
       bus[id].gain.value = min === 0 ? 1 : 0;
       bus[id].connect(band);
     }
+    // The stand-in percussion's own bus: not a crowd layer (never in LAYERS), gated the opposite of
+    // the drums slot in setLayer. The drums start off, so it starts on.
+    bus.perc = ctx.createGain();
+    bus.perc.gain.value = 1;
+    bus.perc.connect(band);
     // Your guitar, a little brighter than the band so it sits in the beat and still stands out, with a
     // touch of body.
     const body = ctx.createBiquadFilter(), gl = ctx.createBiquadFilter();
@@ -197,13 +213,18 @@ export function createAudio(storage) {
     o.stop(t + len + 0.05);
     return o;
   }
-  function burst(out, t, { len, type = 'bandpass', freq, q = 1, vol }) {
+  function burst(out, t, { len, type = 'bandpass', freq, q = 1, vol, attack = 0 }) {
     const src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
     src.buffer = noise;
     f.type = type;
     f.frequency.value = freq;
     f.Q.value = q;
-    g.gain.setValueAtTime(vol, t);
+    if (attack > 0) {
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + attack); // a soft onset, for the shaker's swish
+    } else {
+      g.gain.setValueAtTime(vol, t);
+    }
     g.gain.exponentialRampToValueAtTime(0.001, t + len);
     src.connect(f).connect(g).connect(out);
     src.start(t, Math.random() * 1.5, len + 0.05);
@@ -243,6 +264,16 @@ export function createAudio(storage) {
         tone(out, t, { len, type: 'sawtooth', freq: f, vol: n.vel * 0.03, attack: 0.4, detune: true });
         tone(out, t, { len, type: 'sawtooth', freq: f * 1.004, vol: n.vel * 0.03, attack: 0.4, detune: true });
         break;
+      case 'shaker': // bright but soft noise, with a swish rather than a click
+        burst(out, t, { len: 0.05, type: 'bandpass', freq: PERC_SHAKER_HZ, q: 0.7, vol: n.vel * PERC_SHAKER_LEVEL, attack: PERC_SHAKER_ATTACK });
+        break;
+      case 'snap': // a crisp noise burst with a touch of tone, not loud
+        burst(out, t, { len: 0.03, type: 'bandpass', freq: PERC_SNAP_HZ, q: 1.3, vol: n.vel * PERC_SNAP_LEVEL });
+        tone(out, t, { len: 0.03, type: 'triangle', freq: PERC_SNAP_TONE_HZ, vol: n.vel * PERC_SNAP_LEVEL * 0.3, attack: 0.002 });
+        break;
+      case 'tap': // a soft low thud on the downbeat, its pitch dropping quickly, quiet
+        tone(out, t, { len: 0.1, freq: PERC_TAP_HZ, to: PERC_TAP_DROP_HZ, vol: n.vel * PERC_TAP_LEVEL });
+        break;
     }
   }
 
@@ -273,6 +304,8 @@ export function createAudio(storage) {
     if (!ctx) return;
     bus[id].gain.setTargetAtTime(on ? 1 : 0, Math.max(at, ctx.currentTime), 0.02);
     if (id === 'top') wobble.gain.setTargetAtTime(on ? 9 : 0, Math.max(at, ctx.currentTime), 0.5);
+    // The stand-in percussion fills in for the drums, so it fades the opposite way, at the same moment.
+    if (id === 'drums') bus.perc.gain.setTargetAtTime(on ? 0 : 1, Math.max(at, ctx.currentTime), 0.02);
   }
 
   // Called every frame: schedules the band's 16ths due in the next GROOVE.ahead seconds, and the crackle.
@@ -286,6 +319,7 @@ export function createAudio(storage) {
       for (const { id } of LAYERS) {
         for (const n of bandAt(id, next16)) playBand(id, n, at, loopAt + timeOf16th(next16 + n.len) - at);
       }
+      for (const n of bandAt('perc', next16)) playBand('perc', n, at, loopAt + timeOf16th(next16 + n.len) - at);
       next16++;
     }
     if (t >= crackleAt && t < stopAt) {

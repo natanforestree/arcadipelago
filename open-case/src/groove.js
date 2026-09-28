@@ -77,6 +77,16 @@ export function bandAt(layer, s) {
       if (k === 0) for (const note of chord.keys.slice(1)) out.push({ voice: 'pad', note: note + 12, vel: 0.2, len: 16 });
       return out;
     }
+    // Stand-in percussion (not a crowd layer: audio.js plays it whenever the drums slot is off), a
+    // soft shaker-and-snap beat rather than a metronome: a shaker on every swung 8th, louder on the
+    // beat; finger snaps on 2 and 4; a low tap on the downbeat.
+    case 'perc': {
+      const out = [];
+      if (k % 2 === 0) out.push({ voice: 'shaker', note: 0, vel: k % 4 === 0 ? 0.5 : 0.3, len: 1 });
+      if (k === 4 || k === 12) out.push({ voice: 'snap', note: 0, vel: 0.5, len: 1 });
+      if (k === 0) out.push({ voice: 'tap', note: 0, vel: 0.6, len: 1 });
+      return out;
+    }
     default:
       return [];
   }

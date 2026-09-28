@@ -27,6 +27,9 @@ const PEOPLE = {
   commuter: { body: '#3b3f4a', legs: '#2a2c33', head: '#e0b48a', h: 31 },
 };
 const ICON_TIME = 1.6; // seconds a reaction shows over a head
+const GOLD_PULSE = 8; // speed (rad/s) the callback's gold frame pulses at
+const DEBUG_PANEL_TOP = 32; // clears "they remember" (drawn at y 22, ~8px tall) with a couple of px to spare
+const CALLBACK_MARGIN = 4; // px the "callback!" popup keeps clear of both canvas edges
 const RULE_WORDS = { offKey: 'off key' }; // the ?debug view's words for rules, where they differ from their names
 
 // Your last notes tagged by shape: notes completing the same shape share a letter; '-' completes none.
@@ -187,6 +190,14 @@ export function createRenderer(g) {
       const x = 58 + i * 36, y = 4;
       const lit = scene.gold && i === n - 1;
       px(x, y, 30, 16, lit ? '#5a4520' : '#1b143099');
+      if (lit) {
+        // a pulsing gold frame around the idea that just came back
+        const w = 1 + (Math.sin(t * GOLD_PULSE) > 0 ? 1 : 0);
+        px(x, y, 30, w, C.gold);
+        px(x, y + 16 - w, 30, w, C.gold);
+        px(x, y, w, 16, C.gold);
+        px(x + 30 - w, y, w, 16, C.gold);
+      }
       const idea = listen.strip[i];
       if (!idea) continue;
       let p = 0;
@@ -194,12 +205,25 @@ export function createRenderer(g) {
       const lo = Math.min(...ys), hi = Math.max(...ys), span = Math.max(1, hi - lo);
       ys.forEach((v, k) => px(x + 3 + k * 7, y + 12 - Math.round(((v - lo) / span) * 9), 3, 2, lit ? C.gold : '#ffe9a8'));
     }
+    text('they remember', 163, 22, C.grey, 'center'); // labels the strip for a first-time player; 163 is its centre (58..268)
     if (scene.gold) {
       // the gold arc from the old idea down to your guitar
       const k = Math.min(1, (t - scene.gold.t) / 0.5);
-      const x0 = 58 + (n - 1) * 36 + 15, y0 = 20, [x1, y1] = GUITAR;
+      const boxX = 58 + (n - 1) * 36, x0 = boxX + 15, y0 = 20, [x1, y1] = GUITAR;
       g.globalAlpha = 1 - Math.max(0, (t - scene.gold.t) / GOLD);
-      for (let s = 0; s <= k; s += 0.04) px(x0 + (x1 - x0) * s, y0 + (y1 - y0) * s - Math.sin(Math.PI * s) * 20, 2, 2, C.gold);
+      for (let s = 0; s <= k; s += 0.04) px(x0 + (x1 - x0) * s, y0 + (y1 - y0) * s - Math.sin(Math.PI * s) * 20, 3, 3, C.gold);
+      // the word, on the side of the box away from the guitar so the arc (which only moves from the box
+      // towards x1) never crosses it; clamped so it also stays CALLBACK_MARGIN clear of both canvas
+      // edges (the rightmost box otherwise runs the word off the right side); a 1px dark shadow keeps
+      // it crisp over the sky
+      const rightOfGuitar = x0 > x1, align = rightOfGuitar ? 'left' : 'right';
+      g.font = FONT;
+      const ww = g.measureText('callback!').width;
+      const wx = rightOfGuitar
+        ? Math.min(boxX + 33, W - CALLBACK_MARGIN - ww - 1) // -1 leaves room for the shadow's +1px offset
+        : Math.max(boxX - 3, CALLBACK_MARGIN + ww);
+      text('callback!', wx + 1, 9, C.dim, align);
+      text('callback!', wx, 8, C.gold, align);
       g.globalAlpha = 1;
     }
   }
@@ -250,8 +274,8 @@ export function createRenderer(g) {
       `shapes ${shapeTags(l.shapes.slice(-16))}`,
       `delay ${info.reported == null ? '?' : info.reported.toFixed(0)}ms  key ${info.measured == null ? '?' : info.measured.toFixed(0)}ms`,
     ];
-    px(W - 132, 24, 130, lines.length * 9 + 4, C.panel);
-    lines.forEach((s, i) => text(s, W - 129, 26 + i * 9));
+    px(W - 132, DEBUG_PANEL_TOP, 130, lines.length * 9 + 4, C.panel);
+    lines.forEach((s, i) => text(s, W - 129, DEBUG_PANEL_TOP + 2 + i * 9));
   }
 
   // view: { screen: 'title' | 'ready' | 'playing' | 'paused' | 'over', set, scene, keys, t (set time),
