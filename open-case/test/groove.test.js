@@ -53,18 +53,21 @@ test('each layer has its pattern; the band plays only in key', () => {
   assert.deepEqual(bandAt('nothing', 0), []);
 });
 
-test('the click ticks on every beat, the bar\'s first beat brighter than the rest', () => {
+test('the stand-in percussion is a shaker on every 8th, snaps on 2 and 4, and a low tap on 1', () => {
   for (let s = 0; s < 32; s++) {
-    const hits = bandAt('click', s);
-    if (s % 4 === 0) {
-      assert.equal(hits.length, 1, `16th ${s}`);
-      assert.equal(hits[0].voice, 'click');
-    } else {
+    const hits = bandAt('perc', s);
+    const k = s % 16;
+    if (k % 2 === 1) {
       assert.deepEqual(hits, [], `16th ${s}`);
+      continue;
     }
+    const voices = hits.map((h) => h.voice).sort();
+    if (k === 0) assert.deepEqual(voices, ['shaker', 'tap'], `16th ${s}`);
+    else if (k === 4 || k === 12) assert.deepEqual(voices, ['shaker', 'snap'], `16th ${s}`);
+    else assert.deepEqual(voices, ['shaker'], `16th ${s}`);
   }
-  const bar = 5; // the accent isn't special to bar 0
-  const [downbeat] = bandAt('click', bar * 16);
-  const [beatTwo] = bandAt('click', bar * 16 + 4);
-  assert.ok(downbeat.note > beatTwo.note && downbeat.vel > beatTwo.vel);
+  const bar = 5; // the beat isn't special to bar 0
+  const [onBeat] = bandAt('perc', bar * 16 + 8).filter((h) => h.voice === 'shaker');
+  const [offBeat] = bandAt('perc', bar * 16 + 2).filter((h) => h.voice === 'shaker');
+  assert.ok(onBeat.vel > offBeat.vel, 'the shaker is louder on the beat than on the off-8ths');
 });
