@@ -205,12 +205,17 @@ export function createRenderer(g) {
     }
     text('they remember', 163, 22, C.grey, 'center'); // labels the strip for a first-time player; 163 is its centre (58..268)
     if (scene.gold) {
-      // the gold arc from the old idea down to your guitar, and a word popping up beside it, both fading together
+      // the gold arc from the old idea down to your guitar
       const k = Math.min(1, (t - scene.gold.t) / 0.5);
-      const x0 = 58 + (n - 1) * 36 + 15, y0 = 20, [x1, y1] = GUITAR;
+      const boxX = 58 + (n - 1) * 36, x0 = boxX + 15, y0 = 20, [x1, y1] = GUITAR;
       g.globalAlpha = 1 - Math.max(0, (t - scene.gold.t) / GOLD);
       for (let s = 0; s <= k; s += 0.04) px(x0 + (x1 - x0) * s, y0 + (y1 - y0) * s - Math.sin(Math.PI * s) * 20, 3, 3, C.gold);
-      text('callback!', x0, y0 + 10, C.gold, 'center');
+      // the word, on the side of the box away from the guitar so the arc (which only moves from the box
+      // towards x1) never crosses it; a 1px dark shadow keeps it crisp over the sky
+      const rightOfGuitar = x0 > x1;
+      const wx = rightOfGuitar ? boxX + 33 : boxX - 3, align = rightOfGuitar ? 'left' : 'right';
+      text('callback!', wx + 1, 9, C.dim, align);
+      text('callback!', wx, 8, C.gold, align);
       g.globalAlpha = 1;
     }
   }
