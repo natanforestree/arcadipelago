@@ -1,77 +1,235 @@
--- Open Case's 16-bit style sample, for Nathan to judge the look before any repaint: the park at dusk at
--- 320x180, in layers at different depths (a dithered sky and the low sun, far rooftops, near trees,
--- grass and the paved path), you on your crate with the guitar, the open case with a few coins, the
--- looper, and an old man listening. And a short GIF of the old man walking in, nodding, and grinning
--- as his coin arcs into the case. Run from the repo root:
+-- Open Case's style sample, for Nathan to judge the look before any repaint, drawn after his flat
+-- reference picture: every area one solid colour, a base and at most one shadow per material, no
+-- outlines, no dither, and a flat shadow on the ground under each figure. The park at dusk at 320x180,
+-- in layers at different depths (a banded sky and the low sun, clouds, far rooftops with lit windows,
+-- trees, the hedge and the paved path with its pool of lamplight), you on your crate with the guitar,
+-- the open case with a few coins, the looper, the lamp post, and an old man listening. And a short
+-- GIF of the old man walking in, nodding, and grinning as his coin arcs into the case. Run from the
+-- repo root:
 --   aseprite -b --script art/open-case/style-sample.lua
 -- Writes art/open-case/preview-style.png (the still at 3x), preview-style-1x.png and
 -- preview-oldman.gif (at 3x). Previews aren't committed.
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.-)[^/]+$") or ""
 local L = dofile(here .. "../site/lib.lua") -- the site's buffer, noise and saving helpers
-local C = dofile(here .. "palette.lua")
+local C = dofile(here .. "palette.lua").flat
 local W, H = 320, 180
 
--- The palette stays within 48 colours.
+-- The flat palette stays within 48 colours, and nothing is drawn in any other colour.
+local allowed = {}
 do
-  local seen, n = {}, 0
+  local n = 0
   local function walk(t)
     for _, v in pairs(t) do
-      if type(v) == "table" then walk(v) elseif not seen[v] then seen[v] = true; n = n + 1 end
+      if type(v) == "table" then walk(v) elseif not allowed[v] then allowed[v] = true; n = n + 1 end
     end
   end
   walk(C)
   assert(n <= 48, "the palette has " .. n .. " colours; keep it to 48")
   print("palette: " .. n .. " colours")
 end
+local function checkFlat(b)
+  for y = 0, b.h - 1 do
+    for x = 0, b.w - 1 do
+      local c = b[y][x]
+      assert(c == nil or allowed[c], "drew " .. tostring(c) .. " at " .. x .. "," .. y .. ", outside the flat palette")
+    end
+  end
+end
 
-local function ell(x, y, cx, cy, rx, ry)
+local rect = L.fillRect
+
+local function inOval(x, y, cx, cy, rx, ry)
   local dx, dy = (x + 0.5 - cx) / rx, (y + 0.5 - cy) / ry
-  return dx * dx + dy * dy <= 1, dx, dy
+  return dx * dx + dy * dy <= 1
 end
 
--- Big surfaces (the trees) are dithered between shades; small ones (people, the guitar) aren't, or
--- they'd look grainy. The sprite painters set this while they paint.
-local plain = false
-
--- A shade from a ramp for a surface facing (dx, dy), lit from the top-left.
-local function shade(ramp, dx, dy, x, y)
-  local v = (-dx * 0.6 - dy * 0.8) * 0.5 + 0.5 -- 0 (away from the light) .. 1 (toward it)
-  local t = v * (#ramp - 1)
-  local i = math.floor(t)
-  if (plain and 0.5 or L.bayer(x, y)) < t - i then i = i + 1 end
-  return ramp[math.max(1, math.min(#ramp, i + 1))]
-end
-
-local function blob(b, cx, cy, rx, ry, ramp)
+local function oval(b, cx, cy, rx, ry, c)
   for y = math.floor(cy - ry), math.ceil(cy + ry) do
     for x = math.floor(cx - rx), math.ceil(cx + rx) do
-      local inside, dx, dy = ell(x, y, cx, cy, rx, ry)
-      if inside then L.set(b, x, y, shade(ramp, dx, dy, x, y)) end
+      if inOval(x, y, cx, cy, rx, ry) then L.set(b, x, y, c) end
     end
   end
 end
 
--- A limb from (x0, y0) to (x1, y1), w pixels thick, its upper-left side lit.
-local function limb(b, x0, y0, x1, y1, w, ramp)
-  local n = math.max(1, math.ceil(math.max(math.abs(x1 - x0), math.abs(y1 - y0)) * 2))
-  for i = 0, n do
-    local t = i / n
-    local cx, cy = x0 + (x1 - x0) * t, y0 + (y1 - y0) * t
-    for y = math.floor(cy - w / 2), math.floor(cy + w / 2) do
-      for x = math.floor(cx - w / 2), math.floor(cx + w / 2) do
-        local dx, dy = (x + 0.5 - cx) / (w / 2), (y + 0.5 - cy) / (w / 2)
-        if dx * dx + dy * dy <= 1.2 then L.set(b, x, y, shade(ramp, dx, dy, x, y)) end
-      end
+-- Pixel maps: one character per pixel, "." left clear.
+local PX = {
+  k = C.ink, w = C.light, y = C.yellow[2], Y = C.yellow[1],
+  s = C.skin[2], S = C.skin[1],
+  b = C.blue[3], j = C.blue[2], J = C.blue[1],
+  o = C.hoodie[2], O = C.hoodie[1],
+  g = C.wood[3], G = C.wood[2], D = C.wood[1],
+  r = C.red[2], R = C.red[1],
+  c = C.coat[2], C = C.coat[1],
+}
+
+local function stamp(b, ox, oy, rows)
+  for j, row in ipairs(rows) do
+    for i = 1, #row do
+      local ch = row:sub(i, i)
+      if ch ~= "." then L.set(b, ox + i - 1, oy + j - 1, assert(PX[ch], "no colour for " .. ch)) end
     end
   end
 end
 
--- A sprite piece painted by fn(layer), outlined on its own and drawn over b.
-local function piece(b, fn)
-  local one = L.buffer(W, H)
-  fn(one)
-  L.outline(one, C.outline)
-  L.blit(b, one, 0, 0)
+-- A flat shadow on the ground.
+local function shadow(b, cx, cy, rx, ry) oval(b, cx, cy, rx, ry, C.path[1]) end
+
+-------------------------------------------------------------------------------------------------
+-- You, on the crate, playing: facing out, your head turned toward the case, the guitar across your
+-- lap with its neck out to the right, one arm strumming over the body and one on the neck, the far
+-- leg tucked back and the near one stretched down.
+
+local FAR_LEG = { 139, 126, {
+  "....JJJJ",
+  "...JJJJ.",
+  "...JJJJ.",
+  "...JJJJ.",
+  "..JJJJ..",
+  "..JJJJ..",
+  "..JJJJ..",
+  "..JJJJ..",
+  ".JJJJ...",
+  ".JJJJ...",
+  ".JJJJ...",
+  ".JJJJ...",
+  ".wwww...",
+  "wwwwwww.",
+  "wwwwwww.",
+  "wwwwwww.",
+} }
+local NEAR_LEG = { 138, 121, {
+  "..jjjjjjjjjjj...........",
+  ".jjjjjjjjjjjjjj.........",
+  "jjjjjjjjjjjjjjjj........",
+  "jjjjjjjjjjjjjjjjj.......",
+  "jjjjjjjjjjjjjjjjj.......",
+  "jjjjjjjjjjjjjjjjj.......",
+  ".JJJJJJJJJJJjjjjj.......",
+  ".............jjjj.......",
+  ".............jjjj.......",
+  "..............jjjj......",
+  "..............jjjj......",
+  "..............jjjj......",
+  "...............jjjj.....",
+  "...............jjjj.....",
+  "...............jjjj.....",
+  "................jjjj....",
+  "................jjjj....",
+  "................wwww....",
+  "...............wwwwwww..",
+  "...............wwwwwwww.",
+  "...............wwwwwwww.",
+} }
+local TORSO = { 132, 103, {
+  "................",
+  "....oooo....oo..",
+  "...ooooo....ooo.",
+  ".ooooooooowoowoo",
+  ".ooooooooowoowoo",
+  "OOOooooooooooooO",
+  "OOOooooooooooooO",
+  "OOOooooooooooooO",
+  "OOOooooooooooooO",
+  "OOOooooooooooooO",
+  "OOOoooooooooooO.",
+  "..Ooooooooooooo.",
+  "..ooooooooooooo.",
+  "..ooooooooooooo.",
+  "..ooooooooooooo.",
+  "..ooooooooooooo.",
+  "..ooooooooooooo.",
+  "..ooooooooooooo.",
+  "..ooooooooooooo.",
+  "..ooooooooooooo.",
+} }
+local HEAD = { 136, 92, {
+  "...bbbbb....",
+  ".bbbbbbbbb..",
+  "bbbbbbbbbbb.",
+  "bbbbbbbbbbb.",
+  "jjjjjjjjjjjj",
+  "kkSsssssss..",
+  "kSSssssksss.",
+  "kSSssssksss.",
+  ".SSsssssssss",
+  ".SSssssssss.",
+  "..SSssssSs..",
+  "...SSssss...",
+  ".....SSS....",
+  ".....SSS....",
+} }
+local GUITAR = { 126, 113, {
+  "................gggggg....",
+  "....ggggggg....gggggggg...",
+  "...gggggggggg.gggggggggg..",
+  "..gggggggggggggggggkkkggg.",
+  ".ggggggggggggggggggkkkgggg",
+  ".ggggggggggggggggggkkkgggg",
+  "gggggDDggggggggggggggggggg",
+  "gggggDDgggggggggggggggggg.",
+  "GggggDDgggggggggggggggggg.",
+  "GggggDDggggggggggggggggg..",
+  ".GGgggggggggggggGGGGGG....",
+  ".GGggggggggggG............",
+  "..GGGGGGGGGGG.............",
+  "...GGGGGGGGG..............",
+  ".....GGGGG................",
+} }
+-- the neck in steps, rising to the right: { x0, x1, y }, two pixels thick
+local NECK = { { 151, 154, 115 }, { 155, 158, 114 }, { 159, 162, 113 }, { 163, 166, 112 }, { 167, 170, 111 }, { 171, 174, 110 }, { 175, 177, 109 } }
+local HEADSTOCK = { 176, 106, {
+  "...k.k.",
+  "..DDDDD",
+  ".DDDDDD",
+  "DDDDDD.",
+  "DDD....",
+} }
+local FRET_ARM = { 144, 106, {
+  "..ooo...........",
+  ".ooooo..........",
+  ".oooooo.........",
+  "..oooooo........",
+  "...oooooo.......",
+  "....oooooosssss.",
+  ".....OOOOsssssss",
+  "........SSSSSSS.",
+} }
+local FRET_HAND = { 161, 110, {
+  ".ss.",
+  "ssss",
+  "ssss",
+  "ssss",
+  ".SS.",
+} }
+local STRUM_ARM = { 124, 105, {
+  "..........oooo...",
+  "........oooooo...",
+  "......oooooooo...",
+  "....oooooooo.....",
+  "..oooooooo.......",
+  ".oooooooO........",
+  ".ooooOOO.........",
+  "..OsssOO.........",
+  "...SsssO.........",
+  "....Sssss........",
+  "......Sssss......",
+  "........Ssssss...",
+  "..........Sssssss",
+  "...........ssssss",
+  "............ssss.",
+} }
+
+local function you(b)
+  stamp(b, FAR_LEG[1], FAR_LEG[2], FAR_LEG[3])
+  stamp(b, NEAR_LEG[1], NEAR_LEG[2], NEAR_LEG[3])
+  stamp(b, TORSO[1], TORSO[2], TORSO[3])
+  stamp(b, HEAD[1], HEAD[2], HEAD[3])
+  stamp(b, GUITAR[1], GUITAR[2], GUITAR[3])
+  stamp(b, FRET_ARM[1], FRET_ARM[2], FRET_ARM[3])
+  for _, n in ipairs(NECK) do rect(b, n[1], n[3], n[2], n[3] + 1, C.ink) end
+  stamp(b, HEADSTOCK[1], HEADSTOCK[2], HEADSTOCK[3])
+  stamp(b, FRET_HAND[1], FRET_HAND[2], FRET_HAND[3])
+  stamp(b, STRUM_ARM[1], STRUM_ARM[2], STRUM_ARM[3])
 end
 
 -------------------------------------------------------------------------------------------------
@@ -79,248 +237,303 @@ end
 
 local LAMP_X, LAMP_Y = 70, 50 -- the lamp's head
 local CASE_X, CASE_Y = 166, 138 -- the open case's front-left corner
+local BANDS = { 0, 22, 42, 59, 74, 87, 99 } -- the first row of each band of sky
+
+local function band(y)
+  local i = 1
+  for k = 1, #BANDS do if y >= BANDS[k] then i = k end end
+  return i
+end
+
+-- A long flat cloud in steps, flat along the bottom where the sun lights it: a tone lighter than its
+-- sky, its underside lighter again.
+local function cloud(b, cx, cy, len)
+  local k = band(cy)
+  local body, lit = C.sky[math.min(#C.sky, k + 1)], C.sky[math.min(#C.sky, k + 3)]
+  local function step(y0, y1, l, r, c) rect(b, math.floor(cx + l * len), y0, math.floor(cx + r * len), y1, c) end
+  step(cy - 7, cy - 6, -0.3, 0.05, body)
+  step(cy - 5, cy - 4, -0.55, 0.35, body)
+  step(cy - 3, cy - 2, -0.85, 0.7, body)
+  step(cy - 1, cy, -1, 0.9, lit)
+end
+
+-- The far rooftops, hand-placed so each figure's face sits against a roof: a paler row behind, then
+-- the nearer one with its lit windows. { x0, x1, top }
+local BACK = { { 0, 22, 84 }, { 40, 60, 80 }, { 100, 124, 86 }, { 108, 112, 72 }, { 180, 202, 82 }, { 262, 282, 78 }, { 300, 319, 86 } }
+local FRONT = {
+  { 0, 16, 100 }, { 17, 36, 94 }, { 37, 54, 104 }, { 55, 76, 96 }, { 77, 94, 92 }, { 95, 114, 101 },
+  { 115, 128, 96 }, { 129, 158, 88 }, { 159, 178, 99 }, { 179, 198, 94 }, { 199, 220, 102 },
+  { 221, 254, 106 }, { 255, 272, 97 }, { 273, 292, 93 }, { 293, 319, 100 },
+}
+
+local function tree(b, tx, ty, clumps)
+  rect(b, tx - 3, ty, tx + 3, 124, C.wood[1])
+  for _, c in ipairs(clumps) do
+    local cx, cy, r = tx + c[1], ty + c[2], c[3]
+    for y = math.floor(cy - r), math.ceil(cy + r) do
+      for x = math.floor(cx - r), math.ceil(cx + r) do
+        if inOval(x, y, cx, cy, r, r) then
+          L.set(b, x, y, inOval(x, y, cx - r * 0.3, cy - r * 0.35, r, r) and C.leaf[2] or C.leaf[1])
+        end
+      end
+    end
+  end
+end
+
+-- A lit window this close to you would read as part of you, so the windows keep clear.
+local youMask = L.buffer(W, H)
+you(youMask)
+local function nearYou(x, y)
+  for yy = y - 2, y + 3 do
+    for xx = x - 2, x + 3 do if L.get(youMask, xx, yy) then return true end end
+  end
+  return false
+end
 
 local function park()
   local b = L.buffer(W, H)
-  -- the sky: ordered dither between each pair of bands, dark at the top to the glow at the horizon
-  for y = 0, 125 do
-    for x = 0, W - 1 do
-      local t = math.min(1, y / 112) * (#C.sky - 1)
-      local i = math.floor(t)
-      if L.bayer(x, y) < t - i then i = i + 1 end
-      b[y][x] = C.sky[math.min(#C.sky, i + 1)]
-    end
-  end
+  -- the sky: flat bands, dusk purple at the top to the glow at the horizon
+  for y = 0, 129 do rect(b, 0, y, W - 1, y, C.sky[band(y)]) end
   -- the low sun, half behind the rooftops
-  for y = 80, 125 do
-    for x = 212, 262 do
-      local d = math.sqrt((x + 0.5 - 237) ^ 2 + (y + 0.5 - 104) ^ 2)
-      if d < 15 then b[y][x] = C.sun elseif d < 19 and L.bayer(x, y) < (19 - d) / 4 then b[y][x] = C.sun end
-    end
+  oval(b, 237, 104, 15, 15, C.light)
+  -- long clouds, lit from below
+  for _, cl in ipairs({ { 60, 34, 40 }, { 150, 20, 52 }, { 252, 48, 46 }, { 112, 64, 28 }, { 298, 18, 26 } }) do
+    cloud(b, cl[1], cl[2], cl[3])
   end
-  -- long clouds, lit from below by the sun
-  for _, cl in ipairs({ { 60, 34, 46, 3 }, { 150, 22, 60, 2.5 }, { 250, 46, 52, 3 }, { 112, 58, 34, 2 }, { 300, 20, 30, 2 } }) do
-    local cx, cy, len, th = cl[1], cl[2], cl[3], cl[4]
-    for y = math.floor(cy - th), math.ceil(cy + th) do
-      for x = math.floor(cx - len), math.ceil(cx + len) do
-        local u = (x + 0.5 - cx) / len
-        local half = th * (1 - u * u)
-        if half > 0 and math.abs(y + 0.5 - cy) <= half then
-          b[y][x] = (y + 0.5 > cy + half - 1.2) and C.sky[7] or ((y + 0.5 < cy - half + 1) and C.sky[4] or C.sky[5])
-        end
+  -- far rooftops: the paler row behind, then the near row, a water tower, chimneys, lit windows
+  for _, r in ipairs(BACK) do rect(b, r[1], r[3], r[2], 125, C.sky[4]) end
+  for i, r in ipairs(FRONT) do
+    rect(b, r[1], r[3], r[2], 125, C.sky[3])
+    for wy = r[3] + 4, 116, 6 do
+      for wx = r[1] + 3, r[2] - 4, 5 do
+        if L.rnd(wx, wy, 32 + i) < 0.2 and not nearYou(wx, wy) then rect(b, wx, wy, wx + 1, wy + 1, C.yellow[2]) end
       end
     end
   end
-  -- far rooftops, a water tower and a few lit windows
-  local x = 0
-  local k = 0
-  while x < W do
-    local w = 12 + math.floor(L.rnd(k, 1, 31) * 20)
-    local top = 90 + math.floor(L.rnd(k, 2, 31) * 16)
-    for yy = top, 125 do
-      for xx = x, math.min(W - 1, x + w - 1) do b[yy][xx] = (yy == top) and C.city[2] or C.city[1] end
-    end
-    for wy = top + 4, 118, 6 do
-      for wx = x + 3, x + w - 4, 5 do
-        if L.rnd(wx, wy, 32) < 0.14 then L.fillRect(b, wx, wy, wx + 1, wy + 1, C.window) end
-      end
-    end
-    x = x + w
-    k = k + 1
+  rect(b, 80, 81, 90, 88, C.sky[3]) -- the water tower
+  rect(b, 82, 79, 88, 80, C.sky[3])
+  rect(b, 81, 89, 82, 91, C.sky[3]); rect(b, 88, 89, 89, 91, C.sky[3])
+  rect(b, 30, 88, 32, 93, C.sky[3]) -- chimneys
+  rect(b, 263, 93, 265, 96, C.sky[3])
+  -- the trees, in teal shadow
+  tree(b, 26, 70, { { 4, -16, 15 }, { 0, 0, 24 }, { -14, 10, 16 }, { 16, 8, 17 } })
+  tree(b, 300, 62, { { 8, -18, 14 }, { 0, 0, 24 }, { -18, 12, 16 } })
+  -- the hedge, scalloped along its lit top
+  for x = 0, W - 1 do
+    local u = ((x + 3) % 14 - 7) / 7
+    local top = 118 - math.floor(3 * math.sqrt(math.max(0, 1 - u * u)))
+    rect(b, x, top, x, top + 1, C.leaf[3])
+    rect(b, x, top + 2, x, 129, C.leaf[2])
   end
-  -- the near trees, in teal shadow
-  for _, tr in ipairs({ { 26, 70, { { 0, 0, 24 }, { -14, 10, 16 }, { 16, 8, 17 }, { 4, -16, 15 } } }, { 300, 62, { { 0, 0, 24 }, { -18, 12, 16 }, { 8, -18, 14 } } } }) do
-    local tx, ty = tr[1], tr[2]
-    L.fillRect(b, tx - 3, ty, tx + 3, 124, C.wood[1])
-    for _, c in ipairs(tr[3]) do
-      local cx, cy, r = tx + c[1], ty + c[2], c[3]
-      for yy = math.floor(cy - r), math.ceil(cy + r) do
-        for xx = math.floor(cx - r), math.ceil(cx + r) do
-          local inside, dx, dy = ell(xx, yy, cx, cy, r, r)
-          local lumpy = L.rnd(math.floor(xx / 3), math.floor(yy / 3), 33) * 0.25
-          if inside and dx * dx + dy * dy < 1 - lumpy then L.set(b, xx, yy, shade(C.leaf, dx, dy, xx, yy)) end
-        end
-      end
-    end
-  end
-  -- grass, then the paved path in rows that widen toward you
-  for yy = 118, 130 do
-    for xx = 0, W - 1 do
-      local c = C.leaf[2]
-      if yy < 120 and L.rnd(xx, yy, 34) < 0.5 then c = C.leaf[3] elseif L.rnd(xx, yy, 35) < 0.12 then c = C.leaf[1] end
-      b[yy][xx] = c
-    end
-  end
+  -- the paved path in rows that widen toward you, and the pool of lamplight on it
   local rows = { 130, 134, 139, 145, 152, 160, 169, 180 }
   for r = 1, #rows - 1 do
     local y0, y1 = rows[r], rows[r + 1] - 1
     local sw = 10 + r * 3
-    for yy = y0, y1 do
-      for xx = 0, W - 1 do
-        local sx = xx + (r % 2) * math.floor(sw / 2)
-        local stoneId = math.floor(sx / sw)
-        local mortar = (yy == y1) or (sx % sw == 0)
-        local mid = stoneId * sw + sw / 2 - (r % 2) * math.floor(sw / 2)
-        local c = (L.rnd(stoneId, r, 36) < 0.45) and C.path[3] or C.path[2]
-        if math.abs(mid - LAMP_X) < 12 + r * 3 then c = C.path[4] end -- the pool of lamplight
-        if yy == y0 and not mortar then c = C.path[4] end -- each stone's lit top edge
-        b[yy][xx] = mortar and C.path[1] or c
+    for y = y0, y1 do
+      for x = 0, W - 1 do
+        local sx = x + (r % 2) * math.floor(sw / 2)
+        local joint = (y == y1) or (sx % sw == 0)
+        local lit = inOval(x, y, LAMP_X, 143, 40, 12)
+        b[y][x] = joint and (lit and C.path[2] or C.path[1]) or (lit and C.path[3] or C.path[2])
       end
     end
   end
-  L.fillRect(b, 0, 130, W - 1, 130, C.path[1])
-  -- the lamp's glow on the air (dithered, thinner with distance)
-  for yy = LAMP_Y - 26, LAMP_Y + 30 do
-    for xx = LAMP_X - 30, LAMP_X + 30 do
-      local d = math.sqrt((xx + 0.5 - LAMP_X) ^ 2 + (yy + 0.5 - LAMP_Y - 3) ^ 2)
-      if d > 5 and d < 24 and yy < 118 and L.bayer(xx, yy) < 0.4 - d / 60 then L.set(b, xx, yy, C.lamp[1]) end
-    end
-  end
+  rect(b, 0, 130, W - 1, 130, C.path[1])
   -- the lamp post
-  piece(b, function(s)
-    L.fillRect(s, LAMP_X - 1, LAMP_Y + 6, LAMP_X, 132, C.city[2])
-    L.fillRect(s, LAMP_X - 3, 130, LAMP_X + 2, 133, C.city[2])
-    L.fillRect(s, LAMP_X - 4, LAMP_Y - 2, LAMP_X + 3, LAMP_Y - 1, C.city[2])
-    L.fillRect(s, LAMP_X - 3, LAMP_Y, LAMP_X + 2, LAMP_Y + 5, C.lamp[1])
-    L.fillRect(s, LAMP_X - 2, LAMP_Y + 1, LAMP_X + 1, LAMP_Y + 4, C.lamp[2])
-  end)
-  -- the crate you sit on
-  piece(b, function(s)
-    L.fillRect(s, 130, 124, 152, 141, C.wood[2])
-    L.fillRect(s, 130, 124, 152, 125, C.wood[3])
-    L.fillRect(s, 130, 132, 152, 132, C.wood[1])
-    L.fillRect(s, 141, 126, 141, 141, C.wood[1])
-    L.fillRect(s, 130, 126, 130, 141, C.wood[3])
-  end)
-  -- the looper, a knob on top
-  piece(b, function(s)
-    L.fillRect(s, 118, 141, 128, 146, C.pedal[1])
-    L.fillRect(s, 125, 139, 126, 140, C.city[2])
-  end)
+  rect(b, LAMP_X - 1, LAMP_Y + 7, LAMP_X, 131, C.ink)
+  rect(b, LAMP_X - 3, 128, LAMP_X + 2, 132, C.ink)
+  rect(b, LAMP_X - 2, LAMP_Y - 3, LAMP_X + 1, LAMP_Y - 3, C.ink)
+  rect(b, LAMP_X - 4, LAMP_Y - 2, LAMP_X + 3, LAMP_Y - 2, C.ink)
+  rect(b, LAMP_X - 3, LAMP_Y - 1, LAMP_X + 2, LAMP_Y + 5, C.yellow[2])
+  rect(b, LAMP_X - 2, LAMP_Y, LAMP_X + 1, LAMP_Y + 4, C.light)
+  rect(b, LAMP_X - 3, LAMP_Y + 6, LAMP_X + 2, LAMP_Y + 6, C.ink)
+  -- the crate you sit on, on its shadow
+  shadow(b, 145, 141.5, 19, 2.5)
+  rect(b, 132, 128, 151, 141, C.wood[2])
+  rect(b, 132, 132, 151, 132, C.wood[1])
+  rect(b, 132, 137, 151, 137, C.wood[1])
+  rect(b, 138, 129, 145, 130, C.wood[1]) -- the hand-hold
   return b
 end
 
--- You, on the crate, playing: the far leg, the body and head, the guitar across your lap, and your
--- arms on the strings and the neck.
-local function you(b, beat)
-  plain = true
-  L.fillRect(b, 120, 142, 121, 143, beat and C.pedal[2] or C.pedal[3]) -- the looper's light
-  piece(b, function(s)
-    limb(s, 140, 121, 157, 122, 6, C.jeans) -- the far thigh and shin, half hidden
-    limb(s, 157, 122, 160, 139, 5, C.jeans)
-    L.fillRect(s, 158, 139, 165, 141, C.case[1])
-    blob(s, 141, 108, 8, 13, C.hoodie) -- the body
-    limb(s, 141, 121, 155, 123, 7, C.jeans) -- the near thigh...
-    limb(s, 155, 123, 156, 140, 6, C.jeans) -- ...and shin
-    L.fillRect(s, 154, 140, 162, 142, C.case[1]) -- a shoe
-    blob(s, 143, 89, 6.5, 7, C.skin) -- the head
-    for y = 80, 86 do
-      for x = 136, 150 do
-        if ell(x, y, 143, 87, 7.5, 7) then L.set(s, x, y, C.beanie) end
-      end
-    end
-    L.fillRect(s, 136, 86, 150, 86, C.city[2]) -- the beanie's fold
-    L.set(s, 147, 90, C.outline) -- an eye
-    L.set(s, 150, 91, C.skin[3]) -- the nose
-    L.set(s, 139, 90, C.skin[1]) -- an ear
-  end)
-  piece(b, function(s) -- the guitar
-    limb(s, 158, 112, 190, 97, 2, { C.wood[1], C.wood[2] }) -- the neck
-    L.fillRect(s, 189, 94, 193, 97, C.wood[1]) -- the headstock
-    blob(s, 152, 115, 7, 6.5, C.guitar) -- the lower bout
-    blob(s, 158, 112, 5, 5, C.guitar) -- the upper bout
-    L.disc(s, 155, 113, 1.8, C.outline) -- the sound hole
-    for k = 0, 34 do L.set(s, 150 + k, 116 - k * 0.55, C.guitar[3]) end -- a string catching the light
-  end)
-  piece(b, function(s) -- the arms: one strumming, one on the neck
-    limb(s, 139, 100, 146, 110, 4, C.hoodie)
-    limb(s, 146, 110, 152, 113, 4, C.hoodie)
-    L.fillRect(s, 152, 112, 154, 114, C.skin[2])
-    limb(s, 144, 99, 160, 104, 4, C.hoodie)
-    limb(s, 160, 104, 176, 101, 3, C.hoodie)
-    L.fillRect(s, 176, 99, 178, 102, C.skin[2])
-  end)
-  plain = false
+-- The looper by the crate: its body, the switch, and its light, red on the first beat.
+local function looper(b, beat)
+  shadow(b, 123, 146.5, 7, 1.5)
+  rect(b, 118, 141, 128, 146, C.blue[1])
+  rect(b, 118, 141, 128, 141, C.blue[2])
+  rect(b, 124, 139, 126, 140, C.ink)
+  rect(b, 120, 143, 121, 144, beat and C.red[2] or C.go)
 end
 
 -- The open case: its lid up behind, the red lining, and `coins` coins in it (and a glint on one).
 local function openCase(b, coins, glint)
-  piece(b, function(s)
-    for y = CASE_Y - 8, CASE_Y - 1 do
-      local lean = math.floor((CASE_Y - y) / 2)
-      L.fillRect(s, CASE_X + 2 + lean, y, CASE_X + 32 + lean, y, C.case[1])
-    end
-    L.fillRect(s, CASE_X, CASE_Y, CASE_X + 32, CASE_Y + 8, C.case[1])
-    L.fillRect(s, CASE_X + 2, CASE_Y + 1, CASE_X + 30, CASE_Y + 6, C.case[2])
-    L.fillRect(s, CASE_X + 2, CASE_Y + 1, CASE_X + 30, CASE_Y + 1, C.case[3])
-  end)
+  shadow(b, CASE_X + 17, CASE_Y + 8.5, 19, 2.5)
+  for y = CASE_Y - 8, CASE_Y - 1 do
+    local lean = math.floor((CASE_Y - y) / 2)
+    rect(b, CASE_X + 2 + lean, y, CASE_X + 30 + lean, y, C.ink)
+    if y > CASE_Y - 8 and y < CASE_Y - 1 then rect(b, CASE_X + 4 + lean, y, CASE_X + 28 + lean, y, C.red[1]) end
+  end
+  rect(b, CASE_X, CASE_Y, CASE_X + 32, CASE_Y + 8, C.ink)
+  rect(b, CASE_X + 2, CASE_Y + 1, CASE_X + 30, CASE_Y + 5, C.red[2])
+  rect(b, CASE_X + 2, CASE_Y + 1, CASE_X + 30, CASE_Y + 1, C.red[1])
   for i = 0, coins - 1 do
     local x = CASE_X + 4 + (i * 7) % 25
-    local y = CASE_Y + 3 + (i * 3) % 3
-    L.fillRect(b, x, y, x + 2, y + 1, C.coin[2])
-    L.set(b, x, y, C.coin[3])
-    L.set(b, x + 2, y + 1, C.coin[1])
+    local y = CASE_Y + 2 + i % 2
+    rect(b, x, y, x + 2, y + 1, C.yellow[2])
+    L.set(b, x + 2, y + 1, C.yellow[1])
   end
   if glint then
-    local x, y = CASE_X + 11, CASE_Y + 3
-    L.set(b, x, y - 1, C.coin[3]); L.set(b, x - 1, y, C.coin[3]); L.set(b, x + 1, y, C.coin[3]); L.set(b, x, y + 1, C.coin[3])
+    local x, y = CASE_X + 11, CASE_Y + 2
+    L.set(b, x, y - 1, C.light); L.set(b, x - 1, y, C.light); L.set(b, x, y, C.light); L.set(b, x + 1, y, C.light); L.set(b, x, y + 1, C.light)
   end
 end
 
+-------------------------------------------------------------------------------------------------
 -- The old man, feet at (x, 150), facing left toward you. step: 0..3 through his walk (nil standing);
 -- nod: his head dipped; grin: smiling; tip: his hand held out with a coin.
+
+local HAT = {
+  ".....kkkkkk.....",
+  ".....kkkkkk.....",
+  ".....kkkkkk.....",
+  ".....rrrrrr.....",
+  "...kkkkkkkkkk...",
+}
+local FACE = {
+  "....ssssssww....",
+  "....ssssssSww...",
+  "...sksssssSww...",
+  "..ssksssSSSw....",
+  "...sssssssS.....",
+  "...wwwwsssS.....",
+  "...wwwwwwsS.....",
+  "....wwwwww......",
+  ".....wwww.......",
+}
+local FACE_GRIN = {
+  "....ssssssww....",
+  "....ssssssSww...",
+  "...ssssssSSww...",
+  "..sskksSSSw.....",
+  "...sssssssS.....",
+  "...wwwwkssS.....",
+  "...wkkkwwsS.....",
+  "....wwwwww......",
+  ".....wwww.......",
+}
+local COAT = {
+  "....ccccccccc...",
+  "..cccccccccccC..",
+  "..cccccccccccCC.",
+  "..cccccccccccCC.",
+  "..cccccccccccCC.",
+  "..kccccccccccCC.",
+  "..cccccccccccCC.",
+  "..cccccccccccCC.",
+  "..cccccccccccCC.",
+  "..cccccccccccCC.",
+  ".ckcccccccccccC.",
+  ".cccccccccccccC.",
+  ".cccccccccccccC.",
+  ".cccccccccccccC.",
+  ".cccccccccccccC.",
+  ".ckccccccccccCC.",
+  ".cccccccccccccC.",
+  ".cccccccccccccCC",
+  ".cccccccccccccCC",
+  ".cccccccccccccCC",
+  "ccccccccccccccCC",
+  "ccccccccccccccCC",
+  "ccccccccccccccCC",
+}
+local SCARF = {
+  "...rrrrrrrrr....",
+  "...rrrrrrrrrr...",
+  "....rrrrrrrrR...",
+  "..........RR....",
+  "..........RR....",
+  "..........RR....",
+  "...........R....",
+}
+local ARM_CANE = {
+  ".....CCC....",
+  "....CCCC....",
+  "....CCC.....",
+  "...CCCC.....",
+  "...CCC......",
+  "..CCCC......",
+  "..CCC.......",
+  "..CCC.......",
+  ".sss........",
+  ".sss........",
+}
+local ARM_TIP = {
+  ".........CCC....",
+  "......CCCCCC....",
+  "sss.CCCCCCC.....",
+  "sssCCCCCC.......",
+  "sss.............",
+}
+local LEGS = {
+  [0] = {
+    "......kkkk......",
+    ".....kk..kk.....",
+    ".....kk...kk....",
+    "....kk....kk....",
+    "....kk.....kk...",
+    "...kk......kk...",
+    ".DDDD.....DDDD..",
+    ".DDDD......DDD..",
+  },
+  [1] = {
+    "......kkk.......",
+    "......kkk.......",
+    ".....kk.kk......",
+    ".....kk..kk.....",
+    ".....kk..kkk....",
+    ".....kk...DDD...",
+    "...DDDD.........",
+    "...DDDD.........",
+  },
+  stand = {
+    ".....kk..kk.....",
+    ".....kk..kk.....",
+    ".....kk..kk.....",
+    ".....kk..kk.....",
+    ".....kk..kk.....",
+    ".....kk..kk.....",
+    "...DDDD.DDDD....",
+    "...DDDD.DDDD....",
+  },
+}
+LEGS[2], LEGS[3] = LEGS[0], LEGS[1]
+
 local function oldMan(b, x, step, nod, grin, tip)
-  plain = true
+  x = math.floor(x + 0.5)
   local bob = (step and step % 2 == 1) and 1 or 0
-  local top = 104 + bob
-  piece(b, function(s)
-    local swing = step and ({ -3, 0, 3, 0 })[step + 1] or 0
-    limb(s, x + 2, top + 32, x + 2 - swing, 148, 3, { C.coat[1], C.coat[1] }) -- the legs
-    limb(s, x - 2, top + 32, x - 2 + swing, 148, 3, { C.coat[1], C.coat[2] })
-    L.fillRect(s, x - 5 + swing, 148, x - 1 + swing, 150, C.hat)
-    L.fillRect(s, x - 1 - swing, 148, x + 3 - swing, 150, C.hat)
-    for y = top + 14, top + 34 do -- the coat, widening to its hem
-      local half = 6 + (y - top - 14) * 0.15
-      for xx = math.floor(x - half), math.floor(x + half) do
-        local dx = (xx + 0.5 - x) / half
-        L.set(s, xx, y, shade(C.coat, dx, -0.2, xx, y))
-      end
-    end
-    L.fillRect(s, x - 6, top + 13, x + 6, top + 15, C.scarf)
-    L.fillRect(s, x + 3, top + 16, x + 5, top + 21, C.scarf) -- its loose end
-    local hy = top + 7 + (nod and 1 or 0)
-    blob(s, x - 1, hy, 5, 5.5, C.skin) -- the head
-    L.fillRect(s, x - 6, hy - 5, x + 5, hy - 4, C.hat) -- the brim
-    L.fillRect(s, x - 4, hy - 10, x + 3, hy - 5, C.hat) -- the crown
-    L.set(s, x - 4, hy - 1, C.outline) -- an eye
-    L.set(s, x - 6, hy, C.skin[2]) -- the nose
-    if grin then
-      L.fillRect(s, x - 5, hy + 2, x - 3, hy + 2, C.outline)
-      L.set(s, x - 2, hy + 1, C.outline)
-    else
-      L.fillRect(s, x - 5, hy + 2, x - 4, hy + 2, C.skin[1])
-    end
-    L.fillRect(s, x + 1, hy + 3, x + 3, hy + 4, C.coat[2]) -- white whiskers... in coat grey, as the dusk lights them
-    -- the arm and the cane (or the hand out, tipping)
-    if tip then
-      limb(s, x - 2, top + 17, x - 9, top + 20, 3, C.coat)
-      L.fillRect(s, x - 11, top + 19, x - 9, top + 21, C.skin[2])
-    else
-      limb(s, x - 2, top + 17, x - 6, top + 25, 3, C.coat)
-      L.fillRect(s, x - 7, top + 25, x - 5, top + 27, C.skin[2])
-      limb(s, x - 6, top + 27, x - 8 - (step and 1 or 0), 149, 1, { C.wood[1], C.wood[2] })
-    end
-  end)
-  plain = false
+  local top = 105 + bob
+  local ox = x - 8
+  shadow(b, x, 150.5, 10, 2.5)
+  stamp(b, ox, 143, step and LEGS[step] or LEGS.stand)
+  if not tip then -- the cane, planted on the path
+    rect(b, ox, top + 27, ox, 149, C.wood[1])
+    rect(b, ox, top + 24, ox + 1, top + 24, C.wood[1])
+  end
+  stamp(b, ox, top + 16, COAT)
+  local hx, hy = ox - (nod and 1 or 0), top + (nod and 1 or 0)
+  stamp(b, hx, hy + 5, grin and FACE_GRIN or FACE)
+  stamp(b, hx, hy, HAT)
+  stamp(b, ox, top + 14, SCARF)
+  if tip then stamp(b, ox - 5, top + 17, ARM_TIP) else stamp(b, ox, top + 17, ARM_CANE) end
 end
 
--- A coin, thrown: side-on every other frame, so it spins.
+-- A coin, thrown: face-on and side-on by turns, so it spins.
 local function coin(b, x, y, f)
   if f % 2 == 0 then
-    L.fillRect(b, x - 1, y - 1, x + 1, y + 1, C.coin[2])
-    L.set(b, x - 1, y - 1, C.coin[3])
+    stamp(b, x - 2, y - 2, { ".yy.", "ywyy", "yyyY", ".YY." })
   else
-    L.fillRect(b, x, y - 1, x, y + 1, C.coin[2])
+    stamp(b, x - 1, y - 2, { "yy", "wy", "yY", "YY" })
   end
 end
 
@@ -331,21 +544,26 @@ local base = park()
 local function scene(manX, step, nod, grin, tip, coins, glint, beat)
   local b = L.buffer(W, H)
   L.blit(b, base, 0, 0)
+  looper(b, beat)
   openCase(b, coins, glint)
-  you(b, beat)
+  you(b)
   if manX then oldMan(b, manX, step, nod, grin, tip) end
   return b
 end
 
 -- The still.
 local still = scene(234, nil, false, true, false, 5, true)
+checkFlat(still)
 L.save(still, nil, "art/open-case/preview-style-1x.png")
 L.save(L.scale(still, 3), nil, "art/open-case/preview-style.png")
 
 -- The GIF: walking in, nodding, grinning, the coin arcing into the case. Cropped round the action.
 local CROP = { 110, 70, 200, 90 }
 local frames = {}
-local function add(b, ms) frames[#frames + 1] = { L.scale(L.crop(b, CROP[1], CROP[2], CROP[3], CROP[4]), 3), ms } end
+local function add(b, ms)
+  checkFlat(b)
+  frames[#frames + 1] = { L.scale(L.crop(b, CROP[1], CROP[2], CROP[3], CROP[4]), 3), ms }
+end
 for f = 0, 11 do add(scene(300 - f * 5.5, f % 4, false, false, false, 4, false, f % 6 == 0), 120) end
 for f = 0, 3 do add(scene(234, nil, f % 2 == 0, false, false, 4, false), 180) end
 add(scene(234, nil, false, true, false, 4, false), 400)
