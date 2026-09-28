@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SIGN, wrap, layoutSign, placeSign } from '../sign.js';
 import { STAGES } from '../layout.js';
-import { placeIslands, overlaps } from '../islands.js';
+import { placeIslands, overlaps, islandEntries } from '../islands.js';
 import { readJson } from './helpers.js';
 
 const mono = (s) => s.length * 6;
@@ -73,7 +73,7 @@ test('on a canvas narrower than the sign, its left edge stays in view', () => {
 
 test('for every real game, in both layouts, a nominal board never covers the top half of its island', () => {
   const data = readJson('games.json');
-  const metas = Object.fromEntries([data.unfinished, ...data.games].map((e) => [e.island, readJson(`assets/${e.island}.json`)]));
+  const metas = Object.fromEntries(islandEntries(data).map((e) => [e.island, readJson(`assets/${e.island}.json`)]));
   for (const layout of Object.keys(STAGES)) {
     const stage = STAGES[layout];
     const bounds = [0, 0, stage.w, stage.h];

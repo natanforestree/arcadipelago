@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { placeIslands, checkGames, overlaps } from '../islands.js';
+import { placeIslands, checkGames, overlaps, islandEntries } from '../islands.js';
 import { readJson } from './helpers.js';
 
 // Fixture art: two 100-wide game islands and a 60-wide unfinished one, their opaque boxes inset in their frames.
@@ -82,11 +82,14 @@ test('game ids are unique, lowercase, and never "unfinished"', () => {
   assert.deepEqual(checkGames(reserved, metas()), ['game id "unfinished" is kept for the unfinished island']);
 });
 
-test('games.json needs games and an unfinished island', () => {
+test('games.json needs games; the unfinished island is optional', () => {
   assert.deepEqual(checkGames({ games: [], unfinished: fixture().unfinished }, metas()), ['games.json needs a non-empty "games" list']);
   const noUnfinished = fixture();
   delete noUnfinished.unfinished;
-  assert.deepEqual(checkGames(noUnfinished, metas()), ['games.json needs an "unfinished" island']);
+  assert.deepEqual(checkGames(noUnfinished, metas()), []);
+  assert.deepEqual(placeIslands(noUnfinished, metas(), 'landscape').map((p) => p.id), ['a', 'b']);
+  assert.deepEqual(islandEntries(noUnfinished).map((e) => e.island), ['island-a', 'island-b']);
+  assert.deepEqual(islandEntries(fixture()).map((e) => e.island), ['island-u', 'island-a', 'island-b']);
 });
 
 test('overlaps: touching edges do not overlap', () => {
@@ -96,6 +99,6 @@ test('overlaps: touching edges do not overlap', () => {
 
 test('the real games.json fits its art in both layouts', () => {
   const data = readJson('games.json');
-  const real = Object.fromEntries([data.unfinished, ...data.games].map((e) => [e.island, readJson(`assets/${e.island}.json`)]));
+  const real = Object.fromEntries(islandEntries(data).map((e) => [e.island, readJson(`assets/${e.island}.json`)]));
   assert.deepEqual(checkGames(data, real), []);
 });

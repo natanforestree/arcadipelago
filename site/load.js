@@ -2,12 +2,13 @@
 // `io` replaces the browser's loaders (for the tests). Any file that fails to load fails the whole load.
 import { PHASES } from './sky.js';
 import { STAGES } from './layout.js';
+import { islandEntries } from './islands.js';
 
 export async function loadScene(base = new URL('./', import.meta.url), io = {}) {
   const { image = loadImage, json = loadJson } = io;
   const at = (path) => new URL(path, base).href;
   const [games, sky, signMeta] = await Promise.all([json(at('games.json')), json(at('assets/sky.json')), json(at('assets/sign.json'))]);
-  const names = [games.unfinished.island, ...games.games.map((g) => g.island)];
+  const names = islandEntries(games).map((e) => e.island);
   const layouts = Object.keys(STAGES);
   const [metaList, imageList, skyList, [clouds, atlas, signImage]] = await Promise.all([
     Promise.all(names.map((n) => json(at(`assets/${n}.json`)))),

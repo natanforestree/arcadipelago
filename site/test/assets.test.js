@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { PHASES } from '../sky.js';
 import { SIGN } from '../sign.js';
+import { islandEntries } from '../islands.js';
 import { readJson, pngSize, siteFile } from './helpers.js';
 
 const HEX = /^#[0-9a-f]{6}$/;
@@ -34,7 +35,7 @@ test('each phase has a sky for each stage, and the clouds a row per phase and la
 
 test('each island sheet is its frames side by side, over a row of glows', () => {
   const data = readJson('games.json');
-  for (const { island } of [data.unfinished, ...data.games]) {
+  for (const { island } of islandEntries(data)) {
     const meta = readJson(`assets/${island}.json`);
     assert.deepEqual(pngSize(`assets/${island}.png`), [meta.w * meta.frames, meta.h * 2], island);
     assert.ok(Number.isInteger(meta.ms) && meta.ms > 0 && rect(meta.hit), island);

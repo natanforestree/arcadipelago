@@ -4,9 +4,12 @@ import { BOB_AMP, LIFT } from './motion.js';
 
 const WIDTHS = { game: [96, 140], unfinished: [48, 80] };
 
-// The islands in drawing order: the unfinished island first (it sits furthest back), then the games
-// in the file's order. x, y: the frame's top-left in stage pixels. hit: the island's opaque box in
-// stage pixels, where its link goes. metas maps an island's art name to its JSON.
+// games.json's island entries in drawing order: the unfinished island first, when there is one (it
+// sits furthest back), then the games in the file's order.
+export const islandEntries = (data) => (data.unfinished ? [data.unfinished, ...data.games] : data.games);
+
+// The islands in drawing order (as islandEntries). x, y: the frame's top-left in stage pixels. hit: the
+// island's opaque box in stage pixels, where its link goes. metas maps an island's art name to its JSON.
 export function placeIslands(data, metas, layout) {
   const place = (entry, id, game) => {
     const meta = metas[entry.island];
@@ -14,7 +17,8 @@ export function placeIslands(data, metas, layout) {
     const [hx, hy, hw, hh] = meta.hit;
     return { id, game, island: entry.island, x, y, meta, bob: entry.bob, hit: [x + hx, y + hy, hw, hh] };
   };
-  return [place(data.unfinished, 'unfinished', false), ...data.games.map((g) => place(g, g.id, true))];
+  const games = data.games.map((g) => place(g, g.id, true));
+  return data.unfinished ? [place(data.unfinished, 'unfinished', false), ...games] : games;
 }
 
 export function overlaps([ax, ay, aw, ah], [bx, by, bw, bh]) {
@@ -24,7 +28,6 @@ export function overlaps([ax, ay, aw, ah], [bx, by, bw, bh]) {
 // Every problem with games.json, given the island art's JSON, as sentences; empty means it's fine.
 export function checkGames(data, metas) {
   if (!Array.isArray(data?.games) || data.games.length === 0) return ['games.json needs a non-empty "games" list'];
-  if (!data.unfinished) return ['games.json needs an "unfinished" island'];
   const problems = [];
   const seen = new Set();
   for (const g of data.games) {
@@ -33,7 +36,7 @@ export function checkGames(data, metas) {
     else if (seen.has(g.id)) problems.push(`game id "${g.id}" is listed twice`);
     seen.add(g.id);
   }
-  const entries = [['unfinished', data.unfinished, false], ...data.games.map((g) => [g.id, g, true])];
+  const entries = [...(data.unfinished ? [['unfinished', data.unfinished, false]] : []), ...data.games.map((g) => [g.id, g, true])];
   for (const [id, e, game] of entries) {
     const meta = metas[e.island];
     if (!meta) {
