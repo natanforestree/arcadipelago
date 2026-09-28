@@ -77,6 +77,11 @@ export function bandAt(layer, s) {
       if (k === 0) for (const note of chord.keys.slice(1)) out.push({ voice: 'pad', note: note + 12, vel: 0.2, len: 16 });
       return out;
     }
+    // The metronome click (not a crowd layer: audio.js plays it whenever the drums slot is off). One
+    // hit a beat, brighter on the bar's first beat; note carries the accent flag, not a pitch.
+    case 'click':
+      if (k % 4 !== 0) return [];
+      return [{ voice: 'click', note: k === 0 ? 1 : 0, vel: k === 0 ? 0.9 : 0.55, len: 1 }];
     default:
       return [];
   }

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createAudio, pluckSamples } from '../src/audio.js';
 import { fakeAudioContext } from './fake-audio.js';
-import { BAR } from '../src/groove.js';
+import { BAR, timeOf16th } from '../src/groove.js';
 import { PLAY, GROOVE } from '../src/tuning.js';
 
 function memoryStorage() {
@@ -135,6 +135,35 @@ test('the band fades over a bar at the end and then stops', () =>
     }
     const osc = ctx().started.filter((s) => s.kind === 'osc');
     assert.ok(Math.max(...osc.map((s) => s.t)) < 1 + BAR);
+  }));
+
+test('the click bus is the drums’ inverse: on while they are out, off once they join', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    audio.startBand(0);
+    assert.equal(audio.bus.drums.gain.value, 0);
+    assert.equal(audio.bus.click.gain.value, 1, 'the drums are off, so the click starts on');
+    audio.setLayer('drums', true, 1);
+    assert.equal(audio.bus.drums.gain.value, 1);
+    assert.equal(audio.bus.click.gain.value, 0, 'the drums joined, so the click fades out');
+    audio.setLayer('drums', false, 2);
+    assert.equal(audio.bus.drums.gain.value, 0);
+    assert.equal(audio.bus.click.gain.value, 1, 'the crowd emptied: the click comes back');
+  }));
+
+test('the click ticks on every beat, filling the gap where no other layer plays', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    audio.startBand(0);
+    for (let i = 0; i < 100; i++) {
+      ctx().currentTime += 0.05;
+      audio.update();
+    }
+    const osc = ctx().started.filter((s) => s.kind === 'osc').map((s) => s.t);
+    // 16th 8 of every bar: no other layer has anything to say there, only the click.
+    assert.ok(osc.some((t) => Math.abs(t - timeOf16th(8)) < 1e-9));
   }));
 
 test('coins, applause and the reported delay', () =>

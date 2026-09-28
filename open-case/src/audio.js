@@ -14,6 +14,11 @@ const MUTE_KEY = 'open-case-muted', VOLUME_KEY = 'open-case-volume';
 const PICK = [0.35, 0.55, 0.8, 1]; // loudness by pick strength 1-4
 const BRIGHT = [0.2, 0.35, 0.55, 0.8]; // the pick's brightness by strength
 const BAND_LEVEL = 0.55; // the band bus's level under the guitar
+// The metronome click: a soft tick under the band, on only while the drums slot is off.
+const CLICK_LEVEL = 0.35; // the click's own loudness, softer than the drums it stands in for
+const CLICK_HZ = 1500; // the click's pitch, most beats
+const CLICK_ACCENT_HZ = 2100; // brighter and higher, the bar's first beat
+const CLICK_DECAY = 0.05; // seconds: a short, woodblock-like decay
 
 // A plucked string's samples: up to `seconds` of a string at `hz`, picked at strength 1-4, cut short
 // once it's inaudible. Karplus-Strong with an all-pass for exact tuning; the loop loses enough each
@@ -97,6 +102,11 @@ export function createAudio(storage) {
       bus[id].gain.value = min === 0 ? 1 : 0;
       bus[id].connect(band);
     }
+    // The click's own bus: not a crowd layer (never in LAYERS), gated the opposite of the drums slot
+    // in setLayer. The drums start off, so the click starts on.
+    bus.click = ctx.createGain();
+    bus.click.gain.value = 1;
+    bus.click.connect(band);
     // Your guitar, a little brighter than the band so it sits in the beat and still stands out, with a
     // touch of body.
     const body = ctx.createBiquadFilter(), gl = ctx.createBiquadFilter();
@@ -243,6 +253,9 @@ export function createAudio(storage) {
         tone(out, t, { len, type: 'sawtooth', freq: f, vol: n.vel * 0.03, attack: 0.4, detune: true });
         tone(out, t, { len, type: 'sawtooth', freq: f * 1.004, vol: n.vel * 0.03, attack: 0.4, detune: true });
         break;
+      case 'click': // a soft rim tick; n.note is an accent flag, not a pitch
+        tone(out, t, { len: CLICK_DECAY, type: 'triangle', freq: n.note ? CLICK_ACCENT_HZ : CLICK_HZ, vol: n.vel * CLICK_LEVEL });
+        break;
     }
   }
 
@@ -273,6 +286,8 @@ export function createAudio(storage) {
     if (!ctx) return;
     bus[id].gain.setTargetAtTime(on ? 1 : 0, Math.max(at, ctx.currentTime), 0.02);
     if (id === 'top') wobble.gain.setTargetAtTime(on ? 9 : 0, Math.max(at, ctx.currentTime), 0.5);
+    // The click fills in for the drums, so it fades the opposite way, at the same moment.
+    if (id === 'drums') bus.click.gain.setTargetAtTime(on ? 0 : 1, Math.max(at, ctx.currentTime), 0.02);
   }
 
   // Called every frame: schedules the band's 16ths due in the next GROOVE.ahead seconds, and the crackle.
@@ -286,6 +301,7 @@ export function createAudio(storage) {
       for (const { id } of LAYERS) {
         for (const n of bandAt(id, next16)) playBand(id, n, at, loopAt + timeOf16th(next16 + n.len) - at);
       }
+      for (const n of bandAt('click', next16)) playBand('click', n, at, loopAt + timeOf16th(next16 + n.len) - at);
       next16++;
     }
     if (t >= crackleAt && t < stopAt) {
@@ -330,6 +346,10 @@ export function createAudio(storage) {
     reportedLatency, heardAt,
     get started() {
       return !!ctx;
+    },
+    // The layer and click buses, for tests to check a bus's level directly.
+    get bus() {
+      return bus;
     },
     get muted() {
       return muted;

@@ -52,3 +52,19 @@ test('each layer has its pattern; the band plays only in key', () => {
   assert.ok(drums >= 16 && bass >= 16 && top >= 32, `${drums} ${bass} ${top}`);
   assert.deepEqual(bandAt('nothing', 0), []);
 });
+
+test('the click ticks on every beat, the bar\'s first beat brighter than the rest', () => {
+  for (let s = 0; s < 32; s++) {
+    const hits = bandAt('click', s);
+    if (s % 4 === 0) {
+      assert.equal(hits.length, 1, `16th ${s}`);
+      assert.equal(hits[0].voice, 'click');
+    } else {
+      assert.deepEqual(hits, [], `16th ${s}`);
+    }
+  }
+  const bar = 5; // the accent isn't special to bar 0
+  const [downbeat] = bandAt('click', bar * 16);
+  const [beatTwo] = bandAt('click', bar * 16 + 4);
+  assert.ok(downbeat.note > beatTwo.note && downbeat.vel > beatTwo.vel);
+});
