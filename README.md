@@ -85,7 +85,7 @@ That writes the editable `art/snake-icon.aseprite` and the `snake/icon.png` the 
   - `?debug` shows each listener's interest and the last rule they heard, and a corner panel with the audio delay. On the end card it adds Run the bots and the test log.
   - `?seed=N` fixes the passers-by.
   - `?bot=random` or `?bot=lick` plays a whole set by itself.
-- Tuning: the rules, the crowd, the tips and the feel are in `open-case/src/tuning.js`; the synth's voicing is in `audio.js`.
+- Tuning: the rules, the crowd, the tips and the feel are in `open-case/src/tuning.js`; the synth's voicing is in `open-case/src/audio.js`, and a few view timings are in `scene.js` and `render.js`.
 - Art: the game is drawn in code for now. The tab icon and a style sample have scripts in `art/open-case/`, and `palette.lua` holds their colours. The style sample shows the look Nathan picked for the repaint: flat colour, no outlines, no dithering.
 
   ```sh

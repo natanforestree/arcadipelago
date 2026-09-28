@@ -1,7 +1,8 @@
 // Draws the scene at 320x180 into a 2D context (main.js scales it up by a whole number). Everything is
-// a placeholder drawn in code, in the dusk colours the 16-bit art will use: the park, you on your crate
-// with the guitar, the open case and the looper, the passers-by, their reactions, the note trail, the
-// memory strip, and the title, pause and ?debug overlays. The end card is HTML (index.html).
+// a placeholder drawn in code, in placeholder dusk colours until the flat-style repaint: the park, you
+// on your crate with the guitar, the open case and the looper, the passers-by, their reactions, the
+// note trail, the memory strip, and the title, pause and ?debug overlays. The end card is HTML
+// (index.html).
 import { CROWD, PLAY, LAYERS } from './tuning.js';
 import { BAR, BEAT } from './groove.js';
 import { GUITAR, CASE, coinAt, glyphAt, GOLD } from './scene.js';

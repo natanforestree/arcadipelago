@@ -351,7 +351,10 @@ export function createAudio(storage) {
       ctx?.suspend();
     },
     resume() {
-      if (ctx?.state === 'suspended') ctx.resume();
+      // Always call, unconditionally: ctx.suspend() changes state asynchronously in Safari and
+      // Firefox, so a fast second Esc can see 'running' and skip the resume, leaving the clock frozen
+      // with no pause card. suspend() and resume() are queued in order, so this is safe either way.
+      ctx?.resume();
     },
   };
 }

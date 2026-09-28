@@ -1,6 +1,7 @@
-// Every number Open Case plays by. Times are in seconds unless a name says beats, bars or 16ths (a
-// 16th note is the grid the crowd hears on). Positions are in scene pixels (the scene is 320x180).
-// All of these are starting values: play-testing changes go here.
+// Every number the rules, the crowd and the feel run on. The synth's voicing lives in audio.js, and a
+// few view timings in scene.js and render.js. Times are in seconds unless a name says beats, bars or
+// 16ths (a 16th note is the grid the crowd hears on). Positions are in scene pixels (the scene is
+// 320x180). All of these are starting values: play-testing changes go here.
 export const TICK_HZ = 60;
 export const DT = 1 / TICK_HZ;
 

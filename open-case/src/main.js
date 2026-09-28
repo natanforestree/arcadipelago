@@ -25,6 +25,10 @@ import { DT, LAYERS } from './tuning.js';
 // The module is running, so the page's "couldn't start" message will never be needed.
 document.getElementById('nostart')?.remove();
 
+// Browsers don't treat these as user activation (Chrome doesn't for a lone modifier, no browser does
+// for Esc), so starting an AudioContext from one leaves it suspended.
+const NON_ACTIVATING_KEYS = new Set(['Escape', 'Shift', 'Control', 'Alt', 'Meta', 'CapsLock']);
+
 const params = new URLSearchParams(location.search);
 const debug = params.has('debug');
 const bot = { random: randomBot, lick: lickBot }[params.get('bot')] ?? null;
@@ -140,9 +144,12 @@ function game() {
   }
 
   // Any key at all dismisses the title card and starts the sound (browsers only allow sound after a
-  // key press or a click). It's heard before the keys are read, and it plays no note.
+  // key press or a click). It's heard before the keys are read, and it plays no note. Esc and a lone
+  // modifier don't count as user activation in every browser, so an AudioContext started from one
+  // would stay suspended: leave them alone, doing nothing, on the title card.
   addEventListener('keydown', (e) => {
     if (screen !== 'title' || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (NON_ACTIVATING_KEYS.has(e.key)) return;
     e.preventDefault();
     e.stopImmediatePropagation();
     audio.start();
@@ -162,8 +169,12 @@ function game() {
     onNote: (n) => {
       if (screen === 'ready') begin(n.at);
       audio.noteOn(n.code, n.pitch, n.strength, n.at, n.legato);
-      const heard = audio.heardAt(n.at);
-      if (heard !== null) latency.measured = heard - n.timeStamp;
+      // A strummed note's `at` is deliberately later than now (the strum gap); only notes that sound
+      // at once tell us the true key-to-sound latency.
+      if (n.at <= audio.now()) {
+        const heard = audio.heardAt(n.at);
+        if (heard !== null) latency.measured = heard - n.timeStamp;
+      }
       if (set?.phase === 'playing') {
         playNote(set, n.pitch, n.strength, n.at - start);
         sceneNote(scene, n.pitch, set.listen.notes.length - 1, n.at - start);
@@ -192,7 +203,8 @@ function game() {
       else if (e.type === 'coin') audio.coin(start + set.t + FLIGHT);
       else if (e.type === 'end') {
         audio.endBand(start + set.t);
-        audio.clap(crowdSize(set.crowd), start + set.t + BAR * 0.5);
+        const crowd = crowdSize(set.crowd);
+        if (crowd > 0) audio.clap(crowd, start + set.t + BAR * 0.5);
       } else if (e.type === 'over') showEnd();
     }
     sceneEvents(scene, events, set.t);
@@ -201,7 +213,8 @@ function game() {
   function showEnd() {
     screen = 'over';
     const s = summary(set);
-    logSet(storage, { date: new Date().toISOString(), coins: s.coins, stopped: s.stopped });
+    // The log is Nathan's own sets and choices, so a bot set (?bot=…) never touches it.
+    if (!bot) logSet(storage, { date: new Date().toISOString(), coins: s.coins, stopped: s.stopped });
     document.getElementById('end-coins').textContent = `${s.coins} coin${s.coins === 1 ? '' : 's'} in the case.`;
     document.getElementById('end-stopped').textContent = `${s.stopped} ${s.stopped === 1 ? 'person' : 'people'} stopped to listen.`;
     const names = { jogger: 'A jogger', oldman: 'An old man', student: 'A student', commuter: 'A commuter' };
@@ -225,7 +238,7 @@ function game() {
   }
 
   document.getElementById('again').addEventListener('click', () => {
-    logChoice(storage, 'another');
+    if (!bot) logChoice(storage, 'another');
     end.hidden = true;
     audio.stopBand();
     set = null;
@@ -234,7 +247,7 @@ function game() {
     else screen = 'ready';
   });
   document.getElementById('stop').addEventListener('click', () => {
-    logChoice(storage, 'stop');
+    if (!bot) logChoice(storage, 'stop');
     end.hidden = true;
     audio.stopBand();
     screen = 'thanks';

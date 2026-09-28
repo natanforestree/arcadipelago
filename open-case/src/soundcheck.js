@@ -4,6 +4,10 @@
 import { createInput } from './input.js';
 import { layoutPitches } from './keys.js';
 
+// Browsers don't treat these as user activation (Chrome doesn't for a lone modifier, no browser does
+// for Esc), so starting an AudioContext from one leaves it suspended.
+const NON_ACTIVATING_KEYS = new Set(['Escape', 'Shift', 'Control', 'Alt', 'Meta', 'CapsLock']);
+
 export function soundCheck(audio, { debug }) {
   const panel = document.getElementById('sound');
   const latency = document.getElementById('latency');
@@ -26,6 +30,7 @@ export function soundCheck(audio, { debug }) {
   // Any key starts the sound; that key plays no note.
   addEventListener('keydown', (e) => {
     if (started || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (NON_ACTIVATING_KEYS.has(e.key)) return;
     e.preventDefault();
     e.stopImmediatePropagation();
     begin();
@@ -35,8 +40,12 @@ export function soundCheck(audio, { debug }) {
     now: audio.now,
     onNote: (n) => {
       audio.noteOn(n.code, n.pitch, n.strength, n.at, n.legato);
-      const heard = audio.heardAt(n.at);
-      if (heard !== null) measured = heard - n.timeStamp;
+      // A strummed note's `at` is deliberately later than now (the strum gap); only notes that sound
+      // at once tell us the true key-to-sound latency.
+      if (n.at <= audio.now()) {
+        const heard = audio.heardAt(n.at);
+        if (heard !== null) measured = heard - n.timeStamp;
+      }
     },
     onRelease: (r) => audio.noteOff(r.code, r.at),
     onControl: (action, down) => {

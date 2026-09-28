@@ -88,19 +88,10 @@ test('a set replays exactly from its seed and its notes', () => {
 });
 
 test('coins in the set are the coin events added up', () => {
-  const set = createSet(2);
-  const notes = goodSet(2), moments = momentsOf(notes);
-  let coins = 0, i = 0;
-  while (set.phase !== 'over') {
-    for (; i < moments.length && moments[i].t <= set.t + DT; i++) {
-      const m = moments[i];
-      if (m.note) playNote(set, m.note.pitch, m.note.strength, m.t);
-      else releaseNote(set, m.t);
-    }
-    stepSet(set, DT);
-    for (const e of set.events) if (e.type === 'coin') coins += e.coins;
-  }
-  assert.equal(set.coins, coins);
+  const events = allEvents(2, goodSet(2));
+  let coins = 0;
+  for (const e of events) if (e.type === 'coin') coins += e.coins;
+  assert.equal(runSet(2, goodSet(2)).coins, coins);
 });
 
 test("the honest set's callbacks land: the crowd hears it bring ideas back on every seed", () => {
@@ -108,7 +99,7 @@ test("the honest set's callbacks land: the crowd hears it bring ideas back on ev
     const events = allEvents(seed, goodSet(seed));
     return events.filter((e) => e.type === 'rule' && e.rule === 'callback').length;
   });
-  const minCallbacks = Math.min(...perSeedCallbacks);
-  const floor = Math.max(minCallbacks - 1, 2);
-  assert.ok(perSeedCallbacks.every((c) => c >= floor), `callbacks per seed: ${perSeedCallbacks}, floor ${floor}`);
+  // Every seed manages 10-12 with the fix (ideas.findLast in goodSet); before it, findLast was find
+  // and callbacks fell to 2-6. 8 is a floor comfortably below today's low and above the broken range.
+  assert.ok(perSeedCallbacks.every((c) => c >= 8), `callbacks per seed: ${perSeedCallbacks}`);
 });
