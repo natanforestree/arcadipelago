@@ -13,6 +13,7 @@ import { LAYERS, PLAY, GROOVE } from './tuning.js';
 const MUTE_KEY = 'open-case-muted', VOLUME_KEY = 'open-case-volume';
 const PICK = [0.35, 0.55, 0.8, 1]; // loudness by pick strength 1-4
 const BRIGHT = [0.2, 0.35, 0.55, 0.8]; // the pick's brightness by strength
+const BAND_LEVEL = 0.55; // the band bus's level under the guitar
 
 // A plucked string's samples: up to `seconds` of a string at `hz`, picked at strength 1-4, cut short
 // once it's inaudible. Karplus-Strong with an all-pass for exact tuning; the loop loses enough each
@@ -89,7 +90,7 @@ export function createAudio(storage) {
     lp.type = 'lowpass';
     lp.frequency.value = 3200;
     band = ctx.createGain();
-    band.gain.value = 0.55;
+    band.gain.value = BAND_LEVEL;
     band.connect(hp).connect(lp).connect(master);
     for (const { id, min } of LAYERS) {
       bus[id] = ctx.createGain();
@@ -252,13 +253,13 @@ export function createAudio(storage) {
     next16 = 0;
     stopAt = Infinity;
     band.gain.cancelScheduledValues(at);
-    band.gain.setValueAtTime(0.55, at);
+    band.gain.setValueAtTime(BAND_LEVEL, at);
   }
 
   // The end of the set: the band fades out over a bar from `at`, and stops.
   function endBand(at) {
     if (!ctx) return;
-    band.gain.setValueAtTime(0.55, at);
+    band.gain.setValueAtTime(BAND_LEVEL, at);
     band.gain.linearRampToValueAtTime(0, at + BAR);
     stopAt = at + BAR;
   }
