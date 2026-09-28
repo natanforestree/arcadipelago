@@ -9,6 +9,23 @@ const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 const coins = (bot) => SEEDS.map((seed) => runSet(seed, bot(seed)).coins);
 const sum = (list) => list.reduce((a, b) => a + b, 0);
 
+// Every event of a set, gathered update by update (set.events holds only the latest update's).
+function allEvents(seed, notes) {
+  const set = createSet(seed), moments = momentsOf(notes), events = [];
+  let i = 0;
+  while (set.phase !== 'over') {
+    const until = set.t + DT;
+    for (; i < moments.length && moments[i].t <= until; i++) {
+      const m = moments[i];
+      if (m.note) playNote(set, m.note.pitch, m.note.strength, m.t);
+      else releaseNote(set, m.t);
+    }
+    stepSet(set, DT);
+    events.push(...set.events);
+  }
+  return events;
+}
+
 test('the headline: over seeds 1 to 10 an honest set earns at least 3x each bot, and a coin on every seed', () => {
   const good = coins(goodSet), random = coins(randomBot), lick = coins(lickBot);
   assert.ok(good.every((c) => c >= 1), `honest set: ${good}`);
@@ -24,12 +41,14 @@ test('in key but never bringing an idea back earns less than the honest set, and
 
 test('every bot is the same from a seed, and different across seeds; each starts on the first note', () => {
   for (const bot of [randomBot, lickBot, goodSet, wanderSet]) {
-    assert.deepEqual(bot(4), bot(4));
-    assert.notDeepEqual(bot(4), bot(5));
-    const notes = bot(4);
-    assert.equal(notes[0].t, 0);
-    assert.ok(notes.every((n, i) => i === 0 || n.t >= notes[i - 1].t), 'in time order');
-    assert.ok(notes.every((n) => n.t < timeOf16th(GROOVE.setBars * 16) && n.len > 0));
+    for (const seed of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]) {
+      assert.deepEqual(bot(seed), bot(seed));
+      if (seed < 20) assert.notDeepEqual(bot(seed), bot(seed + 1));
+      const notes = bot(seed);
+      assert.equal(notes[0].t, 0, `bot seed ${seed} first note`);
+      assert.ok(notes.every((n, i) => i === 0 || n.t >= notes[i - 1].t), `bot seed ${seed} in time order`);
+      assert.ok(notes.every((n) => n.t < timeOf16th(GROOVE.setBars * 16) && n.len > 0), `bot seed ${seed} within set`);
+    }
   }
 });
 
@@ -82,4 +101,14 @@ test('coins in the set are the coin events added up', () => {
     for (const e of set.events) if (e.type === 'coin') coins += e.coins;
   }
   assert.equal(set.coins, coins);
+});
+
+test("the honest set's callbacks land: the crowd hears it bring ideas back on every seed", () => {
+  const perSeedCallbacks = SEEDS.map((seed) => {
+    const events = allEvents(seed, goodSet(seed));
+    return events.filter((e) => e.type === 'rule' && e.rule === 'callback').length;
+  });
+  const minCallbacks = Math.min(...perSeedCallbacks);
+  const floor = Math.max(minCallbacks - 1, 2);
+  assert.ok(perSeedCallbacks.every((c) => c >= floor), `callbacks per seed: ${perSeedCallbacks}, floor ${floor}`);
 });

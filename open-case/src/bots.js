@@ -91,7 +91,7 @@ export function goodSet(seed) {
   while (s < SET_16THS - 16) {
     const bar = Math.floor(s / 16);
     // Choose the opening: bring back an old idea changed, answer the last one, or say something new.
-    const old = ideas.find((o) => bar - o.bar >= 9 && bar - o.calledBar >= 17);
+    const old = ideas.findLast((o) => bar - o.bar >= 9 && bar - o.calledBar >= 17);
     let pitches, gaps;
     if (old && phrase % 2 === 0) {
       const m = nextRandom(rng) < 0.5 ? moved(rng, old) : null;
@@ -154,5 +154,5 @@ export function wanderSet(seed) {
     s += int(rng, 5, 10);
   }
   if (notes.length) notes[0] = { ...notes[0], t: 0 };
-  return notes;
+  return notes.filter((n) => n.t < timeOf16th(SET_16THS));
 }
