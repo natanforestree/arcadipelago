@@ -33,9 +33,9 @@ The idea came out of a design session with Max's game-design-consultant skill. I
 | Layers | They join as the crowd grows and drop out as it shrinks, always on a bar line |
 | Sound | All made live with Web Audio, no audio files, like Last Light. If the guitar doesn't pass Nathan's ear at the sound check, it switches to recorded samples and nothing else changes. |
 | Crowd rules | Repeating yourself bores them; off-key notes on strong beats make them frown; an earlier idea brought back changed earns a grin and a coin; endless new notes with no idea ever reused confuses them; long silence loses them |
-| Art | Placeholders drawn in code for the test. The final look is 16-bit (SNES-era), judged first from a style sample. |
+| Art | Placeholders drawn in code for the test. The final look was to be 16-bit, judged from a style sample; after seeing it, Nathan chose a flat style from a reference picture instead (flat colour, no outlines, no dithering). |
 | Island | Replaces the scaffolding island in the same spot, with a strip of scaffolding kept to say it's a work in progress |
-| Later, not now | Real instruments through the mic or a MIDI keyboard; Nathan's own GarageBand music as loops and stems; more spots, the shop and unlocks; full 16-bit art |
+| Later, not now | Real instruments through the mic or a MIDI keyboard; Nathan's own GarageBand music as loops and stems; more spots, the shop and unlocks; full flat-style art |
 | Name | *Open Case*, in `open-case/`, id `open-case` |
 
 ## 1. What you see and do
@@ -210,6 +210,8 @@ This computer remembers the last 50 sets: the date, coins, how many stopped, and
 
 ### The 16-bit style sample
 
+**Update (2026-09-28):** Nathan saw the 16-bit sample and chose a different direction from a reference picture he found: flat colour, no outlines, no dithering, about a dozen colours per figure, figures about 46 px tall at 320×180. The sample script was redrawn in that style; the repaint aims at it.
+
 Made by Aseprite scripts in `art/open-case/`, like the other games' art, and shown to Nathan. As the README says of previews, it isn't committed.
 
 - **A still** of the park at dusk, at 320×180, in layers at different depths: sky, distant rooftops, near trees, the path. You're on the crate with the guitar, with the open case holding a few coins, and the looper.
@@ -286,4 +288,4 @@ The work happens on the `open-case` branch. When it's done, it's merged into `ma
 - Real instruments: a MIDI keyboard (Chrome, Edge and Firefox; not Safari), then guitar and voice through the mic (single-note lines; strummed chords are hard to hear).
 - Nathan's own music: GarageBand loops and stems as layer slots, each with a card giving its tempo, key and chords.
 - More spots (a station at rush hour, a night market), more kinds of listener, new sounds and loops to spend coins on.
-- The full 16-bit repaint.
+- The full flat-style repaint.
