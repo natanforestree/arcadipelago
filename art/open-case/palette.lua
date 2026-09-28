@@ -29,15 +29,16 @@ return {
   -- shadow per material, no outlines, no dither. style-sample.lua draws with these alone. Pairs run
   -- shadow -> base.
   flat = {
-    ink = "#1c1626", -- hair, eyes, the hat, the guitar's neck, the lamp post, the case's shell
+    ink = "#1c1626", -- your black beanie and shirt, hair, eyes, the hat, the guitar's neck, the lamp post, the case's shell
+    charcoal = "#3d3649", -- the lit side of your beanie and shirt
     sky = { "#2a1d4e", "#43286a", "#663276", "#93406f", "#c9566a", "#ec8458", "#f7b464" }, -- top -> horizon
     light = "#fff2cc", -- the sun, the lamp's glass, sneakers, whiskers, glints
     yellow = { "#b0802c", "#fcd062" }, -- lit windows, the lamp, coins
     leaf = { "#1d3b42", "#2e5d5c", "#45806e" }, -- trees in teal shadow, the hedge and its lit top
     path = { "#3a2e48", "#564660", "#9c8480" }, -- joints and shadows, the stones, the pool of lamplight
     skin = { "#c08468", "#f2c69e" },
-    blue = { "#2c3466", "#4660a6", "#6c8ade" }, -- jeans' shadow and the looper, jeans, the beanie
-    hoodie = { "#a8502c", "#e07a38" },
+    blue = { "#2c3466", "#4660a6" }, -- the looper's body and its top
+    pants = { "#2d4b2c", "#4c783a" }, -- your forest green pants
     wood = { "#45291f", "#7a4a2c", "#c68a50" }, -- dark wood, the crate, the guitar
     red = { "#74283a", "#b03c4a" }, -- the case's lining, the scarf, the looper's first beat
     coat = { "#5e566e", "#8e8498" },
