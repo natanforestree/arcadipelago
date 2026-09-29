@@ -1,4 +1,4 @@
-# Aracde + Archipelago = Arcadipelago!
+# Arcade + Archipelago = Arcadipelago!
 
 Little browser games, each on its own floating island, hosted on GitHub Pages at https://natanforestree.github.io/arcadipelago/
 
