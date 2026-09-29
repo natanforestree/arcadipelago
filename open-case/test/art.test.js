@@ -100,7 +100,7 @@ test('the art sits round the positions the rules use', () => {
   for (const [sx, sy] of CROWD.spots) {
     for (const k of KINDS) {
       const name = `${k}-stand-0-${sx < CROWD.playerX ? 'right' : 'left'}`, [pl, pt, pr, pb] = cover(name, sx, sy);
-      assert.ok(pt >= 0, `a ${k} at spot ${sx},${sy} fits on screen`);
+      assert.ok(pl >= 0 && pt >= 0 && pr <= 320 && pb <= 180, `a ${k} at spot ${sx},${sy} fits on screen`);
       for (let y = pt; y < pb; y++) {
         for (let x = pl; x < pr; x++) {
           assert.ok(!(opaqueAt(name, sx, sy, x, y) && opaqueAt('case', 0, 0, x, y)), `a ${k} at spot ${sx},${sy} stands clear of the case`);

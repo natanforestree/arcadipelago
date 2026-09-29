@@ -45,8 +45,9 @@ const touchOnly = matchMedia('(pointer: coarse)').matches && !matchMedia('(any-p
 if (touchOnly) document.getElementById('phone').hidden = false;
 else if (params.has('sound')) soundCheck(audio, { debug: anyDebug });
 else {
-  // The art loads before the title card shows; if it can't, say something went wrong.
-  loadArt().then(game, (err) => {
+  // The art loads before the title card shows; if it can't, or the game can't start, say something
+  // went wrong.
+  loadArt().then(game).catch((err) => {
     console.error(err);
     document.getElementById('message').hidden = false;
   });

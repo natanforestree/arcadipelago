@@ -166,6 +166,17 @@ test('the pigeons peck by the case until a loud note scatters them; they walk ba
   assert.equal(scene.scaredAt, back + 1, 'walking back, they can be scattered again');
 });
 
+test('scattered again while walking back, pigeons fly from where they are, not from home', () => {
+  const scene = createScene(1);
+  sceneNote(scene, 60, 0, 10, 4); // first scatter
+  const mid = 10 + PARK.pigeonsAway * BAR + 1.5; // partway through the walk back
+  const before = pigeonsAt(scene, mid, 0);
+  assert.ok(before.every((p) => p.pose === 'walk'), 'walking back in when scattered again');
+  sceneNote(scene, 60, 1, mid + 0.01, 4); // scattered again, a moment later
+  const flight = pigeonsAt(scene, mid + 0.01, 0);
+  flight.forEach((p, i) => assert.ok(Math.abs(p.x - before[i].x) <= 2, `pigeon ${i}: ${p.x} vs ${before[i].x}`));
+});
+
 test('frame counters wrap for any count, even a hair below zero', () => {
   assert.equal(frameOf(-0.01, 2), 1);
   assert.equal(frameOf(5, 4), 1);

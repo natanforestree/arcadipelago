@@ -33,6 +33,7 @@ export function createScene(seed = 1) {
     trail: [], flights: [], caseCoins: 0, gold: null, clapFrom: -1,
     lastNote: -Infinity, // when you last played a note (you strum)
     scaredAt: null, // when a loud note last scattered the pigeons
+    flyFrom: 1, // how far through the walk back they were when last scattered (1: at home)
     trainBar: Math.floor(randomBetween(rng, PARK.trainFrom, PARK.trainTo)),
     rng, // the windows' bars, drawn as they're first asked for
     windowBars: [],
@@ -44,7 +45,12 @@ export function createScene(seed = 1) {
 export function sceneNote(scene, pitch, index, t, strength = 0) {
   scene.trail.push({ pitch, index, t });
   scene.lastNote = t;
-  if (strength >= RULES.loudStrength && (scene.scaredAt === null || t - scene.scaredAt >= PARK.pigeonsAway * BAR)) scene.scaredAt = t;
+  if (strength >= RULES.loudStrength && (scene.scaredAt === null || t - scene.scaredAt >= PARK.pigeonsAway * BAR)) {
+    // Scattered while walking back in: fly on from there, not from home.
+    const back = scene.scaredAt === null ? -1 : t - scene.scaredAt - PARK.pigeonsAway * BAR;
+    scene.flyFrom = back >= 0 && back < PIGEON_WALK ? back / PIGEON_WALK : 1;
+    scene.scaredAt = t;
+  }
 }
 
 // Takes one update's set events.
@@ -167,17 +173,18 @@ export function birdsAt(flocks, time) {
 // they walk back in from the right, and they're gone in between.
 export function pigeonsAt(scene, t, time) {
   const out = [];
-  const since = scene.scaredAt === null ? Infinity : t - scene.scaredAt;
+  const since = scene.scaredAt === null ? Infinity : Math.max(0, t - scene.scaredAt);
   PIGEONS.forEach(([hx, hy], i) => {
+    const from = 330 + i * 10; // where pigeon i starts walking back in from
     if (since < PIGEON_FLY) {
+      const start = from + (hx - from) * scene.flyFrom; // where it was when scattered
       const up = 70 * since + 20 * since * since;
-      out.push({ x: Math.round(hx + (60 + i * 12) * since), y: Math.round(hy - up), pose: 'fly', frame: frameOf(since * 8 + i, 2), dir: 1 });
+      out.push({ x: Math.round(start + (60 + i * 12) * since), y: Math.round(hy - up), pose: 'fly', frame: frameOf(since * 8 + i, 2), dir: 1 });
       return;
     }
     const back = since - PARK.pigeonsAway * BAR; // seconds since they started walking back
     if (back < 0) return;
     if (back < PIGEON_WALK) {
-      const from = 330 + i * 10;
       out.push({ x: Math.round(from + (hx - from) * (back / PIGEON_WALK)), y: hy, pose: 'walk', frame: frameOf(time * 6 + i, 2), dir: -1 });
       return;
     }

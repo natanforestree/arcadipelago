@@ -70,7 +70,7 @@ The **tab icon** is redrawn flat to match. The front-page island stays in the si
   - the sunset's stage, the window, lamp and star times, and the pigeons' scatter and return follow the set's bar and notes;
   - reduced motion turns the birds, train, clouds and trees off;
   - the game's art stays under 400 KB;
-  - the existing 96 tests still pass;
+  - the existing 98 tests still pass;
   - the art rebuilds byte for byte.
 - **Checked in Chrome:** screenshots at bars 1, 30 and 59 (dusk, blue hour, night), a pigeon scatter, and a flock crossing. Safari is checked as far as it can be here.
 

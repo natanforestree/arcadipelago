@@ -185,7 +185,7 @@ local json = table.concat({
   "  },",
   '  "sky": ' .. list(STAGES, function(st) return list(st, q) end) .. ",",
   '  "bands": ' .. list(D.BANDS, tostring) .. ",",
-  '  "skyBottom": 129,',
+  '  "skyBottom": ' .. D.SKY_BOTTOM .. ",",
   ('  "sun": [%d, %d, %d],'):format(D.SUN[1], D.SUN[2], D.SUN[3]),
   '  "clouds": ' .. list(clouds, function(c) return ("[%d, %d, %d]"):format(c[1], c[2], c[3]) end) .. ",",
   '  "windows": ' .. list(D.windows(), pair) .. ",",

@@ -83,7 +83,7 @@ That writes the editable `art/snake-icon.aseprite` and the `snake/icon.png` the 
 - Debug:
   - `?sound` is the sound check: the loop with a switch per layer, and the guitar on the keys.
   - `?debug` shows each listener's interest and the last rule they heard, and a corner panel with the audio delay. On the end card it adds Run the bots and the test log.
-  - `?seed=N` fixes the passers-by.
+  - `?seed=N` fixes the passers-by, and the park's windows, train and birds.
   - `?bot=random` or `?bot=lick` plays a whole set by itself.
   - `?sky=N` shows the park as it is N bars into a set (until a set starts), to check the sunset without playing three minutes.
 - Tuning: the rules, the crowd, the tips and the feel are in `open-case/src/tuning.js`, and so are the park's sunset and background timings (`PARK`); the synth's voicing is in `open-case/src/audio.js`, and a few view timings are in `scene.js` and `render.js`.

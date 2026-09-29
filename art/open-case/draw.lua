@@ -12,6 +12,7 @@ local W, H = D.W, D.H
 
 -- Layout.
 D.BANDS = { 0, 22, 42, 59, 74, 87, 99 } -- the first row of each band of sky; the sky ends at row 129
+D.SKY_BOTTOM = 129 -- the sky's last row
 D.SUN = { 237, 104, 15 } -- the sun's centre at the start of a set, and its radius
 D.LAMP = { 70, 50 } -- the lamp's head
 D.POOL = { 70, 143, 40, 12 } -- the pool of lamplight on the path: centre and radii
@@ -289,7 +290,7 @@ end
 
 -- The sky's bands in one stage's colours.
 function D.sky(b, stage)
-  for y = 0, 129 do rect(b, 0, y, W - 1, y, stage[D.band(y)]) end
+  for y = 0, D.SKY_BOTTOM do rect(b, 0, y, W - 1, y, stage[D.band(y)]) end
 end
 
 function D.sun(b, cx, cy) oval(b, cx, cy, D.SUN[3], D.SUN[3], C.light) end
