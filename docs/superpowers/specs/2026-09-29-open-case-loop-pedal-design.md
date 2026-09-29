@@ -57,7 +57,7 @@ Nathan asked for "a music shop with different guitar pedals and loop pedal and i
 
 - **Your loop pedal** joins your row of pedals in front of the crate: a wider stompbox with a big footswitch and a light. The light is dark when the loop is empty, blinks red while waiting, is solid red while recording, and is green while playing.
 - **The speaker.** The blue box that has always sat by your crate becomes a small speaker, the band's, with no light. So the only red-and-green light down there is your loop pedal's.
-- **The gear strip** gets a loop slot after the reverb: a loop icon with the key R and three dots that fill as layers go down, red while recording. A popup over the strip says what happened: "loop recording", "layer 2", "loop full", "layer removed", "loop cleared".
+- **The gear strip** gets a loop slot after the reverb: a loop icon with the key R and three dots that fill as layers go down, red while recording. R counts you in over the slot (a gold 4 3 2 1, with soft stick clicks), then shows the recording's progress ("rec" and four bar cells, then a red 3 2 1 as the last bar closes), and a popup says what else happened: "layer 2" as it lands, "loop full", "layer removed", "loop cleared".
 - **Looped notes rise faintly from the loop pedal** as they play, so you can see the loop going round. Your live notes still rise from your instrument.
 - **The title card's** pedal line reads "2-6 pedals   R loop   backspace undo".
 
@@ -151,13 +151,18 @@ The plan's prototype settled a few things this spec left open:
 - **The strip's loop slot** comes straight after the reverb's: the icon, "R", and three dots. The pigeons moved 26 pixels to the right to make room.
 - **Looped notes rise faintly from just over the loop pedal**, higher notes a little higher. They drift up and to the left, away from your own notes, which drift right toward the crowd, and fade in 3 seconds.
 - **The news over the strip:**
-  - when R arms a recording: "loop recording" for the first layer, "layer 2" or "layer 3" after that;
+  - R counts you in rather than saying so at once: a big gold 4 3 2 1 over the loop's slot, one digit a
+    beat, with a soft stick click on each beat after R up to the bar line;
+  - while it records, "rec" and four bar cells fill in as the bars go by; over the last bar's beats 2 to
+    4 they give way to a big red 3 2 1, so you know when it closes;
+  - the layer lands: "layer 1", "layer 2" or "layer 3", in green;
   - "loop full";
   - "recording cancelled" (Backspace during a recording);
   - "layer removed";
   - "loop cleared".
 
-  It shows one message at a time: the newer of the loop's news and a pedal stomp.
+  It shows one message at a time: the newer of the loop's news and a pedal stomp, over the count-in or
+  the recording cue.
 - **While a recording waits**, the light is red for the first half of each beat.
 - **In the shop:**
   - the card's last line, while the loop pedal is chosen, is "R record   backspace undo   esc back";

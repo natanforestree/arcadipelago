@@ -29,7 +29,7 @@ import { soundCheck } from './soundcheck.js';
 import { loadArt } from './assets.js';
 import { PEDALS, loadGear, saveGear, earn, buy, play, stomp, stockItem, owns } from './gear.js';
 import { createShop, choose, move, action, trying, hit } from './shop.js';
-import { createLoop, record, note, release, ring, step, undo, due } from './looper.js';
+import { createLoop, record, note, release, ring, step, undo, due, countBeats } from './looper.js';
 import { BAR } from './groove.js';
 import { DT, LAYERS } from './tuning.js';
 
@@ -94,7 +94,9 @@ function game(art) {
   // The loop pedal's loop in a set, empty at each set's start (in the shop, the one you try it with
   // is shop.loop). Its times are band time: the audio clock since the band's first 16th, `start`.
   let loop = createLoop();
-  // the loop pedal's last news: { what, layer, time } (it shows over the gear strip)
+  // the loop pedal's last news: { what: 'layer' | 'full' | 'cancelled' | 'removed' | 'cleared', layer,
+  // time } (it shows over the gear strip; with none showing, the count-in or the recording's progress
+  // takes its place)
   let loopSaid = null;
   let setLayers = 0; // layers recorded this set, for the log
   let ringHeld = false; // whether Space is down, for a loop that starts while it is
@@ -132,14 +134,17 @@ function game(art) {
 
   // R records a layer from the next bar line, and Backspace cancels a recording or takes off the last
   // layer: in a set once the pedal is yours, until the set's end, and in the shop while you try it.
-  // Their news shows over the gear strip.
+  // Their news shows over the gear strip (a landed layer's; "loop full", say); while there's none, the
+  // count-in or the recording's progress takes its place, so R itself says nothing at once.
   function loopKey(action) {
     const l = shop ? shop.loop : set?.phase === 'playing' && owns(gear, 'loop') ? loop : null;
     if (!l) return;
     const time = pageTime();
     if (action === 'loop') {
-      if (record(l, audio.now() - start)) loopSaid = { what: 'recording', layer: l.layers.length + 1, time };
-      else if (!l.take) loopSaid = { what: 'full', time };
+      if (record(l, audio.now() - start)) {
+        loopSaid = null; // an older message would otherwise hide the count-in
+        audio.countIn(countBeats(l).map((b) => start + b), l.layers.length);
+      } else if (!l.take) loopSaid = { what: 'full', time };
       return;
     }
     const what = undo(l);
@@ -309,8 +314,10 @@ function game(art) {
         // finished by then is dropped, its would-be layer's notes cut off. The loop's layers (kept
         // or not) fade out with the band either way.
         if (loop.take) {
-          if (step(loop, set.t) === 'layer') setLayers++;
-          else {
+          if (step(loop, set.t) === 'layer') {
+            setLayers++;
+            loopSaid = { what: 'layer', layer: loop.layers.length, time: pageTime() };
+          } else {
             undo(loop);
             audio.stopLoop(loop.layers.length);
           }
@@ -468,10 +475,14 @@ function game(art) {
         }
         stepScene(scene, set.t);
       }
-      // The loop: a recording moves on (and in a set, a finished one counts for the log), and the
-      // notes due soon are scheduled with the band's; in the park, each rises from the loop pedal.
+      // The loop: a recording moves on (and in a set, a finished one counts for the log, and says so
+      // over the strip), and the notes due soon are scheduled with the band's; in the park, each rises
+      // from the loop pedal.
       const l = heardLoop();
-      if (l && step(l, audio.now() - start) === 'layer' && !shop) setLayers++;
+      if (l && step(l, audio.now() - start) === 'layer') {
+        if (!shop) setLayers++;
+        loopSaid = { what: 'layer', layer: l.layers.length, time: pageTime() };
+      }
       const played = audio.update((from, to) => (l ? due(l, from, to) : []));
       if (set) for (const n of played) sceneLoopNote(scene, n.pitch, n.at - start);
       latency.reported = audio.reportedLatency();

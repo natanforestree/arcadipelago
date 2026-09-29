@@ -5,7 +5,7 @@
 import { createInput } from './input.js';
 import { layoutPitches } from './keys.js';
 import { STOCK } from './gear.js';
-import { createLoop, record, note, release, ring, step, undo, due, loopState } from './looper.js';
+import { createLoop, record, note, release, ring, step, undo, due, loopState, countBeats } from './looper.js';
 import { LOOP } from './tuning.js';
 
 // Browsers don't treat these as user activation (Chrome doesn't for a lone modifier, no browser does
@@ -84,7 +84,7 @@ export function soundCheck(audio, { debug }) {
         ring(loop, bandTime(), down);
       } else if (action === 'mute') audio.toggleMute();
       else if (action === 'loop') {
-        if (started) record(loop, bandTime());
+        if (started && record(loop, bandTime())) audio.countIn(countBeats(loop).map((b) => bandAt + b), loop.layers.length);
       } else if (action === 'undo') {
         if (undo(loop)) audio.stopLoop(loop.layers.length);
       } else if (action !== 'pause') warm();
