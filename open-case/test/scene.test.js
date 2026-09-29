@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  createScene, sceneNote, sceneEvents, stepScene, coinAt, glyphAt, CASE, GUITAR, TRAIL_LIFE, FLIGHT, GOLD,
+  createScene, sceneNote, sceneLoopNote, sceneEvents, stepScene, coinAt, glyphAt, loopGlyphAt, CASE, GUITAR, LOOP_PEDAL,
+  TRAIL_LIFE, LOOP_TRAIL_LIFE, FLIGHT, GOLD,
   skyStages, sunDrop, windowLit, lampState, starsOut, trainX, cloudX, createFlocks, birdsAt, pigeonsAt, frameOf,
   PIGEONS, TRAIN_LENGTH, PIGEON_FLY, PIGEON_WALK,
 } from '../src/scene.js';
@@ -19,6 +20,23 @@ test('each note leaves a glyph that floats up from the guitar, higher notes high
   assert.ok(glyphAt(low, 1 + TRAIL_LIFE / 2).fade > 0.4);
   stepScene(scene, 1.2 + TRAIL_LIFE);
   assert.deepEqual(scene.trail.map((g) => g.pitch), [72]);
+});
+
+test("each of your loop's notes rises from the loop pedal once it plays, up and away from your own, and fades sooner", () => {
+  const scene = createScene();
+  sceneLoopNote(scene, 60, 2); // scheduled a moment ahead of time 2
+  sceneLoopNote(scene, 72, 2.5);
+  const [low, high] = scene.loopTrail;
+  assert.equal(loopGlyphAt(low, 1.9).fade, 0, 'not before it plays');
+  const start = loopGlyphAt(low, 2);
+  assert.equal(start.x, LOOP_PEDAL[0]);
+  assert.ok(start.y <= LOOP_PEDAL[1] && start.y > LOOP_PEDAL[1] - 10, 'just over the pedal');
+  assert.ok(loopGlyphAt(high, 2.5).y < start.y, 'higher notes a little higher');
+  const later = loopGlyphAt(low, 3);
+  assert.ok(later.y < start.y && later.x < start.x, 'up and to the left, while your own notes drift right');
+  assert.ok(LOOP_TRAIL_LIFE < TRAIL_LIFE);
+  stepScene(scene, 2.1 + LOOP_TRAIL_LIFE);
+  assert.deepEqual(scene.loopTrail.map((g) => g.pitch), [72]);
 });
 
 test('a coin arcs from the listener into the case and stays there', () => {

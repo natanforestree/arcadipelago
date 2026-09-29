@@ -1,16 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createRenderer, shapeTags, personFrame, youFrame, treeFrame, W, H } from '../src/render.js';
+import { createRenderer, shapeTags, personFrame, youFrame, treeFrame, loopLight, loopWords, W, H } from '../src/render.js';
 import { createSet, runSet } from '../src/set.js';
-import { createScene, createFlocks, sceneNote, CASE, PIGEONS } from '../src/scene.js';
+import { createScene, createFlocks, sceneNote, sceneLoopNote, CASE, PIGEONS, LOOP_PEDAL } from '../src/scene.js';
 import { createKeyState } from '../src/keys.js';
 import { goodSet } from '../src/bots.js';
 import { KINDS } from '../src/crowd.js';
 import { BAR, BEAT } from '../src/groove.js';
 import { INTEREST } from '../src/tuning.js';
 import { STOCK, PEDALS, INSTRUMENTS, freshGear, buy, stomp } from '../src/gear.js';
-import { createShop, CARD, BUTTON } from '../src/shop.js';
+import { createShop, choose, CARD, BUTTON } from '../src/shop.js';
+import { createLoop, record, step } from '../src/looper.js';
 import { stoodAt } from './helpers.js';
 
 // The real frame data, with a stand-in for the sheet's image.
@@ -51,7 +52,7 @@ const drawn = (g, prefix) => g.sprites.filter((s) => s.name.startsWith(prefix));
 
 const view = (over) => ({
   screen: 'playing', set: null, scene: createScene(1), keys: createKeyState(), t: 0, bars: 0, time: 1, still: false,
-  flocks: createFlocks(1), gear: freshGear(), stomp: null, shop: null, debug: null, ...over,
+  flocks: createFlocks(1), gear: freshGear(), stomp: null, loop: null, loopSaid: null, shop: null, debug: null, ...over,
 });
 // Gear with everything bought: every pedal (the odd ones on) and every instrument, playing `instrument`.
 function allGear(instrument = 'acoustic') {
@@ -67,7 +68,7 @@ test('the title shows the name, the key layout and how to start, over the park a
   createRenderer(g, art)(view({ screen: 'title' }));
   assert.ok(g.texts.includes('Open Case'));
   assert.ok(['A', 'W', "'", 'press any key'].every((s) => g.texts.includes(s)));
-  assert.ok(g.texts.some((s) => s.startsWith('2-6 your pedals')), 'the pedal keys');
+  assert.ok(g.texts.includes('2-6 pedals   R loop   backspace undo'), 'the pedal keys and the loop pedal\'s');
   assert.ok(g.rects.some(([x, y, w]) => x === 0 && y === 0 && w === W), 'the sky behind it');
   for (const n of ['ground', 'lamp-off', 'you-acoustic-idle-', 'case', 'sun']) assert.ok(drawn(g, n).length, n);
   assert.equal(drawn(g, 'pool').length, 0, 'the lamp is off at dusk');
@@ -114,7 +115,10 @@ test('every frame the renderer asks for is in the sheet, over a whole set, with 
     for (const p of set.crowd.people) p.reaction.t = t - 0.1;
     const gear = allGear(INSTRUMENTS[Math.floor(t) % INSTRUMENTS.length]);
     const stomped = { id: PEDALS[Math.floor(t) % PEDALS.length], on: t % 2 < 1, time: t * 1.3 - 0.5 };
-    for (const still of [false, true]) draw(view({ set, scene, t, bars: t / BAR, time: t * 1.3 - 0.01, still, flocks, gear, stomp: stomped }));
+    const loop = [null, createLoop(), loopOf(2), loopOf(1, t - 1), loopOf(3)][Math.floor(t) % 5]; // empty, waiting or recording, playing
+    const loopSaid = { what: ['recording', 'full', 'cancelled', 'removed', 'cleared'][Math.floor(t / 2) % 5], layer: 1 + (Math.floor(t) % 3), time: t * 1.3 - 0.2 };
+    if (t % 1 < 0.37) sceneLoopNote(scene, 55 + (Math.floor(t) % 20), t + 0.1);
+    for (const still of [false, true]) draw(view({ set, scene, t, bars: t / BAR, time: t * 1.3 - 0.01, still, flocks, gear, stomp: stomped, loop, loopSaid }));
   }
 });
 
@@ -276,7 +280,7 @@ test('your instrument, your pedals by the crate, and the amp with the electric g
   createRenderer(g, art)(view({ set: createSet(1), t: 1, gear: allGear('electric') }));
   assert.equal(drawn(g, 'you-electric-').length, 1);
   assert.equal(drawn(g, 'amp').length, 1);
-  assert.deepEqual(drawn(g, 'pedal-').map((s) => s.name), ['pedal-overdrive-1', 'pedal-chorus-0', 'pedal-tremolo-1', 'pedal-delay-0', 'pedal-reverb-1']);
+  assert.deepEqual(drawn(g, 'pedal-').map((s) => s.name), ['pedal-loop-dark', 'pedal-overdrive-1', 'pedal-chorus-0', 'pedal-tremolo-1', 'pedal-delay-0', 'pedal-reverb-1']);
   const keys = fakeContext();
   createRenderer(keys, art)(view({ set: createSet(1), t: 1, gear: allGear('epiano') }));
   assert.equal(drawn(keys, 'you-epiano-').length, 1);
@@ -358,4 +362,130 @@ test('the shop card has a button when there is something to buy or play, and the
   assert.match(drawn(later, 'keeper-')[0].name, /^keeper-[01]$/);
   assert.ok(later.rects.every(([x, y, w, h]) => y + h <= H && x >= 0 && x + w <= W), 'everything on the screen');
   assert.ok(CARD[1] + CARD[3] <= H);
+});
+
+// A loop with `layers` layers done, from band time 0, and optionally a recording armed at band time
+// `armed` (from the next bar line).
+function loopOf(layers, armed = null) {
+  const loop = createLoop();
+  for (let i = 0; i < layers; i++) {
+    record(loop, i * 5 * BAR);
+    step(loop, (i * 5 + 5) * BAR);
+  }
+  if (armed !== null) record(loop, armed);
+  return loop;
+}
+
+test("the loop pedal's light: dark when empty, blinking red on the beat while it waits, red recording, green playing", () => {
+  assert.equal(loopLight(null, 5), 'dark');
+  assert.equal(loopLight(createLoop(), 5), 'dark');
+  const waiting = loopOf(0, 20 * BAR + 0.1);
+  assert.equal(loopLight(waiting, 20 * BAR + BEAT), 'red', 'on the beat');
+  assert.equal(loopLight(waiting, 20 * BAR + BEAT * 1.6), 'dark', 'between beats');
+  assert.equal(loopLight(waiting, 21 * BAR + 0.5), 'red', 'recording');
+  assert.equal(loopLight(loopOf(2), 30 * BAR), 'green');
+  assert.equal(loopLight(loopOf(2, 30 * BAR + 0.1), 31 * BAR + 2), 'red', 'recording over the loop');
+});
+
+test('the loop pedal stands by the crate once it is yours, its light as the loop is; the speaker is always there', () => {
+  const plain = fakeContext();
+  createRenderer(plain, art)(view({ set: createSet(1), t: 1 }));
+  assert.equal(drawn(plain, 'pedal-loop').length, 0, 'not yours yet');
+  assert.equal(drawn(plain, 'speaker').length, 1);
+  const gear = { ...freshGear(), savings: 100 };
+  buy(gear, 'loop');
+  const at = (loop, t) => {
+    const g = fakeContext();
+    createRenderer(g, art)(view({ set: createSet(1), t, gear, loop }));
+    return drawn(g, 'pedal-loop').map((s) => s.name);
+  };
+  assert.deepEqual(at(createLoop(), 1), ['pedal-loop-dark']);
+  assert.deepEqual(at(loopOf(1), 30 * BAR), ['pedal-loop-green']);
+  assert.deepEqual(at(loopOf(1, 30 * BAR + 0.1), 31 * BAR + 1), ['pedal-loop-red']);
+});
+
+test("the strip's loop slot: its key, and a dot per layer it can hold, lit for each recorded and red for the one recording", () => {
+  const gear = allGear();
+  const slot = (loop, t) => {
+    const g = fakeContext();
+    createRenderer(g, art)(view({ set: createSet(1), t, gear, loop }));
+    const icon = drawn(g, 'strip-loop')[0];
+    const dots = g.rects.filter(([x, y, w, h]) => y === 172 && w === 3 && h === 3 && x > icon.x);
+    return { icon, dots, key: g.positions.find((p) => p.s === 'R'), g };
+  };
+  const empty = slot(createLoop(), 1);
+  assert.equal(empty.icon.name, 'strip-loop-dark');
+  assert.equal(empty.icon.y, 170);
+  assert.equal(empty.icon.x, drawn(empty.g, 'strip-reverb')[0].x + 16, 'after the reverb');
+  assert.ok(empty.key.x > empty.icon.x);
+  assert.deepEqual(empty.dots.map((d) => d[4]), [data.colors.greyDark, data.colors.greyDark, data.colors.greyDark]);
+  const two = slot(loopOf(2, 30 * BAR + 0.1), 31 * BAR + 1);
+  assert.equal(two.icon.name, 'strip-loop-red');
+  assert.deepEqual(two.dots.map((d) => d[4]), [data.colors.light, data.colors.light, data.colors.red]);
+  const right = Math.max(...empty.dots.map(([x, , w]) => x + w));
+  assert.ok(right < Math.min(...PIGEONS.map(([x]) => x)) - 4 - 4, 'the slot ends before the pigeons, however they shuffle');
+  const none = fakeContext();
+  createRenderer(none, art)(view({ set: createSet(1), t: 1 }));
+  assert.equal(drawn(none, 'strip-loop').length, 0, 'not yours yet');
+});
+
+test("the loop pedal's news shows over its slot for a second, the newer over a stomp", () => {
+  assert.deepEqual(
+    [{ what: 'recording', layer: 1 }, { what: 'recording', layer: 2 }, { what: 'full' }, { what: 'cancelled' }, { what: 'removed' }, { what: 'cleared' }].map(loopWords),
+    ['loop recording', 'layer 2', 'loop full', 'recording cancelled', 'layer removed', 'loop cleared'],
+  );
+  const gear = allGear();
+  const at = (time, stomp) => {
+    const g = fakeContext();
+    createRenderer(g, art)(view({ set: createSet(1), t: 1, time, gear, stomp, loopSaid: { what: 'recording', layer: 2, time: 10 } }));
+    return g.texts;
+  };
+  assert.ok(at(10.5).includes('layer 2'));
+  assert.ok(!at(11.2).includes('layer 2'), 'gone after a second');
+  const newer = at(10.5, { id: 'delay', on: true, time: 10.3 });
+  assert.ok(newer.includes('delay on') && !newer.includes('layer 2'), 'one at a time: the stomp came after');
+  const older = at(10.5, { id: 'delay', on: true, time: 9.8 });
+  assert.ok(older.includes('layer 2') && !older.includes('delay on'));
+});
+
+test("your loop's notes rise faintly from the loop pedal as each plays, not before, and fade", () => {
+  const scene = createScene(1);
+  sceneLoopNote(scene, 60, 5);
+  const lit = (t) => {
+    const g = fakeContext();
+    const rects = [];
+    const fill = g.fillRect;
+    g.fillRect = function (x, y, w, h) {
+      if (w === 3 && h === 3 && this.fillStyle === data.colors.light) rects.push([x, y, this.globalAlpha]);
+      return fill.call(this, x, y, w, h);
+    };
+    createRenderer(g, art)(view({ set: createSet(1), scene, t }));
+    return rects;
+  };
+  assert.deepEqual(lit(4.9), [], 'scheduled a moment ahead, but not playing yet');
+  const [[x, y, alpha]] = lit(5.2);
+  assert.ok(Math.abs(x - LOOP_PEDAL[0]) < 6 && y < LOOP_PEDAL[1], 'just over the loop pedal');
+  assert.ok(alpha > 0 && alpha < 0.5, `faint: ${alpha}`);
+  assert.deepEqual(lit(5 + 3.1), [], 'gone');
+});
+
+test("in the shop, the loop pedal's light shows the loop you're trying, and its card says what R and Backspace do", () => {
+  const gear = { ...freshGear(), savings: 0 };
+  const shop = createShop();
+  choose(shop, STOCK.findIndex((s) => s.id === 'loop'));
+  const at = (t) => {
+    const g = fakeContext();
+    createRenderer(g, art)(view({ screen: 'shop', shop, gear, t, time: 5 }));
+    return g;
+  };
+  const [lx, ly] = data.shop.leds.loop;
+  const light = (g) => g.rects.filter(([x, y, w, h]) => x === lx && y === ly - data.shop.lift && w === 2 && h === 2).map((r) => r[4]);
+  assert.deepEqual(light(at(1)), [], 'dark: nothing recorded yet');
+  record(shop.loop, 1);
+  assert.deepEqual(light(at(BAR + 1)), [data.colors.red]);
+  step(shop.loop, BAR + 4 * BAR);
+  assert.deepEqual(light(at(6 * BAR)), [data.colors.go]);
+  const g = at(6 * BAR);
+  assert.ok(g.texts.includes('R records 4 bars, then loops them under you.'));
+  assert.ok(g.texts.includes('R record   backspace undo   arrows choose   esc back'));
 });

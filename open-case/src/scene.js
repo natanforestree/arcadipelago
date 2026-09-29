@@ -1,6 +1,7 @@
-// What's on screen besides the set itself, as plain data updated from what happens: the note trail,
-// coins flying into the case, the gold link of a callback, and the park's life (the sunset over the
-// set, the lit windows, the train, the pigeons by your case and the birds overhead). Pure, so it's
+// What's on screen besides the set itself, as plain data updated from what happens: the note trail
+// (and your loop's, fainter), coins flying into the case, the gold link of a callback, and the park's
+// life (the sunset over the set, the lit windows, the train, the pigeons by your case and the birds
+// overhead). Pure, so it's
 // tested in Node; render.js draws it. Times are seconds on the set's clock, except the birds' and the
 // pigeons' pecking, which run on the page's clock (`time`).
 import { createRng, nextRandom, randomBetween } from './rng.js';
@@ -8,9 +9,12 @@ import { BAR } from './groove.js';
 import { PARK, RULES } from './tuning.js';
 
 export const GUITAR = [152, 128]; // where notes float up from
+export const LOOP_PEDAL = [133, 152]; // where your loop's notes float up from (art/open-case/gear.lua G.LOOP_PEDAL)
 export const CASE = [161, 160]; // where coins land
-export const PIGEONS = [[196, 172], [209, 176], [222, 170]]; // where the pigeons peck: their feet
+// Where the pigeons peck: their feet, clear of the gear strip's loop slot (render.js).
+export const PIGEONS = [[222, 172], [235, 176], [248, 170]];
 const TRAIL_LIFE = 6; // seconds a note's glyph lasts (2 bars)
+const LOOP_TRAIL_LIFE = 3; // seconds a looped note's glyph lasts
 const FLIGHT = 0.7; // seconds a coin takes to reach the case
 const GOLD = 2; // seconds the callback's gold link shows
 const PARK_SEED = 0x9e3779b9; // mixed into the set's seed, so the park draws from its own stream
@@ -31,6 +35,7 @@ export function createScene(seed = 1) {
   const rng = createRng((seed ^ PARK_SEED) >>> 0);
   return {
     trail: [], flights: [], caseCoins: 0, gold: null, clapFrom: -1,
+    loopTrail: [], // your loop's notes, { pitch, t }, in time order (t can be a moment ahead: they're scheduled ahead)
     lastNote: -Infinity, // when you last played a note (you strum)
     scaredAt: null, // when a loud note last scattered the pigeons
     flyFrom: 1, // how far through the walk back they were when last scattered (1: at home)
@@ -53,6 +58,11 @@ export function sceneNote(scene, pitch, index, t, strength = 0) {
   }
 }
 
+// A note of your loop, starting at time t.
+export function sceneLoopNote(scene, pitch, t) {
+  scene.loopTrail.push({ pitch, t });
+}
+
 // Takes one update's set events.
 export function sceneEvents(scene, events, t) {
   for (const e of events) {
@@ -66,6 +76,7 @@ export function sceneEvents(scene, events, t) {
 // Time passes: old glyphs go, coins land.
 export function stepScene(scene, t) {
   while (scene.trail.length && t - scene.trail[0].t > TRAIL_LIFE) scene.trail.shift();
+  while (scene.loopTrail.length && t - scene.loopTrail[0].t > LOOP_TRAIL_LIFE) scene.loopTrail.shift();
   for (const f of scene.flights) if (!f.landed && t - f.t >= FLIGHT) {
     f.landed = true;
     scene.caseCoins++;
@@ -87,6 +98,14 @@ export function coinAt(f, t) {
 export function glyphAt(g, t) {
   const age = t - g.t;
   return { x: GUITAR[0] + age * 16, y: GUITAR[1] - (g.pitch - 52) * 1.4 - age * 5, fade: Math.max(0, 1 - age / TRAIL_LIFE) };
+}
+
+// The same for a looped note's glyph, once the note sounds: it rises from just over the loop pedal
+// (higher notes a little higher) and drifts up and away to the left, so it never follows your own
+// notes off toward the crowd.
+export function loopGlyphAt(g, t) {
+  const age = t - g.t;
+  return { x: LOOP_PEDAL[0] - age * 10, y: LOOP_PEDAL[1] - (g.pitch - 52) * 0.5 - age * 10, fade: age < 0 ? 0 : Math.max(0, 1 - age / LOOP_TRAIL_LIFE) };
 }
 
 // The sunset. `bar` is a whole number of bars into the set (0 before it starts).
@@ -200,4 +219,4 @@ export function pigeonsAt(scene, t, time) {
   return out;
 }
 
-export { TRAIL_LIFE, FLIGHT, GOLD, TRAIN_LENGTH, PIGEON_FLY, PIGEON_WALK };
+export { TRAIL_LIFE, LOOP_TRAIL_LIFE, FLIGHT, GOLD, TRAIN_LENGTH, PIGEON_FLY, PIGEON_WALK };
