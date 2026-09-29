@@ -179,7 +179,7 @@ The plan's prototype settled a few things this spec left open:
 - **Your acoustic guitar stands in the shop too.** It isn't for sale, but choosing it is how you go back to it. So the shop shows ten things; the arrow keys run along the rack, then along the floor.
 - **The chosen item** lifts two pixels, lights up a shade, and has a small gold pointer over it. A pedal's light on the rack is lit while you can hear it.
 - **The card has a fourth line**, "arrows choose   esc back to the park".
-- **Your pedals by the crate** are a row of little stompboxes in front of it, between the looper and the case. The amp stands to the left of the crate, behind the looper.
+- **Your pedals by the crate** are a row of little stompboxes in front of it, between the looper (the band's speaker since the loop pedal came) and the case. The amp stands to the left of the crate, behind the looper.
 - **The keyboards** stand on an X over your lap as you sit on the crate. Your hands press on the keys, the left, both, then the right.
 - **The gear strip** gives each pedal its own place, whatever else you own, between "lock" and the pigeons. A pedal that's off shows in its darker shade.
 - **The title card** has a line for the pedal keys: "2-6 your pedals (from the shop)".
@@ -191,7 +191,7 @@ The plan's prototype settled a few things this spec left open:
 
 ## Not in this change
 
-- The loop pedal (the next spec).
+- The loop pedal (the next spec: `2026-09-29-open-case-loop-pedal-design.md`).
 - Gear that changes how the crowd reacts, and anything that boosts earnings.
 - Selling gear back, more instruments or pedals, and more spots.
 - Regulars (its own spec).

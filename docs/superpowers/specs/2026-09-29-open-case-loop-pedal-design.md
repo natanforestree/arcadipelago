@@ -1,7 +1,7 @@
 # Open Case: the loop pedal (design spec)
 
 **Date:** 2026-09-29
-**Status:** Nathan agreed the design in chat ("seems perfect!"). This written spec is waiting for his review; the implementation plan comes after that.
+**Status:** Nathan agreed the design in chat ("seems perfect!"), then reviewed this spec and its plan. Built from `docs/superpowers/plans/2026-09-29-open-case-loop-pedal.md`.
 
 Nathan asked for "a music shop with different guitar pedals and loop pedal and instruments". The shop is live with the pedals and the instruments ([the shop's spec](2026-09-28-open-case-shop-design.md)); this adds the loop pedal. It's a new item on the shop's rack. Once it's yours, you record 4 bars of what you play and it loops under you, and you can stack up to three layers and play live over the top. Like the rest of the gear, it only changes how you sound: the crowd judges what you play live, as it does now.
 
@@ -141,6 +141,36 @@ All in the flat style, in the same sprite sheet, within 64 colours and 400 KB.
 ## How we'll know it works
 
 Nathan buys the loop pedal and records loops in his sets, and the log shows layers in them. **It works** if he keeps playing over his loops, and his Another-set rate holds or rises. **If recording feels late or early**, the 16th allowance changes. **If three layers is too few or too many**, that's a number in `tuning.js`, and so is the price.
+
+## What the build settled
+
+The plan's prototype settled a few things this spec left open:
+- **The loop pedal stands just behind your row of pedals**, between them and the crate, under your foot. There was no room beside the row: the case is on one side and a listener's spot on the other. Its light is two pixels square, so red and green read at a glance.
+- **The speaker** is the blue box with a handle on top and a dark cone.
+- **The rack is wider**, and the chalkboard moved right to make room. The five pedals stand 20 pixels apart with the loop pedal last, 18 wide, and every price tag hangs clear of the next pedal.
+- **The strip's loop slot** comes straight after the reverb's: the icon, "R", and three dots. The pigeons moved 26 pixels to the right to make room.
+- **Looped notes rise faintly from just over the loop pedal**, higher notes a little higher. They drift up and to the left, away from your own notes, which drift right toward the crowd, and fade in 3 seconds.
+- **The news over the strip:**
+  - when R arms a recording: "loop recording" for the first layer, "layer 2" or "layer 3" after that;
+  - "loop full";
+  - "recording cancelled" (Backspace during a recording);
+  - "layer removed";
+  - "loop cleared".
+
+  It shows one message at a time: the newer of the loop's news and a pedal stomp.
+- **While a recording waits**, the light is red for the first half of each beat.
+- **In the shop:**
+  - the card's last line, while the loop pedal is chosen, is "R record   backspace undo   arrows choose   esc back";
+  - its light on the rack shows the loop you're trying;
+  - the band there is the electric piano alone, at about two thirds of its level in a set;
+  - buying the pedal while you try it keeps your loop going.
+- **An empty recording still counts as a layer.** Four bars with no notes take a layer, and Backspace takes it off.
+- **The loop sits a little under you**, at 80% of your live level.
+- **A safety before the speakers** keeps stacked loops from clipping. Measured offline at the default volume:
+  - one hard four-note chord, clean, already peaks at −2.7 dB;
+  - three layers of it, landing on the same beat you play it live, peaked at +9.3 dB.
+
+  The safety passes everything below about −3 dB untouched, so the game's mix measured the same with it, and it rounds louder peaks off smoothly. That worst case, with the loop at 80%, now peaks at −0.2 dB even at full volume.
 
 ## Not in this change
 
