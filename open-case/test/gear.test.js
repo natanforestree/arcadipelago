@@ -9,12 +9,13 @@ function memoryStorage() {
 }
 const withSavings = (savings) => ({ ...freshGear(), savings });
 
-test('the stock: five pedals on keys 2 to 6 in chain order, then the instruments, priced from tuning.js', () => {
+test('the stock: five pedals on keys 2 to 6 in chain order, the loop pedal, then the instruments, priced from tuning.js', () => {
+  assert.deepEqual(STOCK.map((s) => s.id), ['overdrive', 'chorus', 'tremolo', 'delay', 'reverb', 'loop', ACOUSTIC, 'ukulele', 'electric', 'epiano', 'synth']);
   assert.deepEqual(PEDALS, ['overdrive', 'chorus', 'tremolo', 'delay', 'reverb']);
   assert.deepEqual(PEDALS.map((id) => STOCK.find((s) => s.id === id).key), [2, 3, 4, 5, 6]);
   assert.deepEqual(INSTRUMENTS, [ACOUSTIC, 'ukulele', 'electric', 'epiano', 'synth']);
   for (const item of STOCK) if (item.id !== ACOUSTIC) assert.equal(item.price, SHOP[item.id].price, item.id);
-  assert.equal(STOCK.reduce((sum, item) => sum + item.price, 0), 950, 'the whole stock costs 950 coins');
+  assert.equal(STOCK.reduce((sum, item) => sum + item.price, 0), 1050, 'the whole stock costs 1050 coins');
   for (const item of STOCK) assert.ok(item.name && item.about.length <= 48, `${item.id}: a name, and a line that fits the card`);
 });
 
@@ -101,4 +102,19 @@ test('a damaged save starts afresh, and what makes no sense in it is dropped', (
   assert.deepEqual(loadGear(s), { savings: 75, owned: ['delay'], instrument: ACOUSTIC, on: ['delay'] });
   s.set('open-case-gear', JSON.stringify({ owned: 'delay', on: 7 }));
   assert.deepEqual(loadGear(s), { ...freshGear(), savings: 75 });
+});
+
+test("the loop pedal is bought and kept like a pedal, but it has no number key and never joins the chain", () => {
+  const s = memoryStorage();
+  const gear = withSavings(99);
+  assert.equal(buy(gear, 'loop'), false, '100 coins, with 99 saved');
+  earn(gear, 1);
+  assert.equal(buy(gear, 'loop'), true);
+  assert.deepEqual([gear.savings, gear.owned, gear.on], [0, ['loop'], []]);
+  assert.equal(stomp(gear, 'loop'), null, 'R works it, not a pedal key');
+  assert.equal(play(gear, 'loop'), false);
+  assert.ok(!PEDALS.includes('loop') && !INSTRUMENTS.includes('loop'));
+  saveGear(s, gear);
+  s.set('open-case-gear', JSON.stringify({ ...JSON.parse(s.get('open-case-gear')), on: ['loop'] }));
+  assert.deepEqual(loadGear(s), { savings: 0, owned: ['loop'], instrument: ACOUSTIC, on: [] }, "it's yours after a reload, and never 'on'");
 });

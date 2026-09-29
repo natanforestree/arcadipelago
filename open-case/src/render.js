@@ -1,7 +1,7 @@
 // Draws the scene at 320x180 into a 2D context (main.js scales it up by a whole number), in the flat
 // style, from the sprite sheet art/open-case/sprites.lua makes (assets.js loads it): the park and its
-// sunset, you on your crate with your instrument, your pedals, the open case and the looper, the
-// passers-by, their reactions, the pigeons and birds, the note trail, the memory strip, the gear
+// sunset, you on your crate with your instrument, your pedals, the open case and the band's speaker,
+// the passers-by, their reactions, the pigeons and birds, the note trail, the memory strip, the gear
 // strip, the music shop, and the title, pause and ?debug overlays. The end card is HTML (index.html).
 import { CROWD, PLAY, LAYERS, INTEREST } from './tuning.js';
 import { BAR, BEAT } from './groove.js';
@@ -125,10 +125,9 @@ export function createRenderer(g, art) {
   }
 
   // Everyone and everything standing on the path, nearest last: the listeners, you, your pedals and
-  // amp, the looper, the case and its coins, and the pigeons on the ground. Returns the pigeons in the
+  // amp, the speaker, the case and its coins, and the pigeons on the ground. Returns the pigeons in the
   // air, drawn later.
   function figures({ set, scene, t, time, gear }) {
-    const beatPhase = set && t >= 0 ? (t % BAR) / BAR : 1;
     const things = [
       { y: data.feet.you, draw: () => sprite(youFrame(scene, t, time, gear.instrument), 0, 0) },
       {
@@ -137,7 +136,7 @@ export function createRenderer(g, art) {
           for (const id of PEDALS) if (owns(gear, id)) sprite(`pedal-${id}-${gear.on.includes(id) ? 1 : 0}`, 0, 0);
         },
       },
-      { y: data.feet.looper, draw: () => sprite(`looper-${beatPhase < 0.25 ? 1 : 0}`, 0, 0) },
+      { y: data.feet.speaker, draw: () => sprite('speaker', 0, 0) },
       {
         y: data.feet.case,
         draw: () => {

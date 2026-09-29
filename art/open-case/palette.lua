@@ -13,11 +13,11 @@ return {
   path = { "#3a2e48", "#564660", "#9c8480" }, -- joints and shadows, the stones, the pool of lamplight
   skin = { "#c08468", "#f2c69e" },
   skin2 = { "#7e4e38", "#b07650" }, -- darker skin
-  blue = { "#2c3466", "#4660a6" }, -- the looper's body and its top, the student's hoodie
+  blue = { "#2c3466", "#4660a6" }, -- the speaker's body and its top, the student's hoodie
   pants = { "#2d4b2c", "#4c783a" }, -- your forest green pants
   wood = { "#45291f", "#7a4a2c", "#c68a50" }, -- dark wood, the crate, the guitar
-  red = { "#74283a", "#b03c4a" }, -- the case's lining, the scarf, the jogger's top, the looper's first beat
+  red = { "#74283a", "#b03c4a" }, -- the case's lining, the scarf, the jogger's top, the loop pedal recording
   coat = { "#5e566e", "#8e8498" }, -- grey: the regular's coat, the commuter's suit, pigeons
   brown = { "#553a2e", "#86604a" }, -- the passing old man's coat
-  go = "#6ed89a", -- the looper's light between beats, a listener's nod of recognition
+  go = "#6ed89a", -- the loop pedal playing, a listener's nod of recognition
 }

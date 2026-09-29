@@ -18,7 +18,7 @@ D.LAMP = { 70, 50 } -- the lamp's head
 D.POOL = { 70, 143, 40, 12 } -- the pool of lamplight on the path: centre and radii
 D.YOU = { -6, 10 } -- where you sit, as an offset from the style sample's first layout
 D.CASE = { 147, 156, 28 } -- the open case: its front-left corner and its width
-D.LOOPER = { 112, 151 } -- the looper's top-left
+D.SPEAKER = { 112, 151 } -- the band's speaker's top-left, by your crate
 D.TRAIN_Y = 92 -- the bottom of the distant train, which the nearer rooftops partly hide
 -- The clouds: { centre x, bottom row, length, layer } (layer 1 drifts slowly, 2 faster).
 D.CLOUDS = { { 60, 34, 40, 1 }, { 150, 20, 52, 1 }, { 298, 18, 26, 1 }, { 252, 48, 46, 2 }, { 112, 64, 28, 2 } }
@@ -449,14 +449,19 @@ end
 -------------------------------------------------------------------------------------------------
 -- Things by your crate
 
--- The looper: its body, the switch, and its light, red on each bar's first beat.
-function D.looper(b, red)
-  local x, y = D.LOOPER[1], D.LOOPER[2]
+-- The band's small speaker: a blue box with its handle on top and a dark cone.
+function D.speaker(b)
+  local x, y = D.SPEAKER[1], D.SPEAKER[2]
   shadow(b, x + 5, y + 5.5, 7, 1.5)
-  rect(b, x, y, x + 10, y + 5, C.blue[1])
-  rect(b, x, y, x + 10, y, C.blue[2])
-  rect(b, x + 6, y - 2, x + 8, y - 1, C.ink)
-  rect(b, x + 2, y + 2, x + 3, y + 3, red and C.red[2] or C.go)
+  stamp(b, x + 3, y - 2, { "kkkkk", "k...k" })
+  stamp(b, x, y, {
+    "uuuuuuuuuuu",
+    "UUUkkkkkUUU",
+    "UUkkhhhkkUU",
+    "UUkkhhhkkUU",
+    "UUUkkkkkUUU",
+    "UUUUUUUUUUU",
+  })
 end
 
 -- The open case, empty: its lid up behind and the red lining.

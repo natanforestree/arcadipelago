@@ -24,9 +24,10 @@ const FAMILIES = [
   ['sun', 1], ['ground', 1], ['pool', 1], ['case', 1], ['case-coin', 1],
   [/^roofs-back-\d$/, 5], [/^roofs-front-\d$/, 5], [/^train-\d$/, 5], [/^trees-\d$/, 3], [/^lamp-(off|on|flicker)$/, 3],
   [/^cloud-\d+-\d$/, data.clouds.length * 5],
-  [/^coin-\d$/, 2], [/^looper-\d$/, 2], [/^bird-\d$/, 2],
+  [/^coin-\d$/, 2], ['speaker', 1], [/^bird-\d$/, 2],
   ...INSTRUMENTS.flatMap((id) => [[new RegExp(`^you-${id}-idle-\\d$`), 2], [new RegExp(`^you-${id}-play-\\d$`), 3]]),
   ...PEDALS.flatMap((id) => [[new RegExp(`^pedal-${id}-\\d$`), 2], [new RegExp(`^strip-${id}-\\d$`), 2]]),
+  [/^pedal-loop-(dark|red|green)$/, 3], [/^strip-loop-(dark|red|green)$/, 3],
   ['amp', 1], ['shop-room', 1], ['shop-counter', 1], [/^keeper-\d$/, 4], ['tag-price', 1], ['tag-yours', 1],
   ...STOCK.map((item) => [new RegExp(`^item-${item.id}-\\d$`), 2]),
   ...KINDS.flatMap((k) => ['left', 'right'].flatMap((d) => [
@@ -119,8 +120,8 @@ test('the art sits round the positions the rules use', () => {
   assert.ok(data.feet.you > PATH_Y, 'passers-by walk behind you');
 });
 
-test('your pedals stand in front of the crate, clear of the case and of every listener', () => {
-  const pedals = PEDALS.map((id) => `pedal-${id}-1`);
+test('your pedals and the loop pedal stand in front of the crate, clear of the case and of every listener', () => {
+  const pedals = [...PEDALS.map((id) => `pedal-${id}-1`), 'pedal-loop-green'];
   const [, , , bottom] = cover('you-acoustic-idle-0', 0, 0);
   for (const name of pedals) {
     const [l, t, r, b] = cover(name, 0, 0);
@@ -135,7 +136,10 @@ test('your pedals stand in front of the crate, clear of the case and of every li
       }
     }
   }
-  assert.ok(bottom <= data.feet.pedals);
+  assert.ok(bottom <= data.feet.pedals && bottom <= data.feet.loop);
+  const [, , , loopBottom] = cover('pedal-loop-green', 0, 0);
+  const [, pedalsTop] = cover('pedal-overdrive-1', 0, 0);
+  assert.ok(loopBottom <= pedalsTop + 1, 'the loop pedal stands behind the row of pedals');
 });
 
 test("the shop's stock stands apart, above the card, and the door and its sign are inside the screen", () => {
@@ -150,8 +154,11 @@ test("the shop's stock stands apart, above the card, and the door and its sign a
   }
   const [dx, dy, dw, dh] = data.shop.door;
   assert.ok(dx >= 0 && dy >= 0 && dx + dw <= 320 && dy + dh <= CARD[1]);
-  for (const id of PEDALS) {
+  for (const id of [...PEDALS, 'loop']) {
     const [lx, ly] = data.shop.leds[id], [x, y, w, h] = data.shop.items[id];
-    assert.ok(lx >= x && lx + 2 <= x + w && ly >= y && ly < y + h, `${id}'s light is on the pedal`);
+    assert.ok(lx >= x && lx + 2 <= x + w && ly >= y && ly + (id === 'loop' ? 2 : 1) <= y + h, `${id}'s light is on the pedal`);
   }
+  const rack = [...PEDALS, 'loop'].map((id) => data.shop.items[id]);
+  rack.forEach(([x], i) => i > 0 && assert.ok(x >= rack[i - 1][0] + rack[i - 1][2] + 5, 'room for a price tag between pedals, clear of the next'));
+  assert.ok(rack.at(-1)[2] > rack[0][2], 'the loop pedal is the wider one');
 });

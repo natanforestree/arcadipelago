@@ -7,14 +7,16 @@ import { SHOP } from './tuning.js';
 // The guitar you start with. It isn't for sale, but it stands in the shop so you can go back to it.
 export const ACOUSTIC = 'acoustic';
 
-// Everything in the shop, in the order you move through it: the pedals on the rack, then the
-// instruments on their stands. Each price and pedal key is from tuning.js.
+// Everything in the shop, in the order you move through it: the pedals on the rack (the loop pedal
+// last, since R and Backspace work it rather than a number key), then the instruments on their
+// stands. Each price and pedal key is from tuning.js.
 export const STOCK = [
   { id: 'overdrive', kind: 'pedal', name: 'Overdrive', about: 'Warm grit, more of it the harder you pick.' },
   { id: 'chorus', kind: 'pedal', name: 'Chorus', about: 'A slow shimmer, like two guitars at once.' },
   { id: 'tremolo', kind: 'pedal', name: 'Tremolo', about: 'Your volume pulses on the 8th notes.' },
   { id: 'delay', kind: 'pedal', name: 'Delay', about: 'Echoes in time with the band, fading away.' },
   { id: 'reverb', kind: 'pedal', name: 'Reverb', about: 'A warm hall behind every note.' },
+  { id: 'loop', kind: 'loop', name: 'Loop pedal', about: 'R records 4 bars, then loops them under you.' },
   { id: ACOUSTIC, kind: 'instrument', name: 'Acoustic guitar', about: 'The guitar you started out with.' },
   { id: 'ukulele', kind: 'instrument', name: 'Ukulele', about: 'Bright little strings that ring short.' },
   { id: 'electric', kind: 'instrument', name: 'Electric guitar', about: 'A clean tone that sings, through a small amp.' },
@@ -23,7 +25,7 @@ export const STOCK = [
 ].map((item) => ({ price: 0, key: null, ...item, ...SHOP[item.id] }));
 
 export const stockItem = (id) => STOCK.find((item) => item.id === id) ?? null;
-// The pedals in the order they chain, which is the order of their keys.
+// The pedals in the order they chain, which is the order of their keys (not the loop pedal).
 export const PEDALS = STOCK.filter((item) => item.kind === 'pedal').map((item) => item.id);
 export const INSTRUMENTS = STOCK.filter((item) => item.kind === 'instrument').map((item) => item.id);
 

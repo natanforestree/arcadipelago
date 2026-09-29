@@ -1,7 +1,7 @@
 -- Your gear from the music shop, in the flat style, for the sprite sheet (sprites.lua) and the shop
--- (shop.lua): you playing each instrument, your pedals on the ground by the crate, the small amp
--- that comes with the electric guitar, the gear strip's icons along the bottom of the screen, and
--- each instrument and pedal as it stands in the shop.
+-- (shop.lua): you playing each instrument, your pedals and the loop pedal on the ground by the crate,
+-- the small amp that comes with the electric guitar, the gear strip's icons along the bottom of the
+-- screen, and each instrument and pedal as it stands in the shop.
 --
 -- You are drawn in the style sample's first layout and moved by D.YOU, like draw.lua's D.you. The
 -- pedals, the amp and the strip's icons are drawn where they go on the game's screen.
@@ -18,7 +18,11 @@ G.PEDAL_COLORS = {
 }
 G.PEDAL_ROW = { 117, 160 } -- your first pedal's top-left on the ground, in front of the crate...
 G.PEDAL_STEP = 6 -- ...and each next one this far to the right
-G.AMP = { 109, 136 } -- the amp's top-left, left of the crate behind the looper
+G.LOOP_PEDAL = { 128, 153 } -- the loop pedal's top-left: between the crate and the row of pedals
+-- The loop pedal's light, as a pixel-map letter: dark with nothing to play, red while it records (and
+-- blinking while it waits for the bar line), green while the loop plays.
+G.LOOP_LIGHTS = { dark = "k", red = "r", green = "o" }
+G.AMP = { 109, 136 } -- the amp's top-left, left of the crate behind the speaker
 
 -- A pixel map with its letters swapped: { from = to }.
 local function recolour(rows, swap)
@@ -175,6 +179,20 @@ function G.pedal(b, id, on)
   }, { b = c[1], S = c[2], L = on and "w" or "k" }))
 end
 
+-- The loop pedal on the ground: wider than the others, grey, with a big footswitch, and its light
+-- ('dark', 'red' or 'green').
+function G.loopPedal(b, light)
+  local x, y = G.LOOP_PEDAL[1], G.LOOP_PEDAL[2]
+  D.shadow(b, x + 5.5, y + 5.5, 6.5, 1)
+  stamp(b, x, y, recolour({
+    "ccccccccccc",
+    "cLLcchhhhhc",
+    "cLLcchhhhhc",
+    "ccccccccccc",
+    "CCCCCCCCCCC",
+  }, { L = G.LOOP_LIGHTS[light] }))
+end
+
 -- The small amp beside the crate, which comes with the electric guitar.
 function G.amp(b)
   local x, y = G.AMP[1], G.AMP[2]
@@ -210,6 +228,22 @@ function G.stripIcon(b, id, on)
     "bbcccbb",
     "SSSSSSS",
   }, { b = on and c[1] or c[2], S = on and c[2] or "N", L = on and "w" or "k" }))
+end
+
+-- The loop pedal's icon on the gear strip, from its top-left, its light as on the pedal: grey with a
+-- dark light while the loop is empty, lit up with a red or green light otherwise.
+function G.loopIcon(b, light)
+  local lit = light ~= "dark"
+  stamp(b, 0, 0, recolour({
+    ".bbbbb.",
+    "bLLbbbb",
+    "bLLbbbb",
+    "bbbbbbb",
+    "bhhhhhb",
+    "bhhhhhb",
+    "bbbbbbb",
+    "SSSSSSS",
+  }, { b = lit and "c" or "C", S = lit and "C" or "N", L = G.LOOP_LIGHTS[light] }))
 end
 
 return G

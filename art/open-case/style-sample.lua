@@ -1,8 +1,9 @@
 -- Open Case's style sample: the look Nathan approved, drawn with the game's own drawing code
 -- (draw.lua and figures.lua), so the sample and the game can't drift apart. The park at dusk at
 -- 320x180 with the lamp lit, you on your crate with the guitar, the open case with a few coins, the
--- looper, and the regular (the old man in the red scarf) listening at the right-hand spot. And a short
--- GIF of him walking in, nodding, and grinning as his coin arcs into the case. Run from the repo root:
+-- band's speaker, and the regular (the old man in the red scarf) listening at the right-hand spot.
+-- And a short GIF of him walking in, nodding, and grinning as his coin arcs into the case. Run from
+-- the repo root:
 --   aseprite -b --script art/open-case/style-sample.lua
 -- Writes art/open-case/preview-style.png (the still at 3x), preview-style-1x.png and
 -- preview-oldman.gif (at 3x). Previews aren't committed.
@@ -37,11 +38,11 @@ local function glint(b)
   for _, d in ipairs({ { 0, -1 }, { -1, 0 }, { 0, 0 }, { 1, 0 }, { 0, 1 } }) do L.set(b, x + d[1], y + d[2], C.light) end
 end
 
-local function scene(manX, step, head, grin, tip, coins, shine, beat)
+local function scene(manX, step, head, grin, tip, coins, shine)
   local b = L.buffer(W, H)
   L.blit(b, base, 0, 0)
   D.you(b, 0, 0)
-  D.looper(b, beat)
+  D.speaker(b)
   D.openCase(b)
   for _, s in ipairs(D.caseCoinSpots(coins)) do D.caseCoin(b, s[1], s[2]) end
   if shine then glint(b) end
@@ -60,7 +61,7 @@ local frames = {}
 local function add(b, ms)
   frames[#frames + 1] = { L.scale(L.crop(b, CROP[1], CROP[2], CROP[3], CROP[4]), 3), ms }
 end
-for f = 0, 11 do add(scene(292 - f * 5.5, f % 4, 0, false, false, 4, false, f % 6 == 0), 120) end
+for f = 0, 11 do add(scene(292 - f * 5.5, f % 4, 0, false, false, 4, false), 120) end
 for f = 0, 3 do add(scene(SPOT[1], nil, f % 2 == 0 and 2 or 0, false, false, 4, false), 180) end
 add(scene(SPOT[1], nil, 0, true, false, 4, false), 400)
 local from, to = { SPOT[1] - 12, SPOT[2] - 26 }, { 161, 159 } -- his hand, then where coins land (scene.js CASE)

@@ -16,15 +16,16 @@ S.STANDS = 124 -- the row the stands' feet stand on
 S.SIGN = { 4, 8, 52, 30 } -- the sign over the door: x0, y0, x1, y1 (its words: render.js)
 S.DOOR = { 8, 34, 40, S.FLOOR - 1 }
 S.WINDOW = { 60, 16, 104, 60 }
-S.RACK = { 112, 20, 228, 66 } -- the pedal rack; its shelf's top is row 62
-S.BOARD = { 236, 10, 302, 44 } -- the chalkboard (the savings: render.js)
+S.RACK = { 112, 20, 240, 66 } -- the pedal rack; its shelf's top is row 62
+S.BOARD = { 248, 10, 314, 44 } -- the chalkboard (the savings: render.js)
 S.COUNTER = { 232, 74, W - 1, 112 }
 S.KEEPER = { 266, 74 } -- the shopkeeper's middle, and the counter's top where she stands behind it
 S.LIFT = 2 -- pixels a chosen item rises
 
--- Where each item stands: a pedal's top-left on the rack's shelf, or a guitar's or keyboard's place
--- on the floor ({ x of the middle for a guitar, x of the left for a keyboard }).
-local RACK_X = { overdrive = 118, chorus = 140, tremolo = 162, delay = 184, reverb = 206 }
+-- Where each item stands: a pedal's top-left on the rack's shelf (the pedals, then the wider loop
+-- pedal), or a guitar's or keyboard's place on the floor ({ x of the middle for a guitar, x of the
+-- left for a keyboard }).
+local RACK_X = { overdrive = 117, chorus = 137, tremolo = 157, delay = 177, reverb = 197, loop = 217 }
 local RACK_TOP = 45 -- a pedal's top row: it's 17 tall, so it stands on the shelf (row 62)
 local FLOOR_AT = { acoustic = 55, ukulele = 78, electric = 101, epiano = 117, synth = 168 }
 
@@ -194,7 +195,36 @@ local PEDAL_BODY = {
 }
 S.LED = { 11, 1 } -- the light's place on a rack pedal, from its top-left (2 by 1)
 
+-- The loop pedal on the rack, 18 by 17: grey, its light (2 by 2, lit by render.js while you try it)
+-- beside a little window, a line across, and a big footswitch.
+local LOOP_PEDAL = {
+  ".cccccccccccccccc.",
+  "cccccccccccccccccC",
+  "ccLLcchhhhhhhhcccC",
+  "ccLLcchhhhhhhhcccC",
+  "cccccccccccccccccC",
+  "CCCCCCCCCCCCCCCCCC",
+  "cccccccccccccccccC",
+  "cccccccccccccccccC",
+  "cccccccccccccccccC",
+  "ccccckkkkkkkkccccC",
+  "cccckkkkkkkkkkcccC",
+  "cccckkkkkkkkkkcccC",
+  "ccccckkkkkkkkccccC",
+  "cccccccccccccccccC",
+  "cccccccccccccccccC",
+  "cccccccccccccccccC",
+  ".CCCCCCCCCCCCCCCC.",
+}
+S.LOOP_LED = { 2, 2 } -- the loop pedal's light, from its top-left (2 by 2)
+
 local function rackPedal(b, id, lift)
+  if id == "loop" then
+    local out = {}
+    for i, r in ipairs(LOOP_PEDAL) do out[i] = r:gsub("L", "k") end -- its light, dark
+    stamp(b, RACK_X[id], RACK_TOP - lift, out)
+    return
+  end
   local c = G.PEDAL_COLORS[id]
   local rows = { ".bbbbbbbbbbbb.", "bbbbbbbbbbbkkS", "bbbbbbbbbbbbbS" }
   for _, r in ipairs(KNOBS[id]) do rows[#rows + 1] = r end
@@ -352,7 +382,10 @@ function S.box(id)
 end
 
 -- A rack pedal's light, on the screen, as it stands.
-function S.led(id) return { RACK_X[id] + S.LED[1], RACK_TOP + S.LED[2] } end
+function S.led(id)
+  local at = id == "loop" and S.LOOP_LED or S.LED
+  return { RACK_X[id] + at[1], RACK_TOP + at[2] }
+end
 
 -- The tags on the stock: a price tag, and a green one on what's yours.
 function S.tag(b, yours)

@@ -17,10 +17,11 @@
 --   stars      [[x, y], ...]: where the stars come out
 --   trainY     the distant train's bottom row
 --   caseCoins  [[x, y], ...]: where the coins in the case lie, in the order they land
---   feet       { you, looper, case, amp, pedals }: the row where each meets the ground, to sort them
---              among the people
+--   feet       { you, speaker, case, amp, pedals, loop }: the row where each meets the ground, to sort
+--              them among the people (loop: the loop pedal)
 --   shop       the music shop's layout: items { id: [x, y, w, h] } (each item's box as it stands, for
---              clicks and its tag), leds { id: [x, y] } (each rack pedal's 2x1 light), door [x, y, w, h]
+--              clicks and its tag), leds { id: [x, y] } (each rack pedal's 2x1 light, and the loop
+--              pedal's 2x2 one), door [x, y, w, h]
 --              (the door and its sign, a click leaves), sign and board [x, y] (the middle of the top of
 --              the words on the sign and on the chalkboard), lift (pixels a chosen item rises)
 --   colors     the named colours the game draws with in code
@@ -64,7 +65,8 @@ screen("pool", function(b) D.path(b, true) end)
 for _, state in ipairs({ "off", "on", "flicker" }) do screen("lamp-" .. state, function(b) D.lamp(b, state) end) end
 
 -- You and your things: you playing each instrument (a guitar's picking hand -2, 0 and 2; a keyboard's
--- left hand, both, then the right), your pedals on the ground, the amp and the gear strip's icons
+-- left hand, both, then the right), your pedals and the loop pedal (its light dark, red or green) on
+-- the ground, the amp, the gear strip's icons, and the band's speaker
 for _, id in ipairs(G.INSTRUMENTS) do
   local keys = G.KEYBOARDS[id]
   for f = 0, 1 do screen(("you-%s-idle-%d"):format(id, f), function(b) G.you(b, id, f, nil) end) end
@@ -78,9 +80,12 @@ for _, id in ipairs(G.PEDALS) do
     add(("strip-%s-%d"):format(id, f), 7, 8, 0, 0, function(b) G.stripIcon(b, id, f == 1) end)
   end
 end
+for _, light in ipairs({ "dark", "red", "green" }) do
+  screen("pedal-loop-" .. light, function(b) G.loopPedal(b, light) end)
+  add("strip-loop-" .. light, 7, 8, 0, 0, function(b) G.loopIcon(b, light) end)
+end
 screen("amp", G.amp)
-screen("looper-0", function(b) D.looper(b, false) end)
-screen("looper-1", function(b) D.looper(b, true) end)
+screen("speaker", D.speaker)
 screen("case", D.openCase)
 add("case-coin", 3, 2, 0, 0, function(b) D.caseCoin(b, 0, 0) end)
 for f = 0, 1 do add("coin-" .. f, 5, 5, 2, 2, function(b) D.coin(b, 2, 2, f) end) end
@@ -113,7 +118,7 @@ for f = 0, 1 do add("bird-" .. f, 7, 3, 3, 1, function(b) F.bird(b, f, 3, 1) end
 
 -- The music shop: the room, the counter (drawn over the shopkeeper), the shopkeeper breathing (0, 1)
 -- and nodding at a sale (2, 3), the stock as it stands and chosen, and the tags
-local STOCK = { "overdrive", "chorus", "tremolo", "delay", "reverb", "acoustic", "ukulele", "electric", "epiano", "synth" }
+local STOCK = { "overdrive", "chorus", "tremolo", "delay", "reverb", "loop", "acoustic", "ukulele", "electric", "epiano", "synth" }
 screen("shop-room", S.room)
 screen("shop-counter", S.counter)
 for f = 0, 3 do screen("keeper-" .. f, function(b) S.keeper(b, f) end) end
@@ -223,8 +228,8 @@ local json = table.concat({
   '  "stars": ' .. list(stars, pair) .. ",",
   ('  "trainY": %d,'):format(D.TRAIN_Y),
   '  "caseCoins": ' .. list(D.caseCoinSpots(60), pair) .. ",",
-  ('  "feet": { "you": %d, "looper": %d, "case": %d, "amp": %d, "pedals": %d },'):format(
-    141 + D.YOU[2], D.LOOPER[2] + 6, D.CASE[2] + 9, G.AMP[2] + 13, G.PEDAL_ROW[2] + 5),
+  ('  "feet": { "you": %d, "speaker": %d, "case": %d, "amp": %d, "pedals": %d, "loop": %d },'):format(
+    141 + D.YOU[2], D.SPEAKER[2] + 6, D.CASE[2] + 9, G.AMP[2] + 13, G.PEDAL_ROW[2] + 5, G.LOOP_PEDAL[2] + 5),
   '  "shop": {',
   '    "items": { ' .. table.concat((function()
     local out = {}
@@ -237,6 +242,7 @@ local json = table.concat({
   '    "leds": { ' .. table.concat((function()
     local out = {}
     for i, id in ipairs(G.PEDALS) do out[i] = ('"%s": %s'):format(id, pair(S.led(id))) end
+    out[#out + 1] = ('"loop": %s'):format(pair(S.led("loop")))
     return out
   end)(), ", ") .. " },",
   ('    "door": [%d, %d, %d, %d],'):format(S.SIGN[1], S.SIGN[2], S.SIGN[3] - S.SIGN[1] + 1, S.DOOR[4] - S.SIGN[2] + 1),
