@@ -348,7 +348,7 @@ function game(art) {
     document.getElementById('end-saved').hidden = !!bot;
     document.getElementById('shop').hidden = !!bot;
     document.getElementById('end-stopped').textContent = `${s.stopped} ${s.stopped === 1 ? 'person' : 'people'} stopped to listen.`;
-    const names = { jogger: 'A jogger', oldman: 'An old man', student: 'A student', commuter: 'A commuter' };
+    const names = { jogger: 'A jogger', elder: 'An old man', student: 'A student', commuter: 'A commuter' };
     document.getElementById('end-longest').textContent = s.longest
       ? `${names[s.longest.kind]} stayed longest: ${Math.round(s.longest.seconds)} seconds.`
       : 'Nobody stayed this time.';

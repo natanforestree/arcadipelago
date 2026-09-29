@@ -92,20 +92,20 @@ test('what raises and lowers interest, for whom', () => {
     hear(c, e, 0);
     return Object.fromEntries(Object.entries(kinds).map(([k, p]) => [k, Math.round((p.interest - 0.5) * 100) / 100]));
   };
-  assert.deepEqual(after({ rule: 'phrase', clean: true, loud: false, notes: 5 }), { jogger: 0.05, oldman: 0.05, student: 0.05, commuter: 0.05 });
-  assert.deepEqual(after({ rule: 'phrase', clean: true, loud: false, notes: 2 }), { jogger: 0, oldman: 0, student: 0, commuter: 0 });
-  assert.deepEqual(after({ rule: 'phrase', clean: true, loud: true, notes: 5 }), { jogger: 0.05, oldman: 0, student: 0.05, commuter: 0.05 });
-  assert.deepEqual(after({ rule: 'phrase', clean: false, loud: false, notes: 5 }), { jogger: 0, oldman: 0, student: 0, commuter: 0 });
-  assert.deepEqual(after({ rule: 'loud' }), { jogger: 0, oldman: -0.05, student: 0, commuter: 0 });
-  assert.deepEqual(after({ rule: 'repeat' }), { jogger: -0.15, oldman: -0.15, student: -0.15, commuter: -0.15 });
+  assert.deepEqual(after({ rule: 'phrase', clean: true, loud: false, notes: 5 }), { jogger: 0.05, elder: 0.05, student: 0.05, commuter: 0.05 });
+  assert.deepEqual(after({ rule: 'phrase', clean: true, loud: false, notes: 2 }), { jogger: 0, elder: 0, student: 0, commuter: 0 });
+  assert.deepEqual(after({ rule: 'phrase', clean: true, loud: true, notes: 5 }), { jogger: 0.05, elder: 0, student: 0.05, commuter: 0.05 });
+  assert.deepEqual(after({ rule: 'phrase', clean: false, loud: false, notes: 5 }), { jogger: 0, elder: 0, student: 0, commuter: 0 });
+  assert.deepEqual(after({ rule: 'loud' }), { jogger: 0, elder: -0.05, student: 0, commuter: 0 });
+  assert.deepEqual(after({ rule: 'repeat' }), { jogger: -0.15, elder: -0.15, student: -0.15, commuter: -0.15 });
   assert.deepEqual(after({ rule: 'offKey' }).jogger, -0.1);
   assert.deepEqual(after({ rule: 'random' }).student, INTEREST.random);
-  assert.deepEqual(after({ rule: 'silence' }).oldman, -0.1);
+  assert.deepEqual(after({ rule: 'silence' }).elder, -0.1);
   assert.deepEqual(after({ rule: 'recognised' }).commuter, 0.05);
   assert.deepEqual(after({ rule: 'callback' }).jogger, 0.3);
 });
 
-test('tastes: the jogger likes energy, the old man space, the student groove; the commuter has none', () => {
+test('tastes: the jogger likes energy, the elder space, the student groove; the commuter has none', () => {
   const c = createCrowd(1);
   const kinds = Object.fromEntries(KINDS.map((k, i) => [k, stoodAt(c, k, i, { interest: 0.5 })]));
   const likes = (bar) => {
@@ -115,16 +115,16 @@ test('tastes: the jogger likes energy, the old man space, the student groove; th
   };
   assert.deepEqual(likes({ count: 8, off: 0, rest: 2 }), ['jogger']);
   assert.deepEqual(likes({ count: 7, off: 0, rest: 2 }), []);
-  assert.deepEqual(likes({ count: 2, off: 0, rest: 8 }), ['oldman']);
+  assert.deepEqual(likes({ count: 2, off: 0, rest: 8 }), ['elder']);
   assert.deepEqual(likes({ count: 0, off: 0, rest: 16 }), [], 'a silent bar is nobody\'s taste');
   assert.deepEqual(likes({ count: 6, off: 2, rest: 2 }), ['student']);
-  assert.deepEqual(likes({ count: 9, off: 3, rest: 4 }), ['jogger', 'oldman', 'student']);
+  assert.deepEqual(likes({ count: 9, off: 3, rest: 4 }), ['jogger', 'elder', 'student']);
   assert.equal(kinds.jogger.lastRule, 'taste');
 });
 
 test('a callback earns a coin from each listener stopped, not from passers-by', () => {
   const { c, p, t } = passerBy();
-  stoodAt(c, 'oldman', 0);
+  stoodAt(c, 'elder', 0);
   stoodAt(c, 'student', 5);
   hear(c, { rule: 'callback' }, t);
   assert.deepEqual(c.out.map((e) => [e.type, e.coins, e.why]), [['coin', 1, 'callback'], ['coin', 1, 'callback']]);
@@ -141,14 +141,14 @@ test('below 0.2 anyone leaves, showing what lost them', () => {
   assert.deepEqual(c.out.map((e) => [e.type, e.happy]), [['left', false]]);
 });
 
-test('when their time is up they leave, tipping 2 if happy (the old man 3), nothing if not', () => {
+test('when their time is up they leave, tipping 2 if happy (the elder 3), nothing if not', () => {
   const c = createCrowd(1);
   stoodAt(c, 'student', 0, { budget: 5, interest: 0.9 });
-  stoodAt(c, 'oldman', 1, { budget: 5, interest: 0.9 });
+  stoodAt(c, 'elder', 1, { budget: 5, interest: 0.9 });
   stoodAt(c, 'jogger', 2, { budget: 5, interest: 0.4 });
   runCrowd(c, 0, 5.1);
   const coins = c.out.filter((e) => e.type === 'coin').map((e) => [e.person.kind, e.coins, e.why]);
-  assert.deepEqual(coins, [['student', TIPS.happy, 'happy'], ['oldman', TIPS.happyOldMan, 'happy']]);
+  assert.deepEqual(coins, [['student', TIPS.happy, 'happy'], ['elder', TIPS.happyElder, 'happy']]);
   assert.ok(c.people.filter((p) => p.state !== 'passing').every((p) => p.state === 'leaving'));
   assert.equal(c.longest.kind, 'student');
   assert.ok(near(c.longest.seconds, 5, 0.05));

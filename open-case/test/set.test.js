@@ -56,7 +56,7 @@ test('the set lasts 60 bars, then fades a bar, the listeners still there tip onc
   const set = createSet(1);
   const early = runTo(set, endTime() - 1);
   stoodAt(set.crowd, 'student', 0);
-  stoodAt(set.crowd, 'oldman', 1);
+  stoodAt(set.crowd, 'elder', 1);
   const events = [...early, ...runTo(set, endTime() + BAR + 2)];
   const end = events.find((e) => e.type === 'end'), over = events.find((e) => e.type === 'over');
   assert.ok(end.at >= 180 && end.at < 180 + DT * 1.5);

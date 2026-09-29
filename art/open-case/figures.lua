@@ -1,5 +1,5 @@
 -- Open Case's people and birds in the flat style, shared by the style sample and the sprite sheet: the
--- four passers-by (the jogger, the old man, the student and the commuter), the regular (the old man in
+-- four passers-by (the jogger, the elder, the student and the commuter), the regular (the old man in
 -- the red scarf, drawn by the Regulars feature), the reactions over their heads, the pigeons by your
 -- case and the birds that cross the sky.
 --
@@ -12,7 +12,7 @@ local D = dofile(here .. "draw.lua")
 local L, C, rect, stamp = D.L, D.C, D.rect, D.stamp
 local F = {}
 
-F.KINDS = { "jogger", "oldman", "student", "commuter" }
+F.KINDS = { "jogger", "elder", "student", "commuter" }
 
 -- Walking: each leg's foot, as { forward (pixels, negative is ahead), lifted (pixels) }, for the near
 -- leg then the far one. The body sits a pixel lower when both feet are down.
@@ -292,7 +292,7 @@ end
 -- A passer-by with their feet at (x, feet), facing left. step: 0-3 through the walk (nil standing);
 -- head: 0, 1 settled (breathing) or 2 nodding.
 function F.person(b, kind, x, feet, step, head)
-  if kind == "oldman" then return F.oldMan(b, x, feet, step, head) end
+  if kind == "elder" then return F.oldMan(b, x, feet, step, head) end
   local k = K[kind]
   local ox, top = math.floor(x + 0.5) - 8, feet - 45
   local s = STRIDE[step or "stand"]

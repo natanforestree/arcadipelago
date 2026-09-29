@@ -9,7 +9,7 @@
 import { CROWD, INTEREST, TIPS, RULES } from './tuning.js';
 import { createRng, nextRandom, randomBetween } from './rng.js';
 
-export const KINDS = ['jogger', 'oldman', 'student', 'commuter'];
+export const KINDS = ['jogger', 'elder', 'student', 'commuter'];
 export const PATH_Y = 146; // where passers-by walk
 
 export function createCrowd(seed) {
@@ -51,7 +51,7 @@ function nudge(p, rule, delta, t) {
 // Does a bar suit this person's taste? (The commuter has none.)
 function likes(kind, bar) {
   if (kind === 'jogger') return bar.count >= RULES.joggerNotes;
-  if (kind === 'oldman') return bar.count > 0 && bar.rest >= RULES.oldManRest;
+  if (kind === 'elder') return bar.count > 0 && bar.rest >= RULES.elderRest;
   if (kind === 'student') return bar.count >= RULES.studentMin && bar.off / bar.count >= RULES.studentShare;
   return false;
 }
@@ -62,13 +62,13 @@ export function hear(c, e, t) {
     if (!hearing(p)) continue;
     switch (e.rule) {
       case 'phrase':
-        if (e.clean && e.notes >= RULES.phraseMinNotes && !(p.kind === 'oldman' && e.loud)) nudge(p, 'phrase', INTEREST.phrase, t);
+        if (e.clean && e.notes >= RULES.phraseMinNotes && !(p.kind === 'elder' && e.loud)) nudge(p, 'phrase', INTEREST.phrase, t);
         break;
       case 'bar':
         if (likes(p.kind, e)) nudge(p, 'taste', INTEREST.taste, t);
         break;
       case 'loud':
-        if (p.kind === 'oldman') nudge(p, 'loud', INTEREST.loud, t);
+        if (p.kind === 'elder') nudge(p, 'loud', INTEREST.loud, t);
         break;
       case 'callback':
         nudge(p, 'callback', INTEREST.callback, t);
@@ -91,7 +91,7 @@ function freeSpot(c, x) {
 
 function leave(c, p, happy) {
   p.state = 'leaving';
-  if (happy) c.out.push({ type: 'coin', person: p, coins: p.kind === 'oldman' ? TIPS.happyOldMan : TIPS.happy, why: 'happy' });
+  if (happy) c.out.push({ type: 'coin', person: p, coins: p.kind === 'elder' ? TIPS.happyElder : TIPS.happy, why: 'happy' });
   c.out.push({ type: 'left', person: p, happy });
 }
 

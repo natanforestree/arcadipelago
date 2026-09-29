@@ -48,7 +48,7 @@ export const RULES = {
   silenceBars: 4, // more than this many bars without a note is Silence
   loudStrength: 4,
   joggerNotes: 8, // Energy: at least this many notes in the bar (2 a beat)
-  oldManRest: 4, // Space: a stretch of at least this many 16ths with no new note in the bar
+  elderRest: 4, // Space: a stretch of at least this many 16ths with no new note in the bar
   studentShare: 1 / 3, // Groove: at least this share of the bar's notes on off 16ths...
   studentMin: 3, // ...out of at least this many
 };
@@ -91,13 +91,13 @@ export const CROWD = {
   spots: [[64, 150], [84, 156], [104, 162], [186, 162], [206, 156], [226, 150]],
   kinds: {
     jogger: { speed: 60, patience: 6 },
-    oldman: { speed: 18, patience: 12 },
+    elder: { speed: 18, patience: 12 },
     student: { speed: 30, patience: 8 },
     commuter: { speed: 45, patience: 6 },
   },
 };
 
-export const TIPS = { callback: 1, happy: 2, happyOldMan: 3, end: 1 };
+export const TIPS = { callback: 1, happy: 2, happyElder: 3, end: 1 };
 
 // The band's layers, and how many listeners each needs. A layer drops out only after the crowd has
 // stayed below its number for LAYER_HOLD whole bars.
