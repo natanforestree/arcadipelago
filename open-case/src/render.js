@@ -54,14 +54,15 @@ export function shapeTags(shapes) {
   }).join('');
 }
 
-// The frame a listener shows: walking by where they are (so a slower walker steps slower), and
-// standing still facing you, breathing, or nodding on the beat once they're hooked.
+// The frame a passer-by shows, as the person they are (their kind and look): walking by where they
+// are (so a slower walker steps slower), and standing still facing you, breathing, or nodding on the
+// beat once they're hooked.
 export function personFrame(p, t, time) {
   const facingYou = p.state === 'stopped' || p.state === 'joining';
   const face = (facingYou ? (p.x < CROWD.playerX ? 1 : -1) : p.dir) > 0 ? 'right' : 'left';
-  if (p.state !== 'stopped') return `${p.kind}-walk-${frameOf((Math.abs(p.x) + Math.abs(p.y)) / STEP, 4)}-${face}`;
-  if (p.interest > INTEREST.hook) return `${p.kind}-nod-${t / BEAT - Math.floor(t / BEAT) < NOD ? 1 : 0}-${face}`;
-  return `${p.kind}-stand-${frameOf(time / BREATH + p.id * 0.37, 2)}-${face}`;
+  if (p.state !== 'stopped') return `${p.kind}-${p.look}-walk-${frameOf((Math.abs(p.x) + Math.abs(p.y)) / STEP, 4)}-${face}`;
+  if (p.interest > INTEREST.hook) return `${p.kind}-${p.look}-nod-${t / BEAT - Math.floor(t / BEAT) < NOD ? 1 : 0}-${face}`;
+  return `${p.kind}-${p.look}-stand-${frameOf(time / BREATH + p.id * 0.37, 2)}-${face}`;
 }
 
 // You with your instrument: playing for a moment after each note (a guitar's strum, a keyboard's

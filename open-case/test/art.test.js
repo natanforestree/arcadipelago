@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, statSync } from 'node:fs';
 import { readPng } from './png.js';
-import { KINDS, PATH_Y } from '../src/crowd.js';
+import { KINDS, LOOKS, PATH_Y } from '../src/crowd.js';
 import { CROWD } from '../src/tuning.js';
 import { CASE } from '../src/scene.js';
 import { STOCK, PEDALS, INSTRUMENTS } from '../src/gear.js';
@@ -18,6 +18,7 @@ const sheet = readPng(file('assets/sprites.png'));
 const names = Object.keys(data.frames);
 const REACTIONS = ['repeat', 'offKey', 'callback', 'taste', 'random', 'silence', 'loud', 'recognised']; // every rule crowd.js reacts to
 const range = (n) => [...Array(n).keys()];
+const PEOPLE = KINDS.flatMap((k) => range(LOOKS).map((look) => `${k}-${look}`)); // every passer-by's frames' prefix
 
 // How many frames there are of each thing, from the art spec's table (and the sky's five stages).
 const FAMILIES = [
@@ -30,8 +31,8 @@ const FAMILIES = [
   [/^pedal-loop-(dark|red|green)$/, 3], [/^strip-loop-(dark|red|green)$/, 3],
   ['amp', 1], ['shop-room', 1], ['shop-counter', 1], [/^keeper-\d$/, 4], ['tag-price', 1], ['tag-yours', 1],
   ...STOCK.map((item) => [new RegExp(`^item-${item.id}-\\d$`), 2]),
-  ...KINDS.flatMap((k) => ['left', 'right'].flatMap((d) => [
-    [new RegExp(`^${k}-walk-\\d-${d}$`), 4], [new RegExp(`^${k}-stand-\\d-${d}$`), 2], [new RegExp(`^${k}-nod-\\d-${d}$`), 2],
+  ...PEOPLE.flatMap((who) => ['left', 'right'].flatMap((d) => [
+    [new RegExp(`^${who}-walk-\\d-${d}$`), 4], [new RegExp(`^${who}-stand-\\d-${d}$`), 2], [new RegExp(`^${who}-nod-\\d-${d}$`), 2],
   ])),
   ...REACTIONS.map((r) => [new RegExp(`^react-${r}-\\d$`), 2]),
   ...['peck', 'walk', 'fly'].flatMap((p) => ['left', 'right'].map((d) => [new RegExp(`^pigeon-${p}-\\d-${d}$`), 2])),
@@ -43,7 +44,7 @@ test('every frame the game draws is there, as many of each as the spec says, and
   assert.equal(names.length, FAMILIES.reduce((sum, [, n]) => sum + n, 0), 'no frames beyond these');
   // numbered from 0, so the renderer can pick one by counting
   for (const s of range(5)) for (const n of [`roofs-back-${s}`, `roofs-front-${s}`, `train-${s}`]) assert.ok(names.includes(n), n);
-  for (const k of KINDS) for (const i of range(4)) assert.ok(names.includes(`${k}-walk-${i}-left`), `${k}-walk-${i}`);
+  for (const who of PEOPLE) for (const i of range(4)) assert.ok(names.includes(`${who}-walk-${i}-left`), `${who}-walk-${i}`);
 });
 
 test('every frame lies inside sprites.png', () => {
@@ -107,17 +108,53 @@ test('the art sits round the positions the rules use', () => {
   }
   assert.ok(opaqueAt('case', 0, 0, CASE[0], CASE[1]), 'coins land inside the open case');
   for (const [sx, sy] of CROWD.spots) {
-    for (const k of KINDS) {
-      const name = `${k}-stand-0-${sx < CROWD.playerX ? 'right' : 'left'}`, [pl, pt, pr, pb] = cover(name, sx, sy);
-      assert.ok(pl >= 0 && pt >= 0 && pr <= 320 && pb <= 180, `a ${k} at spot ${sx},${sy} fits on screen`);
+    for (const who of PEOPLE) {
+      const name = `${who}-stand-0-${sx < CROWD.playerX ? 'right' : 'left'}`, [pl, pt, pr, pb] = cover(name, sx, sy);
+      assert.ok(pl >= 0 && pt >= 0 && pr <= 320 && pb <= 180, `${who} at spot ${sx},${sy} fits on screen`);
       for (let y = pt; y < pb; y++) {
         for (let x = pl; x < pr; x++) {
-          assert.ok(!(opaqueAt(name, sx, sy, x, y) && opaqueAt('case', 0, 0, x, y)), `a ${k} at spot ${sx},${sy} stands clear of the case`);
+          assert.ok(!(opaqueAt(name, sx, sy, x, y) && opaqueAt('case', 0, 0, x, y)), `${who} at spot ${sx},${sy} stands clear of the case`);
         }
       }
     }
   }
   assert.ok(data.feet.you > PATH_Y, 'passers-by walk behind you');
+});
+
+// The colour a frame drawn at (0, 0) puts at screen point (sx, sy), or null where it's clear.
+const colourAt = (name, sx, sy) => {
+  if (!opaqueAt(name, 0, 0, sx, sy)) return null;
+  const [fx, fy, , , ax, ay] = data.frames[name], i = ((fy + sy + ay) * sheet.w + fx + sx + ax) * 4;
+  return sheet.data.slice(i, i + 3).join();
+};
+// How many pixels differ between two frames, laid over each other by their anchors.
+const differ = (a, b) => {
+  const [al, at, ar, ab] = cover(a, 0, 0), [bl, bt, br, bb] = cover(b, 0, 0);
+  let n = 0;
+  for (let y = Math.min(at, bt); y < Math.max(ab, bb); y++) {
+    for (let x = Math.min(al, bl); x < Math.max(ar, br); x++) if (colourAt(a, x, y) !== colourAt(b, x, y)) n++;
+  }
+  return n;
+};
+
+test('each kind has six people, three women and three men, each clearly their own', () => {
+  assert.deepEqual(Object.keys(data.looks), KINDS);
+  for (const k of KINDS) {
+    assert.equal(data.looks[k].length, LOOKS, k);
+    assert.ok(data.looks[k].every((who) => who === 'woman' || who === 'man'), k);
+    assert.equal(data.looks[k].filter((who) => who === 'woman').length, 3, `${k}: three women`);
+    for (const a of range(LOOKS)) {
+      for (const b of range(LOOKS)) {
+        if (a < b) assert.ok(differ(`${k}-${a}-stand-0-left`, `${k}-${b}-stand-0-left`) >= 60, `${k} ${a} and ${b} look clearly different`);
+      }
+    }
+  }
+});
+
+test("nobody's drawn above the top of their head, 45 rows over their feet, so reactions stay clear", () => {
+  for (const name of names.filter((n) => PEOPLE.some((who) => n.startsWith(`${who}-`)))) {
+    assert.ok(data.frames[name][5] <= 45, `${name} reaches ${data.frames[name][5]} rows over its feet`);
+  }
 });
 
 test('your pedals and the loop pedal stand in front of the crate, clear of the case and of every listener', () => {
@@ -131,7 +168,7 @@ test('your pedals and the loop pedal stand in front of the crate, clear of the c
         if (!opaqueAt(name, 0, 0, x, y)) continue;
         assert.ok(!opaqueAt('case', 0, 0, x, y), `${name} clear of the case`);
         for (const [sx, sy] of CROWD.spots) {
-          for (const k of KINDS) assert.ok(!opaqueAt(`${k}-stand-0-${sx < CROWD.playerX ? 'right' : 'left'}`, sx, sy, x, y), `${name} clear of a ${k} at ${sx},${sy}`);
+          for (const who of PEOPLE) assert.ok(!opaqueAt(`${who}-stand-0-${sx < CROWD.playerX ? 'right' : 'left'}`, sx, sy, x, y), `${name} clear of ${who} at ${sx},${sy}`);
         }
       }
     }

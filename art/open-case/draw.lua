@@ -76,6 +76,8 @@ local PX = {
   l = C.leaf[3], e = C.leaf[2], E = C.leaf[1], o = C.go,
   v = C.sky[4], V = C.sky[3], -- the reverb pedal's violet
   n = C.path[2], N = C.path[1],
+  a = C.skin3[2], A = C.skin3[1], m = C.skin4[2], M = C.skin4[1], -- tan and deep brown skin
+  f = C.rose[2], F = C.rose[1], j = C.teal[2], J = C.teal[1], x = C.auburn, z = C.blonde,
 }
 D.PX = PX
 

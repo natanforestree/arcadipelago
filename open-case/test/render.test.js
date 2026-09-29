@@ -6,7 +6,7 @@ import { createSet, runSet } from '../src/set.js';
 import { createScene, createFlocks, sceneNote, sceneLoopNote, CASE, PIGEONS, LOOP_PEDAL } from '../src/scene.js';
 import { createKeyState } from '../src/keys.js';
 import { goodSet } from '../src/bots.js';
-import { KINDS } from '../src/crowd.js';
+import { KINDS, LOOKS } from '../src/crowd.js';
 import { BAR, BEAT } from '../src/groove.js';
 import { INTEREST, LOOP } from '../src/tuning.js';
 import { STOCK, PEDALS, INSTRUMENTS, freshGear, buy, stomp } from '../src/gear.js';
@@ -101,7 +101,7 @@ test('every frame the renderer asks for is in the sheet, over a whole set, with 
   const states = ['passing', 'joining', 'stopped', 'leaving'];
   KINDS.forEach((kind, i) => {
     for (const [j, state] of states.entries()) {
-      stoodAt(set.crowd, kind, (i + j) % 6, { state, dir: j % 2 ? 1 : -1, interest: j % 2 ? 0.9 : 0.3, x: 40 + i * 60 + j * 7, reaction: { rule: rules[(i + j) % 8], t: 0 } });
+      stoodAt(set.crowd, kind, (i + j) % 6, { look: (i + j) % LOOKS, state, dir: j % 2 ? 1 : -1, interest: j % 2 ? 0.9 : 0.3, x: 40 + i * 60 + j * 7, reaction: { rule: rules[(i + j) % 8], t: 0 } });
     }
   });
   const scene = createScene(2);
@@ -163,13 +163,14 @@ test('with reduced motion there are no birds or train, and the clouds and trees 
 });
 
 test('listeners face you once they stop, breathe standing, and nod on the beat once hooked', () => {
-  const p = { kind: 'student', state: 'stopped', x: 80, y: 156, dir: -1, id: 3, interest: 0.3 };
-  assert.match(personFrame(p, 0, 0), /^student-stand-\d-right$/, 'left of you, facing right');
+  const p = { kind: 'student', look: 4, state: 'stopped', x: 80, y: 156, dir: -1, id: 3, interest: 0.3 };
+  assert.match(personFrame(p, 0, 0), /^student-4-stand-\d-right$/, 'left of you, facing right, as the student they are');
   assert.match(personFrame({ ...p, x: 200 }, 0, 0), /-left$/);
-  assert.match(personFrame({ ...p, state: 'passing' }, 0, 0), /^student-walk-\d-left$/, 'walking the way they go');
+  assert.match(personFrame({ ...p, state: 'passing' }, 0, 0), /^student-4-walk-\d-left$/, 'walking the way they go');
   const hooked = { ...p, interest: INTEREST.hook + 0.1 };
-  assert.equal(personFrame(hooked, 10 * BEAT + 0.05, 0), 'student-nod-1-right', 'head down on the beat');
-  assert.equal(personFrame(hooked, 10 * BEAT + BEAT * 0.6, 0), 'student-nod-0-right', 'up between beats');
+  assert.equal(personFrame(hooked, 10 * BEAT + 0.05, 0), 'student-4-nod-1-right', 'head down on the beat');
+  assert.equal(personFrame(hooked, 10 * BEAT + BEAT * 0.6, 0), 'student-4-nod-0-right', 'up between beats');
+  assert.match(personFrame({ ...p, look: 0 }, 0, 0), /^student-0-stand-/, 'another student, another look');
   const steps = new Set([0, 4, 8, 12].map((dx) => personFrame({ ...p, state: 'passing', x: 100 + dx }, 0, 0)));
   assert.equal(steps.size, 4, 'a walker steps through four frames as they go');
 });

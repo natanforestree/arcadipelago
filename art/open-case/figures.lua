@@ -1,7 +1,7 @@
 -- Open Case's people and birds in the flat style, shared by the style sample and the sprite sheet: the
--- four passers-by (the jogger, the elder, the student and the commuter), the regular (the old man in
--- the red scarf, drawn by the Regulars feature), the reactions over their heads, the pigeons by your
--- case and the birds that cross the sky.
+-- passers-by (joggers, elders, students and commuters, six looks of each), the regular (the old man
+-- in the red scarf, drawn by the Regulars feature), the reactions over their heads, the pigeons by
+-- your case and the birds that cross the sky.
 --
 -- A figure is drawn facing left, toward you from the right, with its feet at (x, feet); the sheet
 -- mirrors it to face right. It's 16 pixels across and 46 tall from the top of its head (row 0) to its
@@ -34,126 +34,6 @@ local function leg(b, hx, hy, fx, fy, wide, c, shoe)
   rect(b, fx - 1, fy - 1, fx + wide - 1, fy - 1, shoe)
   rect(b, fx - 2, fy, fx + wide - 1, fy, shoe)
 end
-
--------------------------------------------------------------------------------------------------
--- The passers-by. Each: its hips' row, its legs' colours { near, far, shoe, width }, and its head
--- (rows 0-13) and body (from row 14) as pixel maps.
-
-local FACE = { -- a clean face under each kind's hair, rows 5-13 ("H" is the kind's hair)
-  "....ssssssHH....",
-  "....sssssssHH...",
-  "...sksssssSHH...",
-  "..ssssssssSH....",
-  "...sssssssS.....",
-  "...ssSssssS.....",
-  "....sssssS......",
-  ".....SSSS.......",
-  "......SS........",
-}
-
-local K = {}
-
-K.jogger = {
-  hip = 27, legs = { "s", "S", "w", 3 }, hair = "k",
-  head = {
-    "................",
-    "................",
-    "......kkkkk.....",
-    "....kkkkkkkkk...",
-    "...kkkkkkkkkkk..",
-    "....wwwwwwwwkk..",
-  },
-  body = {
-    "....rrrrrrr.....",
-    "...rrrrrrrrrR...",
-    "..rrrrrrrrrrRR..",
-    "..rrrrrrrrrrRR..",
-    "..srrrrrrrrrRs..",
-    "..srrrrrrrrrRs..",
-    "..SrrrrrrrrrRS..",
-    "..SrrrrrrrrrRS..",
-    "..SrrrrrrrrrRS..",
-    "..ssrrrrrrrrRss.",
-    "...rrrrrrrrrR...",
-    "...kkkkkkkkkk...",
-    "...kkkkkkkkkk...",
-    "...kkkkkkkkkk...",
-    "...kkkkk.kkkk...",
-  },
-}
-
-K.student = {
-  hip = 30, legs = { "h", "k", "w", 3 }, hair = "k", skin = true,
-  head = {
-    "................",
-    "......kkkk......",
-    "....kkkkkkkk....",
-    "...kkkkkkkkkk...",
-    "...hhhhhhhhhkk..", -- headphones' band
-    "....ttttttkkkk..",
-  },
-  face = {
-    "....ttttttkkk...",
-    "...tktttttThhk..",
-    "..ttttttttThhk..",
-    "...tttttttThh...",
-    "...ttTttttT.....",
-    "....tttttT......",
-    ".....TTTT.......",
-    "......TT........",
-  },
-  body = {
-    "...uuuuuuuuUU...",
-    "..uuuuuuuuuUUY..",
-    "..uuuuuuuuuUUYy.",
-    "..uuuuuuuuuUUYy.",
-    "..uuuuuuuuuUUYy.",
-    "..uuuuuuuuuUUYy.",
-    "..uuuuuuuuuUUYy.",
-    "..tuuuuuuuuUUYy.",
-    "..tuuuuuuuuUUYy.",
-    "..TuuuuuuuuUUY..",
-    "..TUUUUUUUUUU...",
-    "...uuuuuuuuuU...",
-    "...UUUUUUUUUU...",
-    "...hhhhhhhhhh...",
-    "...hhhhhhhhhh...",
-    "...hhhhh.hhhh...",
-    "...hhhh...hhh...",
-  },
-}
-
-K.commuter = {
-  hip = 32, legs = { "C", "k", "k", 3 }, hair = "D",
-  head = {
-    "................",
-    "................",
-    "................",
-    ".....DDDDDD.....",
-    "....DDDDDDDDD...",
-  },
-  body = {
-    "....cwrwcc......",
-    "...ccwrwcccCC...",
-    "..cccwrwccccCC..",
-    "..cccwrwccccCC..",
-    "..ccccrcccccCC..",
-    "..ccccrcccccCC..",
-    "..cccccckcccCC..",
-    "..ccccccccccCC..",
-    "..ccccccccccCC..",
-    "..ccccccckccCC..",
-    "..ccccccccccCC..",
-    "..ssccccccccCs..",
-    "..ssccccccccCs..",
-    "..DDDDcccccccC..",
-    "..DDDDDccccccC..",
-    "..DDDDDCCCCCCC..",
-    "..DDDDDCCCCCC...",
-    "...CCCCC.CCCC...",
-    "...CCCC...CCC...",
-  },
-}
 
 -- The old man, after the style sample: a flat cap, a white beard, his long brown coat and his cane.
 local OLD_FACE = {
@@ -268,6 +148,7 @@ local COLLAR = {
 -- An old man with his feet at (x, feet), facing left. regular: the red-scarfed regular in his top
 -- hat and grey coat, not the passing one in his flat cap and brown coat. step: 0-3 through his walk
 -- (nil standing); head: 0, or 1 settled (breathing), or 2 nodding; grin; tip: his hand out with a coin.
+-- The style sample draws the regular with it; the passing elders are F.person's.
 function F.oldMan(b, x, feet, step, head, grin, tip, regular)
   local ox, top = math.floor(x + 0.5) - 8, feet - 45
   local s = STRIDE[step or "stand"]
@@ -289,25 +170,455 @@ function F.oldMan(b, x, feet, step, head, grin, tip, regular)
   if tip then stamp(b, ox - 5, top + 17 + bob, armTip(sh)) else stamp(b, ox, top + 17 + bob, armCane(c, sh)) end
 end
 
--- A passer-by with their feet at (x, feet), facing left. step: 0-3 through the walk (nil standing);
--- head: 0, 1 settled (breathing) or 2 nodding.
-function F.person(b, kind, x, feet, step, head)
-  if kind == "elder" then return F.oldMan(b, x, feet, step, head) end
-  local k = K[kind]
+-------------------------------------------------------------------------------------------------
+-- The passers-by. Each kind keeps its sign: the jogger's running kit, the elder's cane and long coat,
+-- the student's headphones and backpack, the commuter's suit and briefcase. Each has six looks,
+-- three women and three men (F.LOOKS), drawn from parts: the kind's body, a hair style and a face,
+-- with the look's colours swapped in by letter.
+
+-- Each skin tone's letters: its base, then its shadow.
+local SKIN = { light = { "s", "S" }, tan = { "a", "A" }, brown = { "t", "T" }, deep = { "m", "M" } }
+
+-- A pixel map with letters swapped all in one pass, so a swapped letter is never swapped again:
+-- map[from] = to, and any letter not in map stays as it is.
+local function paint(rows, map)
+  local out = {}
+  for i, r in ipairs(rows) do out[i] = r:gsub(".", map) end
+  return out
+end
+
+-- Faces, rows 5-13 of the head, in the light skin's letters ("H" the hair behind the ear, or the
+-- beard).
+local FACE = {
+  "....ssssssHH....",
+  "....sssssssHH...",
+  "...sksssssSHH...",
+  "..ssssssssSH....",
+  "...sssssssS.....",
+  "...ssSssssS.....",
+  "....sssssS......",
+  ".....SSSS.......",
+  "......SS........",
+}
+local SHORT_BEARD = {
+  "....ssssssHH....",
+  "....sssssssHH...",
+  "...sksssssSHH...",
+  "..ssssssssSH....",
+  "...sssssssH.....",
+  "...sHHHHHHH.....",
+  "....HHHHHH......",
+  ".....HHHH.......",
+  "......SS........",
+}
+local FACES = { plain = FACE, beard = paint(OLD_FACE, { w = "H" }), shortBeard = SHORT_BEARD }
+
+-- Hair: `top` from the head's row 0, drawn over the face, and `back` (a row, then its rows) drawn
+-- after it: a ponytail, a bob, long hair down the back. "H" is the hair's colour.
+local HAIR = {
+  short = { top = { -- the grey-suited commuter's
+    "................",
+    "................",
+    "................",
+    ".....HHHHHH.....",
+    "....HHHHHHHHH...",
+  } },
+  band = { top = { -- the red-topped jogger's, in a white headband
+    "................",
+    "................",
+    "......HHHHH.....",
+    "....HHHHHHHHH...",
+    "...HHHHHHHHHHH..",
+    "....wwwwwwwwHH..",
+  } },
+  student = { top = { -- the blue-hoodied student's
+    "................",
+    "......HHHH......",
+    "....HHHHHHHH....",
+    "...HHHHHHHHHH...",
+    "...HHHHHHHHHHH..",
+    "..........HHHH..",
+  } },
+  buzz = { top = {
+    "................",
+    "................",
+    "................",
+    "......HHHHH.....",
+    ".....HHHHHHHH...",
+  } },
+  curls = { top = {
+    "................",
+    "......H.HH......",
+    "....HHHHHHHH....",
+    "...HHHHHHHHHH...",
+    "..HHHHHHHHHHHH..",
+    "...H.HHH.HHHHH..",
+  } },
+  messy = { top = {
+    "................",
+    ".....H..H.......",
+    "....HHHHHHH.H...",
+    "...HHHHHHHHHH...",
+    "..HHHHHHHHHHHH..",
+    "...H.HH..HHHHH..",
+  } },
+  part = { top = { -- a side parting, swept forward
+    "................",
+    "................",
+    "....HHHHH.......",
+    "...HHHHHHHHHH...",
+    "...HHHHHHHHHHH..",
+    "...H......HH....",
+  } },
+  bald = { top = {
+    "................",
+    "................",
+    "................",
+    ".....ssssss.....",
+    "....sssssssSS...",
+  } },
+  flatCap = { top = FLAT_CAP },
+  ponytail = { top = { -- tied high, swinging behind
+    "................",
+    "................",
+    "......HHHH......",
+    "....HHHHHHHHH...",
+    "...HHHHHHHHHHHH.",
+  }, back = { 3,
+    ".............HH.",
+    "..............HH",
+    "..............HH",
+    "...............H",
+    "...............H",
+    "..............H.",
+  } },
+  puff = { top = { -- a short afro in a white headband
+    ".....HHHHH......",
+    "...HHHHHHHHH....",
+    "..HHHHHHHHHHH...",
+    "..HHHHHHHHHHHH..",
+    "...wwwwwwwwwHH..",
+  }, back = { 5,
+    "..........HHH...",
+    "...........HHH..",
+  } },
+  cap = { top = { -- a dark running cap, a ponytail through its back
+    "................",
+    "................",
+    "......hhhhh.....",
+    ".....hhhhhhhh...",
+    "..hhhhhhhhhhhH..",
+  }, back = { 4,
+    ".............HH.",
+    "..............HH",
+    "..............H.",
+    "..............H.",
+  } },
+  bob = { top = {
+    "................",
+    "................",
+    ".....HHHHHH.....",
+    "....HHHHHHHHH...",
+    "...HHHHHHHHHHH..",
+    "...HHH....HHHH..",
+  }, back = { 6,
+    "..........HHHH..",
+    "..........HHHH..",
+    "..........HHHH..",
+    "..........HHHH..",
+    "..........HHH...",
+    ".........HHH....",
+  } },
+  long = { top = {
+    "................",
+    "......HHHH......",
+    "....HHHHHHHH....",
+    "...HHHHHHHHHH...",
+    "..HHHHHHHHHHHH..",
+    "..HH......HHHH..",
+  }, back = { 6,
+    "..........HHHH..",
+    "..........HHHH..",
+    "..........HHHH..",
+    "..........HHH...",
+    "..........HHH...",
+    "..........HHH...",
+    "..........HHH...",
+    "..........HHH...",
+    "..........HHH...",
+    "...........HH...",
+    "...........HH...",
+  } },
+  braids = { top = { -- box braids, pulled back
+    "................",
+    "......HHHH......",
+    "....HHHHHHHH....",
+    "...HHHHHHHHHH...",
+    "...HHHHHHHHHHH..",
+    "..........HHHH..",
+  }, back = { 6,
+    "..........HhHh..",
+    "..........HhHh..",
+    "..........HhH...",
+    "..........HhH...",
+    "..........HhH...",
+    "..........HhH...",
+    "..........HhH...",
+    "..........HhH...",
+    "..........H.H...",
+    "..........H.H...",
+  } },
+  locs = { top = {
+    "................",
+    "......HHHH......",
+    "....HHHHHHHH....",
+    "...HHHHHHHHHH...",
+    "..HHHHHHHHHHHH..",
+    "..........HHHHH.",
+  }, back = { 6,
+    "..........H.HHH.",
+    "..........H.H.H.",
+    ".........HH.H.H.",
+    "............H.H.",
+    "............H.H.",
+    "..............H.",
+  } },
+  bun = { top = {
+    "................",
+    "................",
+    "...........HHH..",
+    ".....HHHHHHHHHH.",
+    "....HHHHHHHHHHH.",
+  } },
+  oldCurls = { top = { -- short, curled
+    "................",
+    "................",
+    ".....H.HH.H.....",
+    "....HHHHHHHHH...",
+    "...HHHHHHHHHHH..",
+    "...H.H....HHHH..",
+  } },
+  scarf = { top = { -- a headscarf, over the hair and round the neck
+    "................",
+    "......HHHH......",
+    "....HHHHHHHH....",
+    "...HHHHHHHHHH...",
+    "...HHHHHHHHHHH..",
+    "...H......HHHH..",
+  }, back = { 6,
+    "..........HHHH..",
+    "..........HHHH..",
+    ".........HHHHH..",
+    ".........HHHHH..",
+    "........HHHHHH..",
+    ".......HHHHHH...",
+    ".....HHHHHHH....",
+    "....HHHHHHHH....",
+  } },
+}
+
+-- The student's headphones: a band over the hair and a cup on the ear.
+local HEADPHONES = {
+  "...hhhhhhhhh....",
+  "................",
+  "................",
+  "...........hh...",
+  "...........hh...",
+  "...........hh...",
+}
+
+-- The kinds' bodies from row 14, as the first four passers-by were drawn: "1" and "2" are the top's
+-- colour and its shadow, "3" and "4" the shorts', jeans' or skirt's, and "5" the tie. Skin is in the
+-- light tone's letters.
+local JOGGER = {
+  "....1111111.....",
+  "...1111111112...",
+  "..111111111122..",
+  "..111111111122..",
+  "..s1111111112s..",
+  "..s1111111112s..",
+  "..S1111111112S..",
+  "..S1111111112S..",
+  "..S1111111112S..",
+  "..ss111111112ss.",
+  "...1111111112...",
+  "...3333333333...",
+  "...3333333333...",
+  "...3333333333...",
+  "...33333.3333...",
+}
+local STUDENT = {
+  "...1111111122...",
+  "..11111111122Y..",
+  "..11111111122Yy.",
+  "..11111111122Yy.",
+  "..11111111122Yy.",
+  "..11111111122Yy.",
+  "..11111111122Yy.",
+  "..s1111111122Yy.",
+  "..s1111111122Yy.",
+  "..S1111111122Y..",
+  "..S2222222222...",
+  "...1111111112...",
+  "...2222222222...",
+}
+local JEANS = {
+  "...3333333333...",
+  "...3333333333...",
+  "...33333.3333...",
+  "...3333...333...",
+}
+local DENIM_SKIRT = {
+  "...3333333333...",
+  "..333333333333..",
+  "..333333333333..",
+  "..333333333333..",
+  "..444444444444..",
+}
+local SUIT = {
+  "....1w5w11......",
+  "...11w5w11122...",
+  "..111w5w111122..",
+  "..111w5w111122..",
+  "..111151111122..",
+  "..111151111122..",
+  "..111111k11122..",
+  "..111111111122..",
+  "..111111111122..",
+  "..1111111k1122..",
+  "..111111111122..",
+  "..ss111111112s..",
+  "..ss111111112s..",
+  "..DDDD11111112..",
+  "..DDDDD1111112..",
+  "..DDDDD2222222..",
+  "..DDDDD222222...",
+}
+local TROUSERS = {
+  "...22222.2222...",
+  "...2222...222...",
+}
+local SKIRT = {
+  "...2222222222...",
+  "...2222222222...",
+  "...2222222222...",
+  "...2222222222...",
+}
+local TRENCH = { -- a trench coat's skirt, to the knees
+  "...11111111112..",
+  "...11111111112..",
+  "...11111111112..",
+  "..111111111112..",
+  "..111111111122..",
+  "..111111111122..",
+}
+
+local function join(a, b)
+  local out = { table.unpack(a) }
+  for _, r in ipairs(b) do out[#out + 1] = r end
+  return out
+end
+
+-- Each kind's body for a look, in its colours: its hips' row, its legs { near, far, shoe } (letters),
+-- and its pixel map from row 14.
+local BODY = {}
+function BODY.jogger(lk, sk)
+  local legs = lk.leggings and { lk.bottom[1], lk.bottom[2], "w" } or { sk[1], sk[2], "w" }
+  return { hip = 27, legs = legs, body = paint(JOGGER, { ["1"] = lk.top[1], ["2"] = lk.top[2], ["3"] = lk.bottom[1], s = sk[1], S = sk[2] }) }
+end
+function BODY.student(lk, sk)
+  local legs = lk.skirt and { sk[1], sk[2], "w" } or { lk.bottom[1], lk.bottom[2], "w" }
+  local map = { ["1"] = lk.top[1], ["2"] = lk.top[2], ["3"] = lk.bottom[1], ["4"] = lk.bottom[2], s = sk[1], S = sk[2] }
+  return { hip = 30, legs = legs, body = paint(join(STUDENT, lk.skirt and DENIM_SKIRT or JEANS), map) }
+end
+function BODY.commuter(lk, sk)
+  local below = { trousers = TROUSERS, skirt = SKIRT, trench = TRENCH }
+  local legs = ({ trousers = { lk.suit[2], "k", "k" }, skirt = { sk[1], sk[2], "k" }, trench = { "h", "k", "k" } })[lk.below]
+  local map = { ["1"] = lk.suit[1], ["2"] = lk.suit[2], ["5"] = lk.tie or "w", s = sk[1], S = sk[2] }
+  return { hip = 32, legs = legs, body = paint(join(SUIT, below[lk.below]), map) }
+end
+
+-- The looks, in order (look 0 first). who: "woman" or "man"; skin: a SKIN tone; hair: { a HAIR
+-- style, its colour }; face: a FACES face (plain if none); and the kind's clothes.
+--   jogger: top { base, shadow }, bottom { near, far } (shorts, or leggings on the legs too)
+--   elder: coat { base, shadow }
+--   student: top { base, shadow }, bottom { base, shadow } (jeans, or a skirt)
+--   commuter: suit { base, shadow }, tie (none for a blouse), below: trousers, skirt or trench
+F.LOOKS = {
+  jogger = {
+    { who = "woman", skin = "tan", hair = { "ponytail", "D" }, top = { "j", "J" }, bottom = { "h", "k" }, leggings = true },
+    { who = "woman", skin = "deep", hair = { "puff", "k" }, top = { "y", "Y" }, bottom = { "k", "k" } },
+    { who = "woman", skin = "light", hair = { "cap", "z" }, top = { "f", "F" }, bottom = { "c", "C" }, leggings = true },
+    { who = "man", skin = "light", hair = { "band", "k" }, top = { "r", "R" }, bottom = { "k", "k" } },
+    { who = "man", skin = "brown", hair = { "buzz", "k" }, top = { "u", "U" }, bottom = { "C", "C" } },
+    { who = "man", skin = "tan", hair = { "curls", "D" }, top = { "p", "P" }, bottom = { "k", "k" } },
+  },
+  elder = {
+    { who = "man", skin = "light", hair = { "flatCap", "w" }, face = "beard", coat = { "b", "B" } },
+    { who = "woman", skin = "tan", hair = { "bun", "c" }, coat = { "p", "P" } },
+    { who = "woman", skin = "deep", hair = { "oldCurls", "w" }, coat = { "v", "V" } },
+    { who = "man", skin = "brown", hair = { "bald", "c" }, face = "beard", coat = { "u", "U" } },
+    { who = "woman", skin = "brown", hair = { "scarf", "f" }, coat = { "g", "G" } },
+    { who = "man", skin = "light", hair = { "short", "w" }, coat = { "h", "k" } },
+  },
+  student = {
+    { who = "man", skin = "brown", hair = { "student", "k" }, top = { "u", "U" }, bottom = { "h", "k" } },
+    { who = "woman", skin = "light", hair = { "long", "k" }, top = { "c", "C" }, bottom = { "u", "U" } },
+    { who = "woman", skin = "deep", hair = { "braids", "k" }, top = { "j", "J" }, bottom = { "u", "U" }, skirt = true },
+    { who = "man", skin = "deep", hair = { "locs", "k" }, top = { "r", "R" }, bottom = { "h", "k" } },
+    { who = "woman", skin = "tan", hair = { "bob", "f" }, top = { "p", "P" }, bottom = { "h", "k" } },
+    { who = "man", skin = "light", hair = { "messy", "z" }, top = { "v", "V" }, bottom = { "u", "U" } },
+  },
+  commuter = {
+    { who = "man", skin = "light", hair = { "short", "D" }, suit = { "c", "C" }, tie = "r", below = "trousers" },
+    { who = "woman", skin = "brown", hair = { "bob", "k" }, suit = { "U", "k" }, below = "skirt" },
+    { who = "woman", skin = "light", hair = { "long", "x" }, suit = { "h", "k" }, below = "trousers" },
+    { who = "man", skin = "tan", hair = { "part", "k" }, suit = { "U", "k" }, tie = "f", below = "trousers" },
+    { who = "woman", skin = "deep", hair = { "bun", "k" }, suit = { "g", "G" }, below = "trench" },
+    { who = "man", skin = "deep", hair = { "buzz", "k" }, face = "shortBeard", suit = { "b", "B" }, tie = "u", below = "trousers" },
+  },
+}
+
+-- A look's head, its top-left at (hx, hy): the face, then the hair over it and behind it.
+local function drawHead(b, lk, sk, hx, hy)
+  local map = { s = sk[1], S = sk[2], H = lk.hair[2] }
+  local face = paint(FACES[lk.face or "plain"], map)
+  stamp(b, hx, hy + 14 - #face, face)
+  local hair = HAIR[lk.hair[1]]
+  stamp(b, hx, hy, paint(hair.top, map))
+  if hair.back then stamp(b, hx, hy + hair.back[1], paint({ table.unpack(hair.back, 2) }, map)) end
+end
+
+-- A passer-by with their feet at (x, feet), facing left: a kind, and its look (0-5). step: 0-3
+-- through the walk (nil standing); head: 0, 1 settled (breathing) or 2 nodding.
+function F.person(b, kind, look, x, feet, step, head)
+  local lk = assert(F.LOOKS[kind][look + 1], "no look " .. look .. " for " .. kind)
+  local sk = SKIN[lk.skin]
   local ox, top = math.floor(x + 0.5) - 8, feet - 45
   local s = STRIDE[step or "stand"]
   local bob = s[3]
-  local near, far, shoe, wide = D.PX[k.legs[1]], D.PX[k.legs[2]], D.PX[k.legs[3]], k.legs[4]
-  D.shadow(b, ox + 8, feet + 0.5, 9, 2.5)
-  leg(b, ox + 4, top + k.hip + bob, ox + 4 + s[2][1], feet - s[2][2], wide, far, shoe)
-  leg(b, ox + 8, top + k.hip + bob, ox + 8 + s[1][1], feet - s[1][2], wide, near, shoe)
-  stamp(b, ox, top + 14 + bob, k.body)
   local hx, hy = ox - (head == 2 and 1 or 0), top + bob + ((head or 0) > 0 and 1 or 0)
-  local face = k.face or FACE
-  local rows = {}
-  for i, r in ipairs(face) do rows[i] = r:gsub("H", k.hair) end
-  stamp(b, hx, hy + 14 - #rows, rows)
-  stamp(b, hx, hy, k.head)
+  if kind == "elder" then -- as the old man is drawn, in the look's coat, with the cane
+    local c, sh = lk.coat[1], lk.coat[2]
+    D.shadow(b, ox + 8, feet + 0.5, 10, 2.5)
+    leg(b, ox + 5, top + 33, ox + 5 + s[2][1], feet - s[2][2], 2, C.ink, C.wood[1])
+    leg(b, ox + 9, top + 33, ox + 9 + s[1][1], feet - s[1][2], 2, C.ink, C.wood[1])
+    local cx = ox + (step and (step == 0 and -2 or step == 2 and 1 or 0) or 0)
+    rect(b, cx, top + 27 + bob, cx, feet - 1, C.wood[1])
+    rect(b, cx, top + 24 + bob, cx + 1, top + 24 + bob, C.wood[1])
+    stamp(b, ox, top + 16 + bob, coat(c, sh))
+    drawHead(b, lk, sk, hx, hy)
+    stamp(b, ox, top + 14 + bob, paint(COLLAR, { b = c }))
+    stamp(b, ox, top + 17 + bob, paint(armCane(c, sh), { s = sk[1] }))
+    return
+  end
+  local k = BODY[kind](lk, sk)
+  D.shadow(b, ox + 8, feet + 0.5, 9, 2.5)
+  leg(b, ox + 4, top + k.hip + bob, ox + 4 + s[2][1], feet - s[2][2], 3, D.PX[k.legs[2]], D.PX[k.legs[3]])
+  leg(b, ox + 8, top + k.hip + bob, ox + 8 + s[1][1], feet - s[1][2], 3, D.PX[k.legs[1]], D.PX[k.legs[3]])
+  stamp(b, ox, top + 14 + bob, k.body)
+  drawHead(b, lk, sk, hx, hy)
+  if kind == "student" then stamp(b, hx, hy + 4, HEADPHONES) end
 end
 
 -------------------------------------------------------------------------------------------------

@@ -24,6 +24,8 @@
 --              pedal's 2x2 one), door [x, y, w, h]
 --              (the door and its sign, a click leaves), sign and board [x, y] (the middle of the top of
 --              the words on the sign and on the chalkboard), lift (pixels a chosen item rises)
+--   looks      { kind: ["woman" | "man", ...] }: each kind's passers-by, look 0 first (their frames are
+--              <kind>-<look>-walk-<0-3>, -stand-<0-1> and -nod-<0-1>, each -left and -right)
 --   colors     the named colours the game draws with in code
 --   palette    every colour in the sheet (at most 64)
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.-)[^/]+$") or ""
@@ -98,9 +100,12 @@ local function person(name, draw)
   frames[#frames + 1] = { name = name .. "-right", b = D.mirror(b), px = 11, py = 47 }
 end
 for _, kind in ipairs(F.KINDS) do
-  for step = 0, 3 do person(("%s-walk-%d"):format(kind, step), function(b) F.person(b, kind, 12, 47, step, 0) end) end
-  for f = 0, 1 do person(("%s-stand-%d"):format(kind, f), function(b) F.person(b, kind, 12, 47, nil, f) end) end
-  for f = 0, 1 do person(("%s-nod-%d"):format(kind, f), function(b) F.person(b, kind, 12, 47, nil, f * 2) end) end
+  for look = 0, #F.LOOKS[kind] - 1 do
+    local who = ("%s-%d"):format(kind, look)
+    for step = 0, 3 do person(("%s-walk-%d"):format(who, step), function(b) F.person(b, kind, look, 12, 47, step, 0) end) end
+    for f = 0, 1 do person(("%s-stand-%d"):format(who, f), function(b) F.person(b, kind, look, 12, 47, nil, f) end) end
+    for f = 0, 1 do person(("%s-nod-%d"):format(who, f), function(b) F.person(b, kind, look, 12, 47, nil, f * 2) end) end
+  end
 end
 for _, rule in ipairs(F.REACTIONS) do
   for f = 0, 1 do add(("react-%s-%d"):format(rule, f), 14, 12, 6, 10, function(b) F.reaction(b, rule, f, 6, 10) end) end
@@ -250,6 +255,13 @@ local json = table.concat({
   ('    "board": [%d, %d],'):format((S.BOARD[1] + S.BOARD[3]) // 2, S.BOARD[2] + 6),
   ('    "lift": %d'):format(S.LIFT),
   "  },",
+  '  "looks": { ' .. table.concat((function()
+    local out = {}
+    for i, kind in ipairs(F.KINDS) do
+      out[i] = ('"%s": %s'):format(kind, list(F.LOOKS[kind], function(lk) return q(lk.who) end))
+    end
+    return out
+  end)(), ", ") .. " },",
   '  "colors": {',
   table.concat(colors, ",\n"),
   "  },",

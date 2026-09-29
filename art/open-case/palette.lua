@@ -12,12 +12,18 @@ return {
   leaf = { "#1d3b42", "#2e5d5c", "#45806e" }, -- trees in teal shadow, the hedge and its lit top, a pigeon's neck
   path = { "#3a2e48", "#564660", "#9c8480" }, -- joints and shadows, the stones, the pool of lamplight
   skin = { "#c08468", "#f2c69e" },
-  skin2 = { "#7e4e38", "#b07650" }, -- darker skin
+  skin2 = { "#7e4e38", "#b07650" }, -- brown skin
+  skin3 = { "#b07448", "#dea574" }, -- tan skin
+  skin4 = { "#4a2b20", "#6b4231" }, -- deep brown skin
   blue = { "#2c3466", "#4660a6" }, -- the speaker's body and its top, the student's hoodie
   pants = { "#2d4b2c", "#4c783a" }, -- your forest green pants
   wood = { "#45291f", "#7a4a2c", "#c68a50" }, -- dark wood, the crate, the guitar
   red = { "#74283a", "#b03c4a" }, -- the case's lining, the scarf, the jogger's top, the loop pedal recording
   coat = { "#5e566e", "#8e8498" }, -- grey: the regular's coat, the commuter's suit, pigeons
   brown = { "#553a2e", "#86604a" }, -- the passing old man's coat
+  rose = { "#9c3c5a", "#d4678a" }, -- a jogger's top, a headscarf, a student's pink bob
+  teal = { "#1f6e6a", "#33a394" }, -- a jogger's top, a student's top
+  auburn = "#8c3a22", -- hair
+  blonde = "#e2bc72", -- hair
   go = "#6ed89a", -- the loop pedal playing, a listener's nod of recognition
 }
