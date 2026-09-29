@@ -1,7 +1,7 @@
 # Open Case: the music shop (design spec)
 
 **Date:** 2026-09-28
-**Status:** Nathan agreed the design in chat ("perfect", "yup looks good!") and approved this written spec ("go ahead and continue with subagents.. i trust your judgement"). The plan is `docs/superpowers/plans/2026-09-28-open-case-shop.md`.
+**Status:** Nathan agreed the design in chat ("perfect", "yup looks good!") and approved this written spec ("go ahead and continue with subagents.. i trust your judgement"). Built from `docs/superpowers/plans/2026-09-28-open-case-shop.md`.
 
 Nathan's ask: "instead of just the loop we should add a few things that you can buy in a shop with the money you make … a music shop with different guitar pedals and loop pedal and instruments and what not."
 
@@ -172,6 +172,22 @@ All the new art is in the flat style, in the same sprite sheet, and the art stay
 Nathan plays his next ten sets or so. The log records what he bought, which instrument he played and which pedals he used.
 
 **It works** if he buys things by choice, uses pedals mid-set, and his Another-set rate holds or rises. **If the shop makes sets feel like a grind for coins,** the prices come down; that's a number in `tuning.js`. **If a sound doesn't please him,** its settings in `audio.js` change.
+
+## What the build settled
+
+The plan's prototype settled a few things this spec left open:
+- **Your acoustic guitar stands in the shop too.** It isn't for sale, but choosing it is how you go back to it. So the shop shows ten things; the arrow keys run along the rack, then along the floor.
+- **The chosen item** lifts two pixels, lights up a shade, and has a small gold pointer over it. A pedal's light on the rack is lit while you can hear it.
+- **The card has a fourth line**, "arrows choose   esc back to the park".
+- **Your pedals by the crate** are a row of little stompboxes in front of it, between the looper and the case. The amp stands to the left of the crate, behind the looper.
+- **The keyboards** stand on an X over your lap as you sit on the crate. Your hands press on the keys, the left, both, then the right.
+- **The gear strip** gives each pedal its own place, whatever else you own, between "lock" and the pigeons. A pedal that's off shows in its darker shade.
+- **The title card** has a line for the pedal keys: "2-6 your pedals (from the shop)".
+- **The sounds were measured and evened out.** At a medium pick, each instrument's first moments are about as loud as the acoustic's; the synth, which holds its notes, sits a little under. Switching on the overdrive, the chorus or the tremolo doesn't change how loud you are: the tremolo swings either side of your level. The delay and the reverb let their echoes die away when you switch them off.
+- **The sound check** (`?sound`) has a menu of the instruments and a switch for each pedal, so every sound can be judged by ear with the band.
+- **`?coins=N` keeps nothing:** what you buy on that page isn't saved or logged.
+- **Bots play with your gear but can't change it.** Their end card has no savings line and no shop button.
+- **A held Enter buys once;** held arrows move along the stock.
 
 ## Not in this change
 

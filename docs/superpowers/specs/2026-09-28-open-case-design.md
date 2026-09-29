@@ -216,6 +216,8 @@ This computer remembers the last 50 sets: the date, coins, how many stopped, and
 
 **Update (2026-09-28):** the flat-style repaint is built; see `2026-09-28-open-case-art-design.md`. The game now draws from a sprite sheet made by `art/open-case/sprites.lua`.
 
+**Update (2026-09-28):** the music shop is built; see `2026-09-28-open-case-shop-design.md`. Your coins are saved between sets and spent on pedals and instruments.
+
 Made by Aseprite scripts in `art/open-case/`, like the other games' art, and shown to Nathan. As the README says of previews, it isn't committed.
 
 - **A still** of the park at dusk, at 320×180, in layers at different depths: sky, distant rooftops, near trees, the path. You're on the crate with the guitar, with the open case holding a few coins, and the looper.
