@@ -110,3 +110,27 @@ export const LAYERS = [
 export const LAYER_HOLD = 2;
 
 export const LOG_SIZE = 50; // sets kept in the test log
+
+// The park's life (scene.js and render.js): the sunset over each set, and what moves in the
+// background. Bars count from a set's first note; seconds for the clouds, birds and pigeons' pecking
+// run on the page's clock, so they carry on over the title and between sets.
+export const PARK = {
+  stageBars: 15, // the sky moves on a stage (dusk 0 to night 4) every this many bars...
+  bandFirst: 3, // ...its top band first, this many bars into the stage...
+  bandStep: 2, // ...then each band below it this many bars later, so the horizon's is the last
+  sunGone: 36, // the sun has sunk behind the rooftops by this bar...
+  sunSink: 17, // ...this many pixels below where it starts
+  windowsFrom: 10, // each window lights at its own bar between these two
+  windowsTo: 50,
+  lampOn: 24, // the lamp comes on at this bar, and its pool of light on the path
+  starsFrom: 45, // the stars come out one a bar from this bar
+  trainFrom: 10, // the distant train passes once a set, at a bar between these two...
+  trainTo: 50,
+  trainCross: 6, // ...taking this many seconds to cross
+  clouds: [2, 4], // pixels a second: the far clouds, then the near ones
+  flockFirst: [5, 15], // seconds: the first flock of birds crosses this long after the page opens...
+  flockEvery: [20, 40], // ...then another every this many seconds
+  flockMost: 5, // birds in a flock: 1 to this many
+  flockCross: 8, // seconds a flock takes to cross
+  pigeonsAway: 4, // bars the pigeons stay away after a loud note scatters them
+};
