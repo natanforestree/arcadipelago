@@ -39,6 +39,8 @@ const CUE_DIGIT_TOP = 151; // the count-in's big digit: top-aligned, so it clear
 const CUE_CELL_W = 5, CUE_CELL_H = 3, CUE_CELL_GAP = 1; // the recording cue's four bar cells
 const CUE_TEXT_GAP = 3; // between "rec" and its first cell
 const CUE_CELL_Y = 163; // roughly the middle of "rec"'s 8px row (top at 160)
+const CUE_LEFT_MIN = 177; // keeps "rec" clear of the case sprite's rim, whose red lining reads as the word's
+const BEATS_PER_BAR = 4; // this song's fixed 4/4 meter: always 4, unlike LOOP.bars (how many bars a loop take is)
 const NOD_SHOW = 1.2; // seconds the shopkeeper nods after a sale...
 const NOD_FPS = 4; // ...this many nods a second
 
@@ -88,20 +90,27 @@ export function loopWords({ what, layer }) {
 
 // What the loop's slot counts at band time t, in the news's place, while there's no news to show:
 // null with no loop or no take; while waiting for the bar line (t < take.from), { count } (4 down to
-// 1, one for each beat of the bar t falls in, so it follows the clock wherever R joined the count);
-// while recording, elapsed e = t - take.from (0 <= e < LOOP_LENGTH): on the last bar's beats 2-4,
-// { count, closing: true } (3, 2, 1, so you know when it closes); otherwise { bars: e / BAR } (0 up to
-// just under LOOP.bars, fractional).
+// 1, counted down to the bar line itself rather than up from wherever R joined the count, so a caller
+// whose clock lags a hair behind the bar line — set.t, stepped in whole ticks, trails the audio clock
+// slightly — still reads the beat it's really in, not the tail of the one before); while recording,
+// elapsed e = t - take.from (0 <= e < LOOP_LENGTH): on the last bar's beats 2-4, { count, closing:
+// true } (3, 2, 1, so you know when it closes); otherwise { bars: e / BAR } (0 up to just under
+// LOOP.bars, fractional).
 export function loopCue(loop, t) {
   const take = loop?.take;
   if (!take) return null;
   if (t < take.from) {
-    const beat = Math.max(0, Math.min(3, Math.floor((t - Math.floor(t / BAR) * BAR) / BEAT)));
-    return { count: 4 - beat };
+    // Ceil'd, not floor'd: however close t sits below a beat boundary, it's still that beat's count.
+    // The small tolerance stops a boundary landing a hair above its exact multiple (float error) from
+    // ceiling to one more than it should.
+    const count = Math.min(BEATS_PER_BAR, Math.max(1, Math.ceil((take.from - t) / BEAT - 1e-9)));
+    return { count };
   }
   const e = t - take.from;
   const lastBarFrom = (LOOP.bars - 1) * BAR;
-  if (e >= lastBarFrom + BEAT) return { count: 4 - Math.floor((e - lastBarFrom) / BEAT), closing: true };
+  if (e >= lastBarFrom + BEAT) {
+    return { count: Math.max(1, BEATS_PER_BAR - Math.floor((e - lastBarFrom) / BEAT)), closing: true };
+  }
   return { bars: e / BAR };
 }
 
@@ -339,7 +348,7 @@ export function createRenderer(g, art) {
     g.font = FONT;
     const w = g.measureText('rec').width;
     const cellsW = LOOP.bars * CUE_CELL_W + (LOOP.bars - 1) * CUE_CELL_GAP;
-    const left = x - (w + CUE_TEXT_GAP + cellsW) / 2;
+    const left = Math.max(CUE_LEFT_MIN, x - (w + CUE_TEXT_GAP + cellsW) / 2);
     text('rec', left + 1, 161, C.ink);
     text('rec', left, 160, C.red);
     const bar = Math.floor(what.bars);

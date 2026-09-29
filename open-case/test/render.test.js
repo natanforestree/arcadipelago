@@ -35,7 +35,7 @@ function fakeContext() {
     },
     fillText(s, x, y) {
       texts.push(s);
-      positions.push({ s, x, y, align: this.textAlign, color: this.fillStyle });
+      positions.push({ s, x, y, align: this.textAlign, color: this.fillStyle, font: this.font });
     },
     measureText(s) {
       return { width: s.length * 6 };
@@ -471,6 +471,23 @@ test('loopCue counts down while a recording waits: 4 on the bar\'s first beat, t
   assert.deepEqual(loopCue(loop, 10 * BAR + 3 * BEAT + 0.01), { count: 1 }, 'pressed or not, the count follows the clock');
 });
 
+test("loopCue counts down to the bar line, not up from where R joined: a caller's clock a hair behind the bar line still reads 4, not 1", () => {
+  // set.t lags the audio clock slightly (it's stepped in whole ticks), so the very next frame after R
+  // is pressed just after a bar line can ask loopCue for a t a hair below that bar line, not above it.
+  const loop = createLoop();
+  record(loop, 9.005); // within bar 3 (bar line 9): arms from bar line 12
+  assert.equal(loop.take.from, 12);
+  assert.deepEqual(loopCue(loop, 8.999999997), { count: 4 }, "still beat 1's count, not beat 4's");
+});
+
+test('loopCue while waiting works from a negative t too, as in the shop', () => {
+  const loop = createLoop();
+  record(loop, -2.9); // the shop's band starting a little after you choose the pedal
+  assert.equal(loop.take.from, 0);
+  assert.deepEqual(loopCue(loop, -2.9), { count: 4 });
+  assert.deepEqual(loopCue(loop, -0.5), { count: 1 });
+});
+
 test('loopCue reports elapsed bars while recording, fractional', () => {
   const loop = createLoop();
   record(loop, 0); // from = BAR
@@ -486,10 +503,21 @@ test("loopCue counts down 3, 2, 1 over the last bar's beats 2-4, exactly at the 
   const loop = createLoop();
   record(loop, 0);
   const from = loop.take.from;
-  assert.deepEqual(loopCue(loop, from + (LOOP.bars - 1) * BAR + BEAT - 1e-6), { bars: ((LOOP.bars - 1) * BAR + BEAT - 1e-6) / BAR }, 'a hair before: still just the bars');
+  const justBefore = loopCue(loop, from + (LOOP.bars - 1) * BAR + BEAT - 1e-6);
+  assert.deepEqual(Object.keys(justBefore), ['bars'], 'a hair before: still just the bars');
+  assert.ok(Math.abs(justBefore.bars - ((LOOP.bars - 1) * BAR + BEAT - 1e-6) / BAR) < 1e-9);
   assert.deepEqual(loopCue(loop, from + (LOOP.bars - 1) * BAR + BEAT), { count: 3, closing: true });
   assert.deepEqual(loopCue(loop, from + (LOOP.bars - 1) * BAR + 2 * BEAT), { count: 2, closing: true });
   assert.deepEqual(loopCue(loop, from + (LOOP.bars - 1) * BAR + 3 * BEAT), { count: 1, closing: true });
+});
+
+test('loopCue never dips to 0 from float slop right at the loop\'s own end: the closing count clamps at 1', () => {
+  const loop = createLoop();
+  record(loop, 0);
+  const from = loop.take.from;
+  // A hair past where the recording should already have become a layer: without the clamp, floor
+  // would take the count past 1, to 0.
+  assert.deepEqual(loopCue(loop, from + LOOP_LENGTH + 1e-9), { count: 1, closing: true });
 });
 
 test('the count-in digit draws big and centred over the loop slot, gold counting in and red closing, clear of the strip', () => {
@@ -506,7 +534,7 @@ test('the count-in digit draws big and centred over the loop slot, gold counting
   assert.ok(digit, 'counting in, gold');
   assert.equal(digit.align, 'center');
   assert.equal(digit.y, 151);
-  assert.ok(digit.y + 16 <= 170, 'clears the strip');
+  assert.equal(digit.font, '16px Silkscreen, monospace', 'the big digit, not the strip\'s own 8px');
   const shadow = g1.positions.find((p) => p.s === '4' && p.color === data.colors.ink);
   assert.deepEqual([shadow.x - digit.x, shadow.y - digit.y], [1, 1], 'a 1px shadow, like the news');
   const closing = createLoop();
@@ -526,7 +554,10 @@ test("the recording cue: 'rec' then a cell per bar, empty grey, filled red, the 
   record(loop, 0); // from = BAR
   const g = draw(loop, BAR + 1.5 * BAR); // bar 0 done, bar 1 half full
   assert.ok(g.texts.includes('rec'));
-  assert.equal(g.positions.find((p) => p.s === 'rec' && p.color === data.colors.red).y, 160);
+  const recPos = g.positions.find((p) => p.s === 'rec' && p.color === data.colors.red);
+  assert.equal(recPos.y, 160);
+  assert.equal(recPos.font, '8px Silkscreen, monospace', "the strip's own 8px, not the big digit's");
+  assert.ok(recPos.x >= 177, "clear of the case sprite's rim, even centred it would sit under x 177");
   const backgrounds = g.rects.filter(([, , w, h, c]) => w === 5 && h === 3 && c === data.colors.greyDark);
   assert.equal(backgrounds.length, LOOP.bars, 'a background cell for every bar');
   const xs = backgrounds.map(([x]) => x).sort((a, b) => a - b);
