@@ -4,7 +4,7 @@
 -- game's art stays within 64 colours (sprites.lua checks).
 return {
   ink = "#1c1626", -- your black beanie and shirt, hair, eyes, the hat, the guitar's neck, the lamp post, the case's shell
-  charcoal = "#3d3649", -- the lit side of your beanie and shirt, the old man's cap, the student's jeans
+  charcoal = "#3d3649", -- the lit side of your beanie and shirt, caps, coats and suits, the student's headphones and jeans
   sky = { "#2a1d4e", "#43286a", "#663276", "#93406f", "#c9566a", "#ec8458", "#f7b464" }, -- top -> horizon, at dusk
   night = { "#26275a", "#1b1b44", "#121230" }, -- the sky after dusk, as it darkens
   light = "#fff2cc", -- the sun, the lamp's glass, sneakers, whiskers, glints, stars, the reactions' bubbles
@@ -20,7 +20,7 @@ return {
   wood = { "#45291f", "#7a4a2c", "#c68a50" }, -- dark wood, the crate, the guitar
   red = { "#74283a", "#b03c4a" }, -- the case's lining, the scarf, the jogger's top, the loop pedal recording
   coat = { "#5e566e", "#8e8498" }, -- grey: the regular's coat, the commuter's suit, pigeons
-  brown = { "#553a2e", "#86604a" }, -- the passing old man's coat
+  brown = { "#553a2e", "#86604a" }, -- an elder's coat, a commuter's suit
   rose = { "#9c3c5a", "#d4678a" }, -- a jogger's top, a headscarf, a student's pink bob
   teal = { "#1f6e6a", "#33a394" }, -- a jogger's top, a student's top
   auburn = "#8c3a22", -- hair

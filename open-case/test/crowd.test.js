@@ -80,6 +80,19 @@ test("a deck whose every look left is on screen is refilled, and the look just d
   }
 });
 
+test("the look just dealt isn't dealt again after a reshuffle, even when the new deck's first look is being worn", () => {
+  for (let seed = 0; seed < 100; seed++) {
+    for (let worn = 0; worn < LOOKS; worn++) {
+      if (worn === 2) continue;
+      const c = createCrowd(seed);
+      stoodAt(c, 'jogger', 0, { look: worn }); // still here from earlier
+      c.lastLook.jogger = 2; // the last jogger, look 2, has walked on
+      c.decks.jogger = [];
+      assert.notEqual(dealLook(c, 'jogger'), 2, `seed ${seed}, look ${worn} on screen`);
+    }
+  }
+});
+
 test('the end card names who stayed: a jogger, a student, a commuter, an old woman or an old man', () => {
   assert.equal(personName('jogger', 'woman'), 'A jogger');
   assert.equal(personName('student', 'man'), 'A student');

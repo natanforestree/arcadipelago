@@ -122,10 +122,12 @@ Nathan plays a few sets and it feels like a street: different people of every ki
 ## What the build settled
 
 The plan's prototype settled a few things the line-up left open:
-- **A few colours changed** to read better. The jogger's running cap is charcoal, since a white one read as pale hair. The white-haired elder's coat is charcoal too: the dark green was the hedge's own colour. The student in box braids wears teal, not yellow, next to the yellow backpack every student carries. "Navy" is the palette's deep blue.
+- **A few colours changed** to read better. The jogger's running cap is charcoal, since a white one read as pale hair. The white-haired elder's coat is charcoal too: the dark green was the hedge's own colour. The student in box braids wears teal, not yellow, next to the yellow backpack every student carries. "Navy" is the palette's deep blue. The bald elder's coat is the palette's blue, not navy.
 - **Ten new colours:** tan and deep brown skin, a rose, a teal, auburn and blonde. The sheet has 49 of its 64 colours, 550 frames, and weighs 74 KB.
 - **The closest two looks of a kind** still differ in 150 pixels. The art tests ask for at least 60.
 - **The skirts:** the commuter's skirt suit and the student's denim skirt come to the knee, with bare legs below. The other women wear trousers, leggings, running shorts or a long coat.
+- **Never twice running:** the deal skips a look someone on screen is wearing, and the look just dealt while any other is free. The look just dealt comes back only when the other five of its kind are all on screen.
+- **Adding a look:** a seventh look means drawing it in `figures.lua` and raising `LOOKS` in `crowd.js`; the art tests check the two agree, since they check each kind's count of looks against `LOOKS` itself, not a fixed number.
 
 ## Not in this change
 

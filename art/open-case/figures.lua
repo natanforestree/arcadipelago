@@ -58,7 +58,7 @@ local OLD_FACE_GRIN = {
   "....wwwwww......",
   ".....wwww.......",
 }
-local function coat(c, s) -- the old man's coat, in a coat colour and its shadow
+local function coat(c, s) -- the regular's coat and every elder's, in a coat colour and its shadow
   local rows = {
     "....ccccccccc...",
     "..cccccccccccC..",
