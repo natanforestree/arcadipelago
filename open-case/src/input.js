@@ -6,6 +6,7 @@
 //   onRelease({ code, at })
 //   onControl(action, down)  'ring' (down and up), and on key down: 'octaveDown', 'octaveUp',
 //                            'softer', 'louder', 'lock' (only when they change something), 'mute', 'pause'
+//   onPedal(id)              a pedal key (2 to 6) went down: 'overdrive' to 'reverb'
 // gate(event) runs first on every game key going down; returning false swallows the key (the key
 // that dismisses the title card plays no note).
 //
@@ -13,20 +14,24 @@
 // sounds PLAY.strumGap after the one before it. They sound in the order pressed: the first key
 // already sounded the instant it went down, so they can't be re-sorted lowest first without delaying
 // every note.
-import { NOTE_KEYS, CONTROL_KEYS, createKeyState, noteFor, applyControl } from './keys.js';
+import { NOTE_KEYS, CONTROL_KEYS, PEDAL_KEYS, createKeyState, noteFor, applyControl } from './keys.js';
 import { PLAY } from './tuning.js';
 
-export function createInput(target, { now, onNote, onRelease, onControl, gate = () => true }) {
+export function createInput(target, { now, onNote, onRelease, onControl, onPedal = () => {}, gate = () => true }) {
   const keys = createKeyState();
   const held = new Map(); // code -> the pitch it's sounding
   let groupAt = -Infinity, nextAt = -Infinity;
 
   function down(e) {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
-    const action = CONTROL_KEYS[e.code];
-    if (!(e.code in NOTE_KEYS) && !action) return;
+    const action = CONTROL_KEYS[e.code], pedal = PEDAL_KEYS[e.code];
+    if (!(e.code in NOTE_KEYS) && !action && !pedal) return;
     e.preventDefault(); // Space would scroll; ' and / open Firefox's quick find
     if (e.repeat || !gate(e)) return;
+    if (pedal) {
+      onPedal(pedal);
+      return;
+    }
     if (action) {
       if (action === 'ring' || action === 'mute' || action === 'pause' || applyControl(keys, action)) onControl(action, true);
       return;

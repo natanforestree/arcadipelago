@@ -12,6 +12,7 @@ function harness(over = {}) {
     onNote: (n) => got.push(['note', n.code, n.pitch, n.strength, n.legato, Math.round(n.at * 1000)]),
     onRelease: (r) => got.push(['up', r.code]),
     onControl: (action, down) => got.push([action, down]),
+    onPedal: (id) => got.push(['pedal', id]),
     ...over,
   });
   const key = (type, code, extra = {}) => {
@@ -129,4 +130,16 @@ test('every game key\'s browser default is stopped: Space scrolling, Firefox\'s 
   assert.equal(h.down('Space'), true);
   assert.equal(h.down('Quote'), true, 'even when the key is swallowed');
   assert.equal(h.down('KeyA', { repeat: true }), true, 'and when it repeats');
+});
+
+test('keys 2 to 6 stomp the pedals, once per press, and the gate can swallow them', () => {
+  let open = true;
+  const h = harness({ gate: () => open });
+  assert.equal(h.down('Digit2'), true, 'the browser does nothing with it');
+  h.down('Digit5');
+  h.down('Digit5', { repeat: true });
+  h.down('Digit7');
+  open = false;
+  h.down('Digit6');
+  assert.deepEqual(h.got, [['pedal', 'overdrive'], ['pedal', 'delay']]);
 });

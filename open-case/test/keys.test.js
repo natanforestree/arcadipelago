@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createKeyState, noteFor, applyControl, toPentatonic, layoutPitches, NOTE_KEYS } from '../src/keys.js';
+import { createKeyState, noteFor, applyControl, toPentatonic, layoutPitches, NOTE_KEYS, CONTROL_KEYS, PEDAL_KEYS, shopKey } from '../src/keys.js';
 
 test('the Musical Typing layout: A is C4, the row runs up to F, the black keys sit above', () => {
   const ks = createKeyState();
@@ -53,4 +53,19 @@ test('the layout\'s pitches: every note key that sounds, for working out sounds 
   assert.deepEqual(layoutPitches(ks), [60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77]);
   ks.octave = 1;
   assert.equal(layoutPitches(ks).length, 17, 'F6 is out of range');
+});
+
+test('keys 2 to 6 are the pedals, in chain order, and no key does two jobs', () => {
+  assert.deepEqual(PEDAL_KEYS, { Digit2: 'overdrive', Digit3: 'chorus', Digit4: 'tremolo', Digit5: 'delay', Digit6: 'reverb' });
+  const all = [...Object.keys(NOTE_KEYS), ...Object.keys(CONTROL_KEYS), ...Object.keys(PEDAL_KEYS)];
+  assert.equal(new Set(all).size, all.length);
+});
+
+test('in the shop the arrows choose and Enter buys, once however long it is held', () => {
+  assert.equal(shopKey('ArrowLeft', false), 'left');
+  assert.equal(shopKey('ArrowRight', true), 'right', 'a held arrow moves on along the stock');
+  assert.equal(shopKey('Enter', false), 'enter');
+  assert.equal(shopKey('NumpadEnter', false), 'enter');
+  assert.equal(shopKey('Enter', true), null, 'a held Enter repeating does nothing more');
+  assert.equal(shopKey('KeyA', false), undefined, 'not a shop key: the note keys still play');
 });
