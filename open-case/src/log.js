@@ -1,7 +1,7 @@
 // The test log: this computer remembers the last LOG_SIZE sets (the date, coins, how many stopped, the
-// instrument played, the pedals that were on at any point, and whether Nathan chose Another set, Stop
-// here or Visit the shop), under open-case-log in local storage; and the last LOG_SIZE things he
-// bought, with their dates, under open-case-buys.
+// instrument played, the pedals that were on at any point, how many loop layers were recorded, and
+// whether Nathan chose Another set, Stop here or Visit the shop), under open-case-log in local
+// storage; and the last LOG_SIZE things he bought, with their dates, under open-case-buys.
 import { LOG_SIZE } from './tuning.js';
 
 const KEY = 'open-case-log', BUYS = 'open-case-buys';
@@ -18,8 +18,8 @@ function readList(storage, key) {
 export const readLog = (storage) => readList(storage, KEY);
 export const readBuys = (storage) => readList(storage, BUYS);
 
-// A set just ended: { date, coins, stopped, instrument, pedals }. Its choice is filled in when a
-// button is pressed.
+// A set just ended: { date, coins, stopped, instrument, pedals, layers }. Its choice is filled in
+// when a button is pressed.
 export function logSet(storage, entry) {
   const list = readLog(storage);
   list.push({ ...entry, choice: null });

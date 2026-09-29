@@ -6,7 +6,9 @@
 // played, timed in seconds since the first note.
 //
 // Between sets, the end card leads to the music shop: your coins are saved, and your gear (gear.js)
-// changes how your notes sound, in the park and while you try things in the shop.
+// changes how your notes sound, in the park and while you try things in the shop. Once the loop
+// pedal is yours, R records your notes into a loop (looper.js) that plays on under you; the crowd
+// only ever hears the notes you play live.
 //
 // URL options: ?sound (the sound check); ?debug (interest bars, the corner panel, and Run the bots on
 // the end card); ?seed=N (fixes the passers-by, and the park's windows, train and birds); ?bot=random or
@@ -18,15 +20,16 @@ import { createInput } from './input.js';
 import { layoutPitches, shopKey } from './keys.js';
 import { createSet, stepSet, playNote, releaseNote, summary, runSet, momentsOf } from './set.js';
 import { crowdSize } from './crowd.js';
-import { createScene, createFlocks, sceneNote, sceneEvents, stepScene, FLIGHT } from './scene.js';
+import { createScene, createFlocks, sceneNote, sceneLoopNote, sceneEvents, stepScene, FLIGHT } from './scene.js';
 import { createRenderer, W, H } from './render.js';
 import { randomBot, lickBot } from './bots.js';
 import { safeStorage } from './storage.js';
 import { readLog, logSet, logChoice, readBuys, logBuy } from './log.js';
 import { soundCheck } from './soundcheck.js';
 import { loadArt } from './assets.js';
-import { PEDALS, loadGear, saveGear, earn, buy, play, stomp, stockItem } from './gear.js';
-import { createShop, move, action, trying, hit } from './shop.js';
+import { PEDALS, loadGear, saveGear, earn, buy, play, stomp, stockItem, owns } from './gear.js';
+import { createShop, choose, move, action, trying, hit } from './shop.js';
+import { createLoop, record, note, release, ring, step, undo, due } from './looper.js';
 import { BAR } from './groove.js';
 import { DT, LAYERS } from './tuning.js';
 
@@ -88,6 +91,13 @@ function game(art) {
   let shop = null; // the shop's state (shop.js) while you're in it
   let stomped = null; // the last pedal stomped: { id, on, time } (its name shows over the gear strip)
   let setPedals = new Set(); // every pedal that's been on during this set, for the log
+  // The loop pedal's loop in a set, empty at each set's start (in the shop, the one you try it with
+  // is shop.loop). Its times are band time: the audio clock since the band's first 16th, `start`.
+  let loop = createLoop();
+  let loopSaid = null; // the loop pedal's last news: { what, layer, time } (it shows over the gear strip)
+  let setLayers = 0; // layers recorded this set, for the log
+  let ringHeld = false; // whether Space is down, for a loop that starts while it is
+  let shopBand = false; // whether the band is playing in the shop, for trying the loop pedal
 
   function fit() {
     const dpr = devicePixelRatio || 1;
@@ -110,7 +120,31 @@ function game(art) {
     audio.startBand(at);
     for (const { id, min } of LAYERS) audio.setLayer(id, min === 0, at);
     setPedals = new Set(gear.on);
+    loop = createLoop();
+    ring(loop, 0, ringHeld);
+    setLayers = 0;
     screen = 'playing';
+  }
+
+  // The loop you hear: the set's, or in the shop the one you're trying (null while you aren't).
+  const heardLoop = () => (shop ? shop.loop : loop);
+
+  // R records a layer from the next bar line, and Backspace cancels a recording or takes off the last
+  // layer: in a set once the pedal is yours, until the set's end, and in the shop while you try it.
+  // Their news shows over the gear strip.
+  function loopKey(action) {
+    const l = shop ? shop.loop : set?.phase === 'playing' && owns(gear, 'loop') ? loop : null;
+    if (!l) return;
+    const time = pageTime();
+    if (action === 'loop') {
+      if (record(l, audio.now() - start)) loopSaid = { what: 'recording', layer: l.layers.length + 1, time };
+      else if (!l.take) loopSaid = { what: 'full', time };
+      return;
+    }
+    const what = undo(l);
+    if (!what) return;
+    audio.stopLoop(l.layers.length); // the cancelled recording's notes, or the layer taken off
+    loopSaid = { what, time };
   }
 
   // Your notes play through your gear, or in the shop, through what you're trying.
@@ -118,6 +152,15 @@ function game(art) {
     const setup = shop ? trying(shop, gear) : gear;
     if (audio.setInstrument(setup.instrument)) warmLayout();
     for (const id of PEDALS) audio.setPedal(id, setup.on.includes(id));
+    // Trying the loop pedal in the shop: the band plays while it's chosen, and stops as you move on.
+    if (!!shop?.loop !== shopBand) {
+      shopBand = !shopBand;
+      if (shopBand) {
+        start = audio.now() + 0.1;
+        audio.tryBand(start);
+        ring(shop.loop, 0, ringHeld);
+      } else audio.stopBand();
+    }
   }
 
   function startBot() {
@@ -209,6 +252,7 @@ function game(art) {
     onNote: (n) => {
       if (screen === 'ready') begin(n.at);
       audio.noteOn(n.code, n.pitch, n.strength, n.at, n.legato);
+      if (heardLoop()) note(heardLoop(), n.at - start, n.code, n);
       // A strummed note's `at` is deliberately later than now (the strum gap); only notes that sound
       // at once tell us the true key-to-sound latency.
       if (n.at <= audio.now()) {
@@ -222,10 +266,15 @@ function game(art) {
     },
     onRelease: (r) => {
       audio.noteOff(r.code, r.at);
+      if (heardLoop()) release(heardLoop(), r.at - start, r.code);
       if (set) releaseNote(set, r.at - start);
     },
     onControl: (action, down) => {
-      if (action === 'ring') audio.setRing(down);
+      if (action === 'ring') {
+        audio.setRing(down);
+        ringHeld = down;
+        if (heardLoop()) ring(heardLoop(), audio.now() - start, down);
+      } else if (action === 'loop' || action === 'undo') loopKey(action);
       else if (action === 'mute') {
         audio.toggleMute();
         mute.checked = audio.muted;
@@ -254,6 +303,11 @@ function game(art) {
       else if (e.type === 'coin') audio.coin(start + set.t + FLIGHT);
       else if (e.type === 'end') {
         audio.endBand(start + set.t);
+        // A recording still under way is dropped; the loop's layers fade out with the band.
+        if (loop.take) {
+          undo(loop);
+          audio.stopLoop(loop.layers.length);
+        }
         const crowd = crowdSize(set.crowd);
         if (crowd > 0) audio.clap(crowd, start + set.t + BAR * 0.5);
       } else if (e.type === 'over') showEnd();
@@ -272,8 +326,9 @@ function game(art) {
     // The log is Nathan's own too, and also skips a ?coins page: see `logging` above.
     if (logging) {
       const pedals = PEDALS.filter((id) => setPedals.has(id));
-      logSet(storage, { date: new Date().toISOString(), coins: s.coins, stopped: s.stopped, instrument: gear.instrument, pedals });
+      logSet(storage, { date: new Date().toISOString(), coins: s.coins, stopped: s.stopped, instrument: gear.instrument, pedals, layers: setLayers });
     }
+    loop = createLoop(); // the loop belongs to the set, and it's over
     document.getElementById('end-coins').textContent = `${s.coins} coin${s.coins === 1 ? '' : 's'} in the case.`;
     document.getElementById('end-saved').textContent = `Saved: ${gear.savings} coin${gear.savings === 1 ? '' : 's'}.`;
     document.getElementById('end-saved').hidden = !!bot;
@@ -294,7 +349,8 @@ function game(art) {
   function showLog() {
     const sets = readLog(storage).map((e) => ({
       date: e.date,
-      text: `${e.coins} coins, ${e.stopped} stopped, ${[e.instrument ?? 'acoustic', ...(e.pedals ?? [])].join(' + ')}, ${e.choice ?? 'no choice yet'}`,
+      text: `${e.coins} coins, ${e.stopped} stopped, ${[e.instrument ?? 'acoustic', ...(e.pedals ?? [])].join(' + ')}, `
+        + `${e.layers ? `${e.layers} loop layer${e.layers === 1 ? '' : 's'}, ` : ''}${e.choice ?? 'no choice yet'}`,
     }));
     const buys = readBuys(storage).map((e) => ({ date: e.date, text: `bought the ${stockItem(e.id)?.name.toLowerCase() ?? e.id} for ${e.price}` }));
     document.getElementById('log').replaceChildren(...[...sets, ...buys].sort((a, b) => b.date.localeCompare(a.date)).map((e) => {
@@ -368,7 +424,7 @@ function game(art) {
   canvas.addEventListener('click', (e) => {
     const target = inShop(e);
     if (target?.hit === 'item') {
-      shop.at = target.at;
+      choose(shop, target.at);
       sound();
     } else if (target?.hit === 'button') shopDo('enter');
     else if (target?.hit === 'door') leaveShop();
@@ -388,6 +444,7 @@ function game(art) {
       get set() { return set; },
       get scene() { return scene; },
       get shop() { return shop; },
+      get loop() { return heardLoop(); },
       audio, input, latency, art, flocks, gear,
     };
   }
@@ -404,12 +461,18 @@ function game(art) {
         }
         stepScene(scene, set.t);
       }
-      audio.update();
+      // The loop: a recording moves on (and in a set, a finished one counts for the log), and the
+      // notes due soon are scheduled with the band's; in the park, each rises from the loop pedal.
+      const l = heardLoop();
+      if (l && step(l, audio.now() - start) === 'layer' && !shop) setLayers++;
+      const played = audio.update((from, to) => (l ? due(l, from, to) : []));
+      if (set) for (const n of played) sceneLoopNote(scene, n.pitch, n.at - start);
       latency.reported = audio.reportedLatency();
       draw({
         screen: screen === 'thanks' || screen === 'over' ? 'playing' : screen,
-        set, scene, keys: input.keys, t: set ? set.t : 0, bars: set ? set.t / BAR : skyBar,
+        set, scene, keys: input.keys, t: set ? set.t : shop?.loop ? audio.now() - start : 0, bars: set ? set.t / BAR : skyBar,
         time: (now - t0) / 1000, still: reducedMotion.matches, flocks, gear, stomp: stomped, shop,
+        loop: shop ? shop.loop : set ? loop : null, loopSaid,
         debug: debug ? latency : null,
       });
       out.drawImage(off, 0, 0, canvas.width, canvas.height);
