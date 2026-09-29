@@ -10,7 +10,7 @@ import { CROWD, INTEREST, TIPS, RULES } from './tuning.js';
 import { createRng, nextRandom, randomBetween } from './rng.js';
 
 export const KINDS = ['jogger', 'oldman', 'student', 'commuter'];
-const PATH_Y = 146; // where passers-by walk
+export const PATH_Y = 146; // where passers-by walk
 
 export function createCrowd(seed) {
   return {
