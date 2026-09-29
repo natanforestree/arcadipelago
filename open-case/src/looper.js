@@ -14,9 +14,10 @@ export const LOOP_LENGTH = LOOP.bars * BAR; // seconds: one pass of the chords
 const EARLY = (LOOP.early * BEAT) / 4; // seconds: how early a note can be for a recording's first bar line
 
 // { layers, take, ring }: the layers so far, oldest first, each { from: the band time its recording
-// started, notes }; the recording waiting or under way, { from, notes, sounding }, or null; and
-// whether Space is held. Each note is { at: seconds after its layer's first bar line (a hair below 0
-// if it came early), pitch, strength, legato, len: seconds it sounded, null while it still does }.
+// started, notes }; the recording waiting or under way, { from, armed, notes, sounding }, or null; and
+// whether Space is held. `armed` is the band time R was pressed, for the count-in (countBeats). Each
+// note is { at: seconds after its layer's first bar line (a hair below 0 if it came early), pitch,
+// strength, legato, len: seconds it sounded, null while it still does }.
 export function createLoop() {
   return { layers: [], take: null, ring: false };
 }
@@ -25,8 +26,20 @@ export function createLoop() {
 // recording is waiting or under way, or when the loop is full.
 export function record(loop, t) {
   if (loop.take || loop.layers.length >= LOOP.layers) return false;
-  loop.take = { from: (Math.floor(t / BAR) + 1) * BAR, notes: [], sounding: [] };
+  loop.take = { from: (Math.floor(t / BAR) + 1) * BAR, armed: t, notes: [], sounding: [] };
   return true;
+}
+
+// The band times of the count-in's clicks for the recording that's waiting: every beat (a whole
+// multiple of BEAT) strictly after R was pressed and strictly before the bar line it arms from, in
+// order ([] with no take). Integer beat indices, not repeated addition, keep the times exact multiples
+// of BEAT; a small tolerance keeps float error from ever including the bar line itself.
+export function countBeats(loop) {
+  const take = loop.take;
+  if (!take) return [];
+  const out = [];
+  for (let k = Math.floor(take.armed / BEAT) + 1; k * BEAT < take.from - 1e-9; k++) out.push(k * BEAT);
+  return out;
 }
 
 // A note you play starts at band time t (id: its key, for its release). It's kept if a recording is

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createLoop, record, note, release, ring, step, undo, due, loopState, LOOP_LENGTH } from '../src/looper.js';
+import { createLoop, record, note, release, ring, step, undo, due, loopState, LOOP_LENGTH, countBeats } from '../src/looper.js';
 import { BAR, BEAT } from '../src/groove.js';
 import { LOOP } from '../src/tuning.js';
 
@@ -41,6 +41,31 @@ test('R arms a recording from the next bar line, even pressed just after one; it
   const late = createLoop();
   record(late, 3 * BAR - 0.05);
   assert.equal(late.take.from, 3 * BAR, 'pressed just before a bar line, it records from that one');
+});
+
+test('record also remembers when R was pressed, for the count-in', () => {
+  const loop = createLoop();
+  record(loop, BAR + 0.01);
+  assert.equal(loop.take.armed, BAR + 0.01);
+  assert.equal(loop.take.from, 2 * BAR, 'the timing rule is unchanged');
+});
+
+test("countBeats gives the count-in's clicks: every beat strictly after R was pressed, strictly before the bar line it arms", () => {
+  assert.deepEqual(countBeats(createLoop()), [], 'no take waiting');
+  const early = createLoop();
+  record(early, 0.1);
+  assert.deepEqual(countBeats(early), [0.75, 1.5, 2.25], 'bar 1 beat 1: three clicks left before the bar line');
+  const late = createLoop();
+  record(late, 2.3);
+  assert.deepEqual(countBeats(late), [], 'pressed on beat 4: nothing left to count, and no click for it either');
+  const onLine = createLoop();
+  record(onLine, 3.0);
+  assert.equal(onLine.take.from, 6, 'exactly on a bar line arms the next one');
+  assert.deepEqual(countBeats(onLine), [3.75, 4.5, 5.25], '3.0 itself is not after armed');
+  const negative = createLoop();
+  record(negative, -0.05);
+  assert.equal(negative.take.from, 0, "the shop's band starting a hair after you choose the pedal");
+  assert.deepEqual(countBeats(negative), []);
 });
 
 test("R does nothing while a recording waits or runs, or once there are 3 layers", () => {
