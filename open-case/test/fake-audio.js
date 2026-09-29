@@ -1,17 +1,25 @@
 // A stand-in for Web Audio in Node, enough for audio.js to build and play everything. It records
-// every sound started (what and when) and every buffer made, so tests can see what was played.
+// every sound started and stopped (what and when), every buffer made, every connection (each node's
+// `outs`, and what feeds each node or setting in its `from`), and every change scheduled on a setting
+// (each param's `events`), so tests can see what was played and how things are wired.
 function param(value = 0) {
   return {
     value,
-    setValueAtTime(v) {
+    events: [], // [method, value, time, time constant]
+    setValueAtTime(v, t) {
       this.value = v;
+      this.events.push(['set', v, t]);
     },
-    exponentialRampToValueAtTime() {},
-    linearRampToValueAtTime(v) {
-      this.value = v;
+    exponentialRampToValueAtTime(v, t) {
+      this.events.push(['exp', v, t]);
     },
-    setTargetAtTime(v) {
+    linearRampToValueAtTime(v, t) {
       this.value = v;
+      this.events.push(['linear', v, t]);
+    },
+    setTargetAtTime(v, t, tc) {
+      this.value = v;
+      this.events.push(['target', v, t, tc]);
     },
     cancelScheduledValues() {},
   };
@@ -19,11 +27,20 @@ function param(value = 0) {
 
 export function fakeAudioContext() {
   const started = [], stopped = [], buffers = [];
-  const node = (extra = {}) => ({
-    connect: (to) => to,
-    disconnect() {},
-    ...extra,
-  });
+  const node = (kind, extra = {}) => {
+    const n = {
+      kind,
+      outs: [],
+      connect: (to) => {
+        n.outs.push(to);
+        (to.from ??= []).push(n); // what feeds a node or a setting (a wave into a gain, say)
+        return to;
+      },
+      disconnect() {},
+      ...extra,
+    };
+    return n;
+  };
   const ctx = {
     started, stopped, buffers,
     currentTime: 0,
@@ -31,7 +48,7 @@ export function fakeAudioContext() {
     state: 'running',
     baseLatency: 0.005,
     outputLatency: 0.01,
-    destination: node(),
+    destination: node('destination'),
     resume() {
       ctx.state = 'running';
     },
@@ -39,19 +56,34 @@ export function fakeAudioContext() {
       ctx.state = 'suspended';
     },
     getOutputTimestamp: () => ({ contextTime: ctx.currentTime, performanceTime: 5000 + ctx.currentTime * 1000 }),
-    createGain: () => node({ gain: param(1) }),
-    createBiquadFilter: () => node({ type: 'lowpass', frequency: param(350), Q: param(1), gain: param(0) }),
+    createGain: () => node('gain', { gain: param(1) }),
+    createBiquadFilter: () => node('filter', { type: 'lowpass', frequency: param(350), Q: param(1), gain: param(0) }),
+    createWaveShaper: () => node('shaper', { curve: null, oversample: 'none' }),
+    createDelay: (most = 1) => node('delay', { most, delayTime: param(0) }),
+    createConvolver: () => node('convolver', { buffer: null, normalize: true }),
     createBuffer: (ch, len, rate) => {
       const data = new Float32Array(len);
-      const b = { length: len, duration: len / rate, getChannelData: () => data };
+      const b = { length: len, duration: len / rate, numberOfChannels: ch, getChannelData: () => data };
       buffers.push(b);
       return b;
     },
     createBufferSource: () => {
-      const s = node({ buffer: null, loop: false, start: (t = 0, offset = 0) => started.push({ kind: 'buffer', t, offset, buffer: s.buffer }), stop: (t) => stopped.push({ kind: 'buffer', t }) });
+      const s = node('buffer', { buffer: null, loop: false, start: (t = 0, offset = 0) => started.push({ kind: 'buffer', t, offset, buffer: s.buffer, node: s }), stop: (t) => stopped.push({ kind: 'buffer', t, node: s }) });
       return s;
     },
-    createOscillator: () => node({ type: 'sine', frequency: param(440), detune: param(0), start: (t = 0) => started.push({ kind: 'osc', t }), stop() {} }),
+    createOscillator: () => {
+      const o = node('osc', {
+        type: 'sine', frequency: param(440), detune: param(0),
+        setPeriodicWave(w) {
+          o.type = 'custom';
+          o.wave = w;
+        },
+        start: (t = 0) => started.push({ kind: 'osc', t, node: o }),
+        stop: (t) => stopped.push({ kind: 'osc', t, node: o }),
+      });
+      return o;
+    },
+    createPeriodicWave: (real, imag) => ({ real, imag }),
   };
   return ctx;
 }

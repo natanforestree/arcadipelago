@@ -13,7 +13,7 @@
     body { display: grid; place-items: center; }
     canvas { display: block; image-rendering: crisp-edges; image-rendering: pixelated; }
     canvas[hidden] { display: none; }
-    body, button, input { font: 12px/1.6 Silkscreen, monospace; color: #fff2cc; }
+    body, button, input, select { font: 12px/1.6 Silkscreen, monospace; color: #fff2cc; }
     a { color: #c9b8e8; }
     a.back { position: fixed; top: 8px; left: 10px; text-decoration: none; }
     a.back:hover, a.back:focus { color: #fff2cc; }
@@ -22,8 +22,8 @@
     .card { position: fixed; inset: 0; margin: auto; width: min(420px, calc(100vw - 32px)); height: fit-content; max-height: calc(100vh - 32px); overflow: auto; padding: 20px; box-sizing: border-box; background: #1c1626ee; border: 2px solid #663276; display: grid; gap: 8px; }
     .card h2 { margin: 0; font-size: 16px; text-align: center; }
     .card p { margin: 0; }
-    .card .row { display: flex; gap: 12px; justify-content: center; margin-top: 8px; }
-    .card button { padding: 6px 12px; background: #43286a; border: 2px solid #93406f; cursor: pointer; }
+    .card .row { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 8px; }
+    .card button, .card select { padding: 6px 12px; background: #43286a; border: 2px solid #93406f; cursor: pointer; }
     .card button:hover, .card button:focus-visible { background: #663276; }
     .card label { display: flex; gap: 8px; align-items: center; }
     .card input[type=range] { flex: 1; }
@@ -54,7 +54,9 @@
   <section class="card" id="sound" hidden>
     <h2>Sound check</h2>
     <p id="sound-start">Press any key or click here to start the loop.</p>
-    <p>Play the guitar on the keys: A to ' and W E T Y U O P. Z X octave, C V softer or louder, Space lets notes ring, 1 scale lock, M mute.</p>
+    <p>Play on the keys: A to ' and W E T Y U O P. Z X octave, C V softer or louder, Space lets notes ring, 1 scale lock, 2 to 6 pedals, M mute.</p>
+    <label>Instrument <select id="sound-instrument"></select></label>
+    <div class="row" id="sound-pedals"></div>
     <label><input type="checkbox" data-layer="keys" checked> Keys and crackle</label>
     <label><input type="checkbox" data-layer="drums" checked> Kick and snare</label>
     <label><input type="checkbox" data-layer="bass" checked> Bass</label>

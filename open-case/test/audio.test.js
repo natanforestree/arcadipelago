@@ -1,9 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createAudio, pluckSamples } from '../src/audio.js';
+import { createAudio, pluckSamples, softClip, VOICING } from '../src/audio.js';
 import { fakeAudioContext } from './fake-audio.js';
-import { BAR, timeOf16th } from '../src/groove.js';
+import { BAR, BEAT, timeOf16th } from '../src/groove.js';
 import { PLAY, GROOVE, LAYERS } from '../src/tuning.js';
+import { PEDALS, INSTRUMENTS } from '../src/gear.js';
 
 function memoryStorage() {
   const m = new Map();
@@ -227,3 +228,211 @@ test('a saved volume that makes no sense falls back to 0.8', () => {
   storage.set('open-case-volume', '7');
   assert.equal(createAudio(storage).volume, 0.8);
 });
+
+// Following the wiring: every node reachable from `from`, nearest first, and the first pedal on the way.
+function downstream(from) {
+  const seen = new Set(), queue = [...(from.outs ?? [])], order = [];
+  while (queue.length) {
+    const n = queue.shift();
+    if (seen.has(n)) continue;
+    seen.add(n);
+    order.push(n);
+    queue.push(...(n.outs ?? []));
+  }
+  return order;
+}
+const nextPedal = (from) => downstream(from).find((n) => n.pedal) ?? null;
+// Plays a note on `id` at time 2 and returns the sounds it started.
+function playOn(ctx, audio, id, strength = 3) {
+  audio.setInstrument(id);
+  ctx().currentTime = 2;
+  const before = ctx().started.length;
+  audio.noteOn('KeyA', 60, strength, 2, false);
+  return ctx().started.slice(before);
+}
+
+test('the ukulele rings short and the electric guitar long; both stay in tune', () => {
+  const len = (id) => pluckSamples(48000, 220, 3, VOICING[id].pluck).length / 48000;
+  assert.ok(len('ukulele') < 2 && len('ukulele') < len('acoustic') / 2, `ukulele ${len('ukulele')} s`);
+  assert.ok(len('electric') > len('acoustic') * 1.3, `electric ${len('electric')} s`);
+  for (const id of ['ukulele', 'electric']) {
+    const x = pluckSamples(48000, 220, 3, VOICING[id].pluck);
+    const p = period(x, 4800, 48000 / 220);
+    assert.ok(Math.abs(p / (48000 / 220) - 1) < 0.003, `${id}: period ${p}`);
+  }
+});
+
+test('every instrument sounds for a note at once, through its own tone into the pedals', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    for (const id of INSTRUMENTS) {
+      const fresh = playOn(ctx, audio, id);
+      assert.ok(fresh.length >= 1 && fresh.every((s) => s.t === 2), `${id} sounds at once`);
+      const path = downstream(fresh[0].node), first = path.findIndex((n) => n.pedal);
+      assert.equal(path[first].pedal, 'overdrive', `${id} plays into the first pedal`);
+      for (const [type, hz] of VOICING[id].tone) {
+        const at = path.findIndex((n) => n.kind === 'filter' && n.type === type && n.frequency.value === hz);
+        assert.ok(at >= 0 && at < first, `${id}: its ${type} at ${hz} Hz, before the pedals`);
+      }
+    }
+  }));
+
+test("every instrument's note stops soon after its key comes up, or when Space lets go", () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    for (const id of INSTRUMENTS) {
+      playOn(ctx, audio, id);
+      let stops = ctx().stopped.length;
+      audio.noteOff('KeyA', 2.4);
+      const late = ctx().stopped.slice(stops);
+      assert.ok(late.length >= 1, `${id} stops`);
+      assert.ok(late.every((st) => st.t <= 2.4 + VOICING[id].release * 2 + 1e-9), `${id} stops soon after its key is up`);
+      audio.setRing(true);
+      playOn(ctx, audio, id);
+      stops = ctx().stopped.length;
+      audio.noteOff('KeyA', 2.4);
+      assert.ok(ctx().stopped.slice(stops).every((st) => st.t > 3), `${id}: Space holds it`);
+      ctx().currentTime = 5;
+      audio.setRing(false);
+      assert.ok(ctx().stopped.slice(stops).some((st) => st.t >= 5 && st.t <= 5 + VOICING[id].release * 2 + 1e-9), `${id}: letting Space go stops it`);
+    }
+  }));
+
+test('the synth holds while its key is down; the electric piano fades away by itself', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    let stops = ctx().stopped.length;
+    playOn(ctx, audio, 'synth');
+    assert.equal(ctx().stopped.length, stops, 'no end until the key comes up');
+    audio.noteOff('KeyA', 2.2);
+    stops = ctx().stopped.length;
+    playOn(ctx, audio, 'epiano');
+    const ends = ctx().stopped.slice(stops);
+    assert.ok(ends.length > 0 && ends.every((st) => st.t > 4 && st.t < 14), 'it ends by itself, some seconds on');
+  }));
+
+test('no key press waits: the keyboards make no samples, and a warmed guitar makes none either', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    const made = ctx().buffers.length;
+    playOn(ctx, audio, 'epiano');
+    playOn(ctx, audio, 'synth');
+    audio.warm([60, 62], 3);
+    assert.equal(ctx().buffers.length, made, 'the keyboards need nothing worked out');
+    audio.setInstrument('ukulele');
+    audio.warm([60, 62], 3);
+    const warmed = ctx().buffers.length;
+    assert.equal(warmed, made + 2);
+    playOn(ctx, audio, 'ukulele');
+    assert.equal(ctx().buffers.length, warmed, 'the note was ready');
+    assert.ok(ctx().buffers.at(-1).length < 8000 * 2, "the ukulele's short ring");
+  }));
+
+test('changing instrument: only a real change counts, and notes already sounding carry on', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    assert.equal(audio.instrument, 'acoustic');
+    assert.equal(audio.setInstrument('acoustic'), false);
+    assert.equal(audio.setInstrument('banjo'), false);
+    assert.equal(audio.setInstrument('synth'), true, 'before the sound starts, too');
+    audio.start();
+    playOn(ctx, audio, 'synth');
+    const stops = ctx().stopped.length;
+    audio.setInstrument('acoustic');
+    assert.equal(ctx().stopped.length, stops);
+    audio.noteOff('KeyA', 3);
+    assert.ok(ctx().stopped.length > stops, 'and it stops when its key comes up');
+  }));
+
+test('the pedals chain in order, overdrive to reverb, then to the speakers', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    let at = playOn(ctx, audio, 'acoustic')[0].node;
+    const order = [];
+    for (let p = nextPedal(at); p; p = nextPedal(at)) {
+      order.push(p.pedal);
+      at = p;
+    }
+    assert.deepEqual(order, PEDALS);
+    assert.ok(downstream(at).includes(ctx().destination), 'the last pedal reaches the speakers');
+  }));
+
+// The changes a stomp makes to the gains in and after the pedals (and the gains feeding their
+// settings, like the tremolo's depth), from the stomp's time.
+function stompFades(ctx, audio, id, on, at) {
+  const after = downstream(nextPedal(playOn(ctx, audio, 'acoustic')[0].node));
+  const feeding = after.flatMap((n) => (n.gain?.from ?? []).filter((f) => f.gain));
+  const inside = [...new Set([...after.filter((n) => n.gain), ...feeding])];
+  const before = new Map(inside.map((n) => [n, n.gain.events.length]));
+  audio.setPedal(id, on, at);
+  return inside.flatMap((n) => n.gain.events.slice(before.get(n)));
+}
+
+test('a stomp fades its pedal in or out over a few milliseconds, never cutting the sound', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    for (const id of PEDALS) {
+      for (const on of [true, false]) {
+        const fades = stompFades(ctx, audio, id, on, 3);
+        assert.ok(fades.length >= 1, `${id} ${on ? 'on' : 'off'} changes something`);
+        for (const [how, , t, tc] of fades) {
+          assert.equal(how, 'target', `${id}: a fade, not a jump`);
+          assert.equal(t, 3);
+          assert.ok(tc > 0 && tc <= 0.01, `${id}: over a few milliseconds`);
+        }
+      }
+    }
+    assert.equal(stompFades(ctx, audio, 'delay', false, 4).length, 0, 'already off: nothing changes');
+  }));
+
+test('the overdrive hands over from your clean sound at the same moment, so there is no gap', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    const fades = stompFades(ctx, audio, 'overdrive', true, 3);
+    assert.deepEqual(fades.map(([, v]) => v).sort(), [0, 0.16], 'the clean sound fades out as the driven one fades in');
+    const curve = softClip();
+    assert.ok(Math.abs(curve[512]) < 1e-6 && Math.abs(curve[0] + 1) < 1e-6 && Math.abs(curve[1024] - 1) < 1e-6);
+    assert.ok(curve[600] - curve[512] > curve[1024] - curve[936], 'steep in the middle, flat at the ends: soft clipping');
+  }));
+
+test('pedals switched on before the sound starts are on once it does', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.setPedal('reverb', true);
+    audio.start();
+    assert.ok(ctx().buffers.some((b) => b.numberOfChannels === 2), "the hall's echo is worked out at the start");
+    const reverbIn = downstream(playOn(ctx, audio, 'acoustic')[0].node).find((n) => n.pedal === 'reverb');
+    const send = reverbIn.outs.find((n) => n.gain && n.outs.some((o) => o.kind === 'convolver'));
+    assert.equal(send.gain.value, 1);
+  }));
+
+test('the tremolo pulses on the 8th notes, lined up with the band when it starts', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    audio.startBand(1.5);
+    const waves = ctx().started.filter((s) => s.kind === 'osc' && s.node.type === 'custom');
+    assert.equal(waves.at(-1).t, 1.5, 'a new wave starts with the band');
+    assert.ok(Math.abs(waves.at(-1).node.frequency.value - 2 / BEAT) < 1e-9, 'at the 8th notes');
+    assert.deepEqual([...waves.at(-1).node.wave.real], [0, 1], 'a cosine: loudest on the 8th itself');
+    assert.ok(ctx().stopped.some((st) => st.node === waves.at(-2).node && st.t === 1.5), 'the old wave hands over');
+  }));
+
+test('the delay echoes on the dotted 8th and fades over three or four repeats', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    const nodes = downstream(playOn(ctx, audio, 'acoustic')[0].node);
+    const line = nodes.find((n) => n.kind === 'delay' && n.delayTime.value > 0.1);
+    assert.ok(Math.abs(line.delayTime.value - BEAT * 0.75) < 1e-9);
+    const loop = downstream(line).find((n) => n.gain && n.outs.includes(line));
+    const repeat = loop.gain.value;
+    assert.ok(repeat ** 3 > 0.03 && repeat ** 5 < 0.01, `each echo ${repeat} of the one before`);
+  }));
