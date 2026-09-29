@@ -185,7 +185,7 @@ The plan's prototype settled a few things this spec left open:
 - **The title card** has a line for the pedal keys: "2-6 your pedals (from the shop)".
 - **The sounds were measured and evened out.** At a medium pick, each instrument's first moments are about as loud as the acoustic's; the synth, which holds its notes, sits a little under. Switching on the overdrive, the chorus or the tremolo doesn't change how loud you are: the tremolo swings either side of your level. The delay and the reverb let their echoes die away when you switch them off.
 - **The sound check** (`?sound`) has a menu of the instruments and a switch for each pedal, so every sound can be judged by ear with the band.
-- **`?coins=N` keeps nothing:** what you buy on that page isn't saved or logged.
+- **`?coins=N` keeps nothing:** what you buy or play on that page isn't saved or logged.
 - **Bots play with your gear but can't change it.** Their end card has no savings line and no shop button.
 - **A held Enter buys once;** held arrows move along the stock.
 

@@ -439,12 +439,24 @@ export function createAudio(storage) {
   function noteOn(code, pitch, strength, at, legato) {
     if (!ctx) return;
     noteOff(code, at); // the same key again: the old note stops
-    const voice = VOICES[instrument](pitch, strength, Math.max(at, ctx.currentTime), legato);
-    voices.set(code, { ...voice, release: VOICING[instrument].release });
+    const start = Math.max(at, ctx.currentTime);
+    // A re-struck pitch still ringing from Space (a different key code, since noteOff above already
+    // moved this one on): damp it too, so repeats replace their ringing self instead of stacking.
+    for (const v of ringing) {
+      if (v.pitch === pitch) {
+        ringing.delete(v);
+        damp(v, start);
+      }
+    }
+    const voice = VOICES[instrument](pitch, strength, start, legato);
+    voices.set(code, { ...voice, release: VOICING[instrument].release, pitch, start });
   }
 
+  // Damps a voice from `at`, but never before it actually starts: a strummed note can be released
+  // before its own delayed start, and starting the fade early would be undone by the attack's later
+  // automation, then cut off with a click.
   function damp(v, at) {
-    const t = Math.max(at, ctx.currentTime);
+    const t = Math.max(at, ctx.currentTime, v.start);
     v.g.gain.setTargetAtTime(0, t, v.release / 4);
     for (const src of v.sources) {
       try {

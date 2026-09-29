@@ -53,6 +53,12 @@ export function createInput(target, { now, onNote, onRelease, onControl, onPedal
 
   function up(e) {
     if (e.code === 'Space') onControl('ring', false);
+    if (e.key === 'Meta') {
+      // macOS never sends the keyup of a note key let go while Cmd is held, so it would drone on:
+      // let every held key go now instead, the same as releaseAll, but leave the ring alone.
+      for (const code of [...held.keys()]) up({ code });
+      return;
+    }
     if (!held.has(e.code)) return;
     held.delete(e.code);
     onRelease({ code: e.code, at: now() });

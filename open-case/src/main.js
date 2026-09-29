@@ -82,6 +82,9 @@ function game(art) {
   const gear = loadGear(storage);
   if (debugSavings !== null) gear.savings = debugSavings;
   const keep = () => debugSavings === null && saveGear(storage, gear);
+  // The log is Nathan's own: a bot set or a ?coins page never writes to it. Savings still count up
+  // on a ?coins page (earn, below); they're just never kept, same as keep() above.
+  const logging = !bot && debugSavings === null;
   let shop = null; // the shop's state (shop.js) while you're in it
   let stomped = null; // the last pedal stomped: { id, on, time } (its name shows over the gear strip)
   let setPedals = new Set(); // every pedal that's been on during this set, for the log
@@ -261,10 +264,13 @@ function game(art) {
   function showEnd() {
     screen = 'over';
     const s = summary(set);
-    // The log and the savings are Nathan's own, so a bot set (?bot=…) touches neither.
+    // Savings are Nathan's own: a bot set (?bot=…) touches neither them nor his gear.
     if (!bot) {
       earn(gear, s.coins);
       keep();
+    }
+    // The log is Nathan's own too, and also skips a ?coins page: see `logging` above.
+    if (logging) {
       const pedals = PEDALS.filter((id) => setPedals.has(id));
       logSet(storage, { date: new Date().toISOString(), coins: s.coins, stopped: s.stopped, instrument: gear.instrument, pedals });
     }
@@ -299,7 +305,7 @@ function game(art) {
   }
 
   document.getElementById('again').addEventListener('click', () => {
-    if (!bot) logChoice(storage, 'another');
+    if (logging) logChoice(storage, 'another');
     end.hidden = true;
     audio.stopBand();
     set = null;
@@ -308,14 +314,14 @@ function game(art) {
     else screen = 'ready';
   });
   document.getElementById('stop').addEventListener('click', () => {
-    if (!bot) logChoice(storage, 'stop');
+    if (logging) logChoice(storage, 'stop');
     end.hidden = true;
     audio.stopBand();
     screen = 'thanks';
     document.getElementById('thanks').hidden = false;
   });
   document.getElementById('shop').addEventListener('click', () => {
-    logChoice(storage, 'shop');
+    if (logging) logChoice(storage, 'shop');
     end.hidden = true;
     audio.stopBand();
     set = null;

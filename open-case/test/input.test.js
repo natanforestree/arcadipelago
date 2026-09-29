@@ -23,7 +23,7 @@ function harness(over = {}) {
   return {
     input, got, on,
     down: (code, extra) => key('keydown', code, extra),
-    up: (code) => key('keyup', code),
+    up: (code, extra) => key('keyup', code, extra),
     at: (t) => (time = t),
   };
 }
@@ -107,6 +107,14 @@ test('the gate can swallow a key, which then plays nothing and is never released
   open = true;
   h.down('KeyS');
   assert.deepEqual(h.got, [['note', 'KeyS', 62, 3, false, 1000]]);
+});
+
+test("macOS drops a note key's keyup while Cmd is held: Cmd coming up releases every held key, leaving the ring alone", () => {
+  const h = harness();
+  h.down('KeyA');
+  h.down('KeyS');
+  h.up('MetaLeft', { key: 'Meta' });
+  assert.deepEqual(h.got.slice(2), [['up', 'KeyA'], ['up', 'KeyS']]);
 });
 
 test('losing focus lets go of every key and the ring', () => {

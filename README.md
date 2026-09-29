@@ -81,12 +81,12 @@ That writes the editable `art/snake-icon.aseprite` and the `snake/icon.png` the 
 
 - Tests (Node 22, no dependencies): `cd open-case && npm test`. The headline test plays a scripted honest set against a random bot and a lick bot over ten seeds. The art tests check the committed sprite sheet against what the game draws.
 - Debug:
-  - `?sound` is the sound check: the loop with a switch per layer, your instrument on the keys, and every instrument and pedal in the shop to try.
+  - `?sound` is the sound check: the loop with a switch per layer, and every instrument and pedal in the shop to try on the keys.
   - `?debug` shows each listener's interest and the last rule they heard, and a corner panel with the audio delay. On the end card it adds Run the bots and the test log.
   - `?seed=N` fixes the passers-by, and the park's windows, train and birds.
   - `?bot=random` or `?bot=lick` plays a whole set by itself.
   - `?sky=N` shows the park as it is N bars into a set (until a set starts), to check the sunset without playing three minutes.
-  - `?coins=N` sets your savings to N on that page, to try the shop. Nothing bought on it is kept.
+  - `?coins=N` sets your savings to N on that page, to try the shop. Nothing done on it is kept or logged.
 - Tuning: the rules, the crowd, the tips and the feel are in `open-case/src/tuning.js`, and so are the park's sunset and background timings (`PARK`) and the shop's prices and pedal keys (`SHOP`). The sounds (the band, each instrument and each pedal) are in `open-case/src/audio.js`, and a few view timings are in `scene.js` and `render.js`.
 - Art: flat colour, no outlines, no dithering, the look Nathan picked from a reference picture. The game draws from one sprite sheet, `open-case/assets/sprites.png`, with its frame and layout data in `sprites.json`. `art/open-case/sprites.lua` writes both from the shared drawing code: `draw.lua` (the park, you and your things), `figures.lua` (the passers-by, their reactions, the pigeons and the birds), `gear.lua` (you with each instrument, your pedals, the amp and the gear strip's icons) and `shop.lua` (the music shop). `palette.lua` holds every colour, at most 64. The style sample and the tab icon have scripts there too. Rebuild everything from the repo root (it's deterministic: an unchanged script rebuilds its files byte for byte):
 

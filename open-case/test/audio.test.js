@@ -124,6 +124,51 @@ test('while Space is held, released notes ring on; letting it go damps them', ()
     assert.ok(ctx().stopped.at(-1).t >= 1.5);
   }));
 
+test('re-striking the same pitch while it still rings stops the earlier voice, so repeats do not stack', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    audio.setInstrument('synth');
+    audio.setRing(true);
+    const stoppedNodes = () => new Set(ctx().stopped.map((s) => s.node));
+    const strike = (t) => {
+      ctx().currentTime = t;
+      const before = ctx().started.length;
+      audio.noteOn('KeyA', 60, 3, t, false);
+      const sources = ctx().started.slice(before).map((s) => s.node);
+      audio.noteOff('KeyA', t + 0.02); // let go right away: Space keeps it ringing
+      return sources;
+    };
+    const first = strike(2);
+    const second = strike(2.2);
+    assert.ok(first.every((n) => stoppedNodes().has(n)), 'the first voice is stopped once the second starts');
+    const third = strike(2.4);
+    assert.ok(second.every((n) => stoppedNodes().has(n)), 'the second voice is stopped once the third starts');
+    assert.ok(third.every((n) => !stoppedNodes().has(n)), 'the third, still ringing, is the only one left');
+  }));
+
+test('a note released before its delayed start begins damps from its own start, not before (no click)', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    audio.setInstrument('synth');
+    ctx().currentTime = 5.0;
+    const before = ctx().started.length;
+    audio.noteOn('KeyA', 60, 3, 5.036, false); // a strummed note, starting a moment from now
+    const sources = ctx().started.slice(before).map((s) => s.node);
+    audio.noteOff('KeyA', 5.02); // the key comes up before the voice even starts
+    const stops = ctx().stopped.filter((s) => sources.includes(s.node));
+    assert.ok(stops.length > 0, 'the voice does stop');
+    for (const { t } of stops) {
+      assert.ok(t >= 5.036 - 1e-9, `stopped at ${t}, before its own start`);
+      assert.ok(t <= 5.036 + VOICING.synth.release * 2 + 1e-9, `stopped at ${t}, long after its start`);
+    }
+    const g = downstream(sources[0]).find((n) => n.gain?.events?.some(([how, v]) => how === 'target' && v === 0));
+    assert.ok(g, "the note's own gain");
+    const [, , fadeAt] = g.gain.events.find(([how, v]) => how === 'target' && v === 0);
+    assert.ok(fadeAt >= 5.036 - 1e-9, `the fade is scheduled at ${fadeAt}, before the voice's own start`);
+  }));
+
 test('the band is scheduled a moment ahead, every layer into its slot, never further ahead', () =>
   withAudio((ctx) => {
     const audio = createAudio(memoryStorage());
