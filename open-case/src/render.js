@@ -1,14 +1,16 @@
 // Draws the scene at 320x180 into a 2D context (main.js scales it up by a whole number), in the flat
 // style, from the sprite sheet art/open-case/sprites.lua makes (assets.js loads it): the park and its
-// sunset, you on your crate with the guitar, the open case and the looper, the passers-by, their
-// reactions, the pigeons and birds, the note trail, the memory strip, and the title, pause and ?debug
-// overlays. The end card is HTML (index.html).
+// sunset, you on your crate with your instrument, your pedals, the open case and the looper, the
+// passers-by, their reactions, the pigeons and birds, the note trail, the memory strip, the gear
+// strip, the music shop, and the title, pause and ?debug overlays. The end card is HTML (index.html).
 import { CROWD, PLAY, LAYERS, INTEREST } from './tuning.js';
 import { BAR, BEAT } from './groove.js';
 import {
   GUITAR, coinAt, glyphAt, GOLD, skyStages, sunDrop, windowLit, lampState, starsOut, trainX, cloudX,
   birdsAt, pigeonsAt, frameOf,
 } from './scene.js';
+import { STOCK, PEDALS, owns, stockItem } from './gear.js';
+import { card, trying, CARD, BUTTON } from './shop.js';
 
 export const W = 320, H = 180;
 const FONT = '8px Silkscreen, monospace';
@@ -25,6 +27,12 @@ const NOD = 0.3; // the share of each beat a hooked listener's head is down
 const OVER_HEAD = 47; // pixels above a listener's feet their reaction's tail points to
 const SWAY = 0.8; // how fast (rad/s) the trees sway...
 const RUSTLE = 0.2; // ...and how long (seconds) they rustle after each bar line
+const STRIP_X = 106; // the gear strip: its first pedal's icon (clear of "lock")...
+const STRIP_STEP = 16; // ...and the next one's, this far to the right (each pedal has its own place), so the
+// last ends before the pigeons (scene.js PIGEONS)
+const STOMP_SHOW = 1; // seconds a stomped pedal's name shows over the strip
+const NOD_SHOW = 1.2; // seconds the shopkeeper nods after a sale...
+const NOD_FPS = 4; // ...this many nods a second
 
 // Your last notes tagged by shape: notes completing the same shape share a letter; '-' completes none.
 export function shapeTags(shapes) {
@@ -116,12 +124,19 @@ export function createRenderer(g, art) {
     sprite(`lamp-${lamp}`, 0, 0);
   }
 
-  // Everyone and everything standing on the path, nearest last: the listeners, you, the looper, the
-  // case and its coins, and the pigeons on the ground. Returns the pigeons in the air, drawn later.
-  function figures({ set, scene, t, time }) {
+  // Everyone and everything standing on the path, nearest last: the listeners, you, your pedals and
+  // amp, the looper, the case and its coins, and the pigeons on the ground. Returns the pigeons in the
+  // air, drawn later.
+  function figures({ set, scene, t, time, gear }) {
     const beatPhase = set && t >= 0 ? (t % BAR) / BAR : 1;
     const things = [
-      { y: data.feet.you, draw: () => sprite(youFrame(scene, t, time, 'acoustic'), 0, 0) },
+      { y: data.feet.you, draw: () => sprite(youFrame(scene, t, time, gear.instrument), 0, 0) },
+      {
+        y: data.feet.pedals,
+        draw: () => {
+          for (const id of PEDALS) if (owns(gear, id)) sprite(`pedal-${id}-${gear.on.includes(id) ? 1 : 0}`, 0, 0);
+        },
+      },
       { y: data.feet.looper, draw: () => sprite(`looper-${beatPhase < 0.25 ? 1 : 0}`, 0, 0) },
       {
         y: data.feet.case,
@@ -131,6 +146,7 @@ export function createRenderer(g, art) {
         },
       },
     ];
+    if (gear.instrument === 'electric') things.push({ y: data.feet.amp, draw: () => sprite('amp', 0, 0) });
     if (set) for (const p of set.crowd.people) things.push({ y: p.y, draw: () => sprite(personFrame(p, t, time), p.x, p.y) });
     const flying = [];
     for (const b of pigeonsAt(scene, t, time)) {
@@ -203,11 +219,25 @@ export function createRenderer(g, art) {
     }
   }
 
-  function hud(keys, set) {
+  function hud(keys, set, gear, stomp, time) {
     text(`oct ${keys.octave >= 0 ? '+' : ''}${keys.octave}`, 4, 170);
     for (let i = 0; i < PLAY.strengthMax; i++) px(52 + i * 5, 172, 4, 4, i < keys.strength ? C.light : C.ink);
     if (keys.lock) text('lock', 78, 170, C.gold);
     if (set) text(`bar ${Math.min(60, Math.floor(set.t / BAR) + 1)}/60`, W - 4, 170, C.light, 'right');
+    // The gear strip: each pedal you own in its own place, with its key, lit while it's on; the name
+    // of the one just stomped shows above it for a moment.
+    PEDALS.forEach((id, i) => {
+      if (!owns(gear, id)) return;
+      const on = gear.on.includes(id), x = STRIP_X + i * STRIP_STEP;
+      sprite(`strip-${id}-${on ? 1 : 0}`, x, 170);
+      text(String(stockItem(id).key), x + 9, 170, on ? C.light : C.grey);
+    });
+    if (stomp && time - stomp.time >= 0 && time - stomp.time < STOMP_SHOW) {
+      const x = STRIP_X + PEDALS.indexOf(stomp.id) * STRIP_STEP + 7;
+      const words = `${stockItem(stomp.id).name.toLowerCase()} ${stomp.on ? 'on' : 'off'}`;
+      text(words, x + 1, 161, C.ink, 'center');
+      text(words, x, 160, stomp.on ? C.gold : C.light, 'center');
+    }
   }
 
   function title() {
@@ -232,7 +262,49 @@ export function createRenderer(g, art) {
     }
     text('Z X octave   C V softer/louder   space ring', W / 2, 106, C.grey, 'center');
     text('1 scale lock   M mute   esc pause', W / 2, 116, C.grey, 'center');
-    text('press any key', W / 2, 132, C.gold, 'center');
+    text('2-6 your pedals (from the shop)', W / 2, 126, C.grey, 'center');
+    text('press any key', W / 2, 136, C.gold, 'center');
+  }
+
+  // The music shop: the room and the shopkeeper (nodding just after a sale), the stock with its tags
+  // (the chosen item lifted, with a pointer over it, and the lights lit on the pedals you can hear),
+  // the savings on the chalkboard, and the card for the chosen item.
+  function shopView({ shop, gear, time, still }) {
+    const S = data.shop;
+    sprite('shop-room', 0, 0);
+    text('back to', S.sign[0], S.sign[1], C.ink, 'center');
+    text('the park', S.sign[0], S.sign[1] + 8, C.ink, 'center');
+    text('saved', S.board[0], S.board[1], C.grey, 'center');
+    text(`${gear.savings} coin${gear.savings === 1 ? '' : 's'}`, S.board[0], S.board[1] + 11, C.light, 'center');
+    const since = time - shop.soldAt;
+    sprite(`keeper-${since >= 0 && since < NOD_SHOW ? 2 + frameOf(since * NOD_FPS, 2) : frameOf(time / BREATH, 2)}`, 0, 0);
+    sprite('shop-counter', 0, 0);
+    const heard = trying(shop, gear).on;
+    STOCK.forEach((item, i) => {
+      const chosen = i === shop.at, lift = chosen ? S.lift : 0, [x, y, w] = S.items[item.id];
+      sprite(`item-${item.id}-${chosen ? 1 : 0}`, 0, 0);
+      if (heard.includes(item.id)) px(S.leds[item.id][0], S.leds[item.id][1] - lift, 2, 1, C.light);
+      sprite(owns(gear, item.id) ? 'tag-yours' : 'tag-price', x + w - 1, y + 3 - lift);
+      if (chosen) {
+        const cx = x + Math.floor(w / 2), cy = y - lift - 7 - (!still && Math.sin(time * 5) > 0 ? 1 : 0);
+        px(cx - 2, cy, 5, 1, C.gold);
+        px(cx - 1, cy + 1, 3, 1, C.gold);
+        px(cx, cy + 2, 1, 1, C.gold);
+      }
+    });
+    const words = card(shop, gear);
+    g.globalAlpha = 0.92;
+    px(CARD[0], CARD[1], CARD[2], CARD[3], C.ink);
+    g.globalAlpha = 1;
+    text(words.name, CARD[0] + 6, CARD[1] + 3);
+    text(words.price, CARD[0] + CARD[2] - 6, CARD[1] + 3, words.price === 'yours' ? C.go : C.gold, 'right');
+    text(words.about, CARD[0] + 6, CARD[1] + 12, C.grey);
+    text(words.says, CARD[0] + 6, CARD[1] + 21, words.button ? C.gold : C.light);
+    text('arrows choose   esc back to the park', CARD[0] + 6, CARD[1] + 30, C.greyDark);
+    if (words.button) {
+      px(BUTTON[0], BUTTON[1], BUTTON[2], BUTTON[3], C.gold);
+      text(words.button, BUTTON[0] + BUTTON[2] / 2, BUTTON[1] + 3, C.ink, 'center');
+    }
   }
 
   function debugView(set, info) {
@@ -257,12 +329,15 @@ export function createRenderer(g, art) {
     lines.forEach((s, i) => text(s, W - 129, DEBUG_PANEL_TOP + 2 + i * 9));
   }
 
-  // view: { screen: 'title' | 'ready' | 'playing' | 'paused' | 'over', set, scene, keys, t (set time),
-  //   bars (bars into the set, a fraction is fine; 0 with no set), time (seconds since the page opened),
-  //   still (reduced motion), flocks (the birds, from createFlocks), debug: null | { reported, measured } }
+  // view: { screen: 'title' | 'ready' | 'playing' | 'paused' | 'over' | 'shop', set, scene, keys,
+  //   t (set time), bars (bars into the set, a fraction is fine; 0 with no set), time (seconds since
+  //   the page opened), still (reduced motion), flocks (the birds, from createFlocks), gear (gear.js),
+  //   stomp: null | { id, on, time } (the last pedal stomped, and when, on the page's clock),
+  //   shop: the shop's state (shop.js) on the shop screen, debug: null | { reported, measured } }
   return function draw(view) {
     const { screen, set, scene, keys, t, time } = view;
     g.imageSmoothingEnabled = false;
+    if (screen === 'shop') return shopView(view);
     park(view);
     const flying = figures(view);
     if (set) {
@@ -282,7 +357,7 @@ export function createRenderer(g, art) {
       strip(set.listen, scene, t);
       if (view.debug) debugView(set, view.debug);
     }
-    if (keys && screen !== 'title') hud(keys, screen === 'ready' ? null : set);
+    if (keys && screen !== 'title') hud(keys, screen === 'ready' ? null : set, view.gear, view.stomp, time);
     if (screen === 'title') title();
     else if (screen === 'ready') text('play a note to start the set', W / 2, 60, C.light, 'center');
     else if (screen === 'paused') { // dimmed, under the pause card (index.html)

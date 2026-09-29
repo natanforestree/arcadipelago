@@ -3,12 +3,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRenderer, shapeTags, personFrame, youFrame, treeFrame, W, H } from '../src/render.js';
 import { createSet, runSet } from '../src/set.js';
-import { createScene, createFlocks, sceneNote, CASE } from '../src/scene.js';
+import { createScene, createFlocks, sceneNote, CASE, PIGEONS } from '../src/scene.js';
 import { createKeyState } from '../src/keys.js';
 import { goodSet } from '../src/bots.js';
 import { KINDS } from '../src/crowd.js';
 import { BAR, BEAT } from '../src/groove.js';
 import { INTEREST } from '../src/tuning.js';
+import { STOCK, PEDALS, INSTRUMENTS, freshGear, buy, stomp } from '../src/gear.js';
+import { createShop, CARD, BUTTON } from '../src/shop.js';
 import { stoodAt } from './helpers.js';
 
 // The real frame data, with a stand-in for the sheet's image.
@@ -49,14 +51,23 @@ const drawn = (g, prefix) => g.sprites.filter((s) => s.name.startsWith(prefix));
 
 const view = (over) => ({
   screen: 'playing', set: null, scene: createScene(1), keys: createKeyState(), t: 0, bars: 0, time: 1, still: false,
-  flocks: createFlocks(1), debug: null, ...over,
+  flocks: createFlocks(1), gear: freshGear(), stomp: null, shop: null, debug: null, ...over,
 });
+// Gear with everything bought: every pedal (the odd ones on) and every instrument, playing `instrument`.
+function allGear(instrument = 'acoustic') {
+  const gear = { ...freshGear(), savings: 10000 };
+  for (const item of STOCK) buy(gear, item.id);
+  PEDALS.forEach((id, i) => i % 2 === 0 && stomp(gear, id));
+  gear.instrument = instrument;
+  return gear;
+}
 
 test('the title shows the name, the key layout and how to start, over the park at dusk', () => {
   const g = fakeContext();
   createRenderer(g, art)(view({ screen: 'title' }));
   assert.ok(g.texts.includes('Open Case'));
   assert.ok(['A', 'W', "'", 'press any key'].every((s) => g.texts.includes(s)));
+  assert.ok(g.texts.some((s) => s.startsWith('2-6 your pedals')), 'the pedal keys');
   assert.ok(g.rects.some(([x, y, w]) => x === 0 && y === 0 && w === W), 'the sky behind it');
   for (const n of ['ground', 'lamp-off', 'you-acoustic-idle-', 'case', 'sun']) assert.ok(drawn(g, n).length, n);
   assert.equal(drawn(g, 'pool').length, 0, 'the lamp is off at dusk');
@@ -98,9 +109,12 @@ test('every frame the renderer asks for is in the sheet, over a whole set, with 
   const flocks = createFlocks(2);
   for (let t = 0; t < 62 * BAR; t += 0.37) {
     if (Math.abs(t - 20) < 0.2) sceneNote(scene, 60, 0, t, 4); // the pigeons scatter
+    if (t % 3 < 0.37) sceneNote(scene, 62, 0, t, 3); // you play, on every instrument in turn
     set.t = t;
     for (const p of set.crowd.people) p.reaction.t = t - 0.1;
-    for (const still of [false, true]) draw(view({ set, scene, t, bars: t / BAR, time: t * 1.3 - 0.01, still, flocks }));
+    const gear = allGear(INSTRUMENTS[Math.floor(t) % INSTRUMENTS.length]);
+    const stomped = { id: PEDALS[Math.floor(t) % PEDALS.length], on: t % 2 < 1, time: t * 1.3 - 0.5 };
+    for (const still of [false, true]) draw(view({ set, scene, t, bars: t / BAR, time: t * 1.3 - 0.01, still, flocks, gear, stomp: stomped }));
   }
 });
 
@@ -251,4 +265,97 @@ test('listeners are drawn nearest last, so someone in front covers someone behin
   createRenderer(g, art)(view({ set, scene: createScene(1), t: 1, bars: 0 }));
   const order = g.sprites.map((s) => s.name.split('-')[0]).filter((n) => ['jogger', 'commuter', 'you', 'case'].includes(n));
   assert.deepEqual(order, ['commuter', 'you', 'jogger', 'case']);
+});
+
+test('your instrument, your pedals by the crate, and the amp with the electric guitar', () => {
+  const plain = fakeContext();
+  createRenderer(plain, art)(view({ set: createSet(1), t: 1 }));
+  assert.equal(drawn(plain, 'pedal-').length, 0, 'no pedals yet');
+  assert.equal(drawn(plain, 'amp').length, 0);
+  const g = fakeContext();
+  createRenderer(g, art)(view({ set: createSet(1), t: 1, gear: allGear('electric') }));
+  assert.equal(drawn(g, 'you-electric-').length, 1);
+  assert.equal(drawn(g, 'amp').length, 1);
+  assert.deepEqual(drawn(g, 'pedal-').map((s) => s.name), ['pedal-overdrive-1', 'pedal-chorus-0', 'pedal-tremolo-1', 'pedal-delay-0', 'pedal-reverb-1']);
+  const keys = fakeContext();
+  createRenderer(keys, art)(view({ set: createSet(1), t: 1, gear: allGear('epiano') }));
+  assert.equal(drawn(keys, 'you-epiano-').length, 1);
+  assert.equal(drawn(keys, 'amp').length, 0, 'the amp is only for the electric guitar');
+});
+
+test('the gear strip shows each pedal you own in its place, with its key, lit while on', () => {
+  const g = fakeContext();
+  const gear = { ...freshGear(), savings: 500 };
+  buy(gear, 'chorus');
+  buy(gear, 'delay');
+  stomp(gear, 'delay');
+  createRenderer(g, art)(view({ set: createSet(1), t: 1, gear }));
+  const icons = drawn(g, 'strip-');
+  assert.deepEqual(icons.map((s) => s.name), ['strip-chorus-0', 'strip-delay-1']);
+  assert.ok(icons.every((s) => s.y === 170), 'along the bottom');
+  const alone = fakeContext();
+  createRenderer(alone, art)(view({ set: createSet(1), t: 1, gear: { ...gear, owned: ['delay'] } }));
+  assert.equal(drawn(alone, 'strip-')[0].x, icons[1].x, 'a pedal keeps its place whatever else you own');
+  const keys = g.positions.filter((p) => p.s === '3' || p.s === '5');
+  assert.deepEqual(keys.map((p) => p.s), ['3', '5']);
+  const oct = g.positions.find((p) => p.s.startsWith('oct')), bar = g.positions.find((p) => p.s.startsWith('bar '));
+  assert.ok(icons[0].x > oct.x + 50 && icons[1].x + 20 < bar.x - 54, 'between the pick strength and the bar count');
+  const all = fakeContext();
+  createRenderer(all, art)(view({ set: createSet(1), t: 1, gear: allGear() }));
+  const last = drawn(all, 'strip-').at(-1);
+  assert.ok(last.x + 14 < Math.min(...PIGEONS.map(([x]) => x)) - 4, 'the strip ends before the pigeons');
+  assert.ok(drawn(all, 'strip-')[0].x >= 78 + 4 * 6, 'and starts after "lock"');
+  const none = fakeContext();
+  createRenderer(none, art)(view({ set: createSet(1), t: 1 }));
+  assert.equal(drawn(none, 'strip-').length, 0, 'empty until you own a pedal');
+});
+
+test('a stomped pedal says so over the strip for a second', () => {
+  const gear = allGear();
+  const at = (time) => {
+    const g = fakeContext();
+    createRenderer(g, art)(view({ set: createSet(1), t: 1, time, gear, stomp: { id: 'delay', on: true, time: 10 } }));
+    return g.texts;
+  };
+  assert.ok(at(10.2).includes('delay on'));
+  assert.ok(!at(11.2).includes('delay on'), 'gone after a second');
+  const g = fakeContext();
+  createRenderer(g, art)(view({ screen: 'ready', time: 3, gear, stomp: { id: 'overdrive', on: false, time: 2.5 } }));
+  assert.ok(g.texts.includes('overdrive off'), 'between sets too');
+});
+
+test('the shop: the room, the stock with its tags, the chosen item lifted, the savings and the card', () => {
+  const g = fakeContext();
+  const gear = { ...freshGear(), savings: 45 };
+  buy(gear, 'overdrive');
+  const shop = { ...createShop(), at: STOCK.findIndex((s) => s.id === 'chorus') };
+  createRenderer(g, art)(view({ screen: 'shop', shop, gear, time: 5 }));
+  for (const n of ['shop-room', 'shop-counter', 'keeper-']) assert.equal(drawn(g, n).length, 1, n);
+  assert.equal(drawn(g, 'item-').length, STOCK.length);
+  assert.deepEqual(drawn(g, 'item-').filter((s) => s.name.endsWith('-1')).map((s) => s.name), ['item-chorus-1'], 'only the chosen one lifted');
+  assert.equal(drawn(g, 'tag-yours').length, 2, 'the overdrive and the acoustic are yours');
+  assert.equal(drawn(g, 'tag-price').length, STOCK.length - 2);
+  for (const s of ['back to', 'the park', 'saved', '5 coins', 'Chorus', '50 coins', 'Not enough coins yet (you have 5)']) {
+    assert.ok(g.texts.includes(s), s);
+  }
+  assert.equal(drawn(g, 'ground').length, 0, 'not the park');
+  assert.ok(!g.rects.some(([x, y, w, h, c]) => x === BUTTON[0] && y === BUTTON[1] && w === BUTTON[2] && h === BUTTON[3]), 'no button: nothing to do');
+  const lit = g.rects.filter(([x, y, w, h, c]) => w === 2 && h === 1 && c === data.colors.light).map(([x, y]) => `${x},${y}`);
+  const led = data.shop.leds.chorus;
+  assert.deepEqual(lit, [`${led[0]},${led[1] - data.shop.lift}`], "the chosen pedal's light is lit: you're hearing it");
+});
+
+test('the shop card has a button when there is something to buy or play, and the keeper nods at a sale', () => {
+  const g = fakeContext();
+  const gear = { ...freshGear(), savings: 300 };
+  const shop = { ...createShop(), at: STOCK.findIndex((s) => s.id === 'synth'), soldAt: 4.5 };
+  createRenderer(g, art)(view({ screen: 'shop', shop, gear, time: 5 }));
+  assert.ok(g.texts.includes('Enter to buy') && g.texts.includes('buy'));
+  assert.ok(g.rects.some(([x, y, w, h]) => x === BUTTON[0] && y === BUTTON[1] && w === BUTTON[2] && h === BUTTON[3]));
+  assert.match(drawn(g, 'keeper-')[0].name, /^keeper-[23]$/, 'nodding just after a sale');
+  const later = fakeContext();
+  createRenderer(later, art)(view({ screen: 'shop', shop, gear, time: 7 }));
+  assert.match(drawn(later, 'keeper-')[0].name, /^keeper-[01]$/);
+  assert.ok(later.rects.every(([x, y, w, h]) => y + h <= H && x >= 0 && x + w <= W), 'everything on the screen');
+  assert.ok(CARD[1] + CARD[3] <= H);
 });
