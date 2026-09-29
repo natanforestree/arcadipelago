@@ -524,6 +524,25 @@ test("your loop's notes are scheduled a moment ahead with the band, each once a 
     assert.deepEqual(yours(ctx).map((s) => s.t), heard.map((n) => n.at), 'each one sounds, as a plucked note');
   }));
 
+test('a stall in the frames skips the note due in the gap, and schedules nothing late or twice', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    audio.startBand(0.5);
+    const loop = loopWith(1, [...Array(16).keys()].map((i) => [i * BEAT, 60 + (i % 5), 0.2]));
+    // Frames run as usual through the first time round and partway into the second, then stall: the
+    // next frame lands about a second later, as if the tab had been backgrounded.
+    const heard = runLoop(ctx, audio, loop, 30);
+    ctx().currentTime += 1;
+    heard.push(...audio.update((from, to) => due(loop, from, to)).map((n) => ({ ...n, when: ctx().currentTime })));
+    heard.push(...runLoop(ctx, audio, loop, 0.5 + BAR + 3 * LOOP_LENGTH - 0.5));
+    assert.ok(heard.every((n) => n.at >= n.when - 1e-9), 'nothing scheduled in the past, even right after the stall');
+    const keys = heard.map((n) => `${n.at.toFixed(6)}:${n.layer}`);
+    assert.equal(new Set(keys).size, keys.length, 'nothing scheduled twice');
+    assert.ok(!heard.some((n) => Math.abs(n.at - 30.5) < 1e-6), 'the note due inside the gap is skipped, not played late');
+    assert.equal(heard.length, 31, 'the first time round in full, the second short the one note the stall swallowed');
+  }));
+
 test('a looped note is a voice of its own through your instrument and pedals: a live note on its pitch, or Space, never cuts it off', () =>
   withAudio((ctx) => {
     const audio = createAudio(memoryStorage());
@@ -564,8 +583,10 @@ test("taking off a layer stops its notes at once: those sounding let go, and tho
     audio.stopLoop(1);
     const gainOf = (osc) => downstream(osc).find((g) => g.gain?.events?.length && g.kind === 'gain');
     const cut = (pitch) => layerOf(pitch).map((o) => ctx().stopped.filter((s) => s.node === o).at(-1).t);
+    assert.ok(layerOf(64).length > 0, 'layer 2 is sounding, so this is checking something');
     assert.ok(cut(64).every((t) => t <= ctx().currentTime + VOICING.synth.release * 2 + 1e-9), 'the sounding note of layer 2 lets go now');
     assert.ok(gainOf(layerOf(67)[0]).cut, "layer 2's note still to come is cut off before it sounds");
+    assert.ok(layerOf(60).length > 0, 'layer 1 is sounding, so this is checking something');
     assert.ok(cut(60).every((t) => t >= BAR + LOOP_LENGTH + 4 - 1e-9), 'layer 1 plays on');
   }));
 
@@ -603,6 +624,17 @@ test("in the shop, the band plays its electric piano alone, softer, so you can t
     audio.startBand(5);
     const setLevel = band.gain.events.filter(([how, , t]) => how === 'set' && t === 5).at(-1)[1];
     assert.ok(tryLevel > 0 && tryLevel < setLevel * 0.7, `${tryLevel} next to ${setLevel} in a set`);
+  }));
+
+test('choosing the loop pedal in the shop, then moving straight on: the tried chord never sounds', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    audio.tryBand(0.1); // scheduled a moment ahead, as main.js does when you choose it
+    audio.stopBand(); // moving on before that moment, as a held arrow can
+    const band = ctx().busGain('keys').outs[0];
+    const last = [...band.gain.events].sort((a, b) => a[2] - b[2]).at(-1);
+    assert.deepEqual([last[0], last[1]], ['target', 0], "the fade to nothing is last, not the try's leftover");
   }));
 
 test("a safety before the speakers leaves the game's sound as it was, and rounds off what a loop stacks on top", () =>

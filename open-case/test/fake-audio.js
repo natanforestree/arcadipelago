@@ -21,7 +21,9 @@ function param(value = 0) {
       this.value = v;
       this.events.push(['target', v, t, tc]);
     },
-    cancelScheduledValues() {},
+    cancelScheduledValues(t) {
+      this.events = this.events.filter(([, , time]) => time < t);
+    },
   };
 }
 

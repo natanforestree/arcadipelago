@@ -654,7 +654,9 @@ export function createAudio(storage) {
   function stopBand() {
     loopAt = -1;
     if (!ctx) return;
-    band.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+    const at = ctx.currentTime;
+    band.gain.cancelScheduledValues(at); // drop a shop try's chord that hadn't started yet
+    band.gain.setTargetAtTime(0, at, 0.05);
     stopLoop();
   }
 
