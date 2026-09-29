@@ -35,6 +35,10 @@ const STRIP_STEP = 16; // ...and the next one's, this far to the right (each ped
 const LOOP_SLOT = PEDALS.length; // the loop pedal's place on the gear strip, after the pedals
 const LOOP_FAINT = 0.45; // your loop's note glyphs, this faint next to your own
 const STOMP_SHOW = 1; // seconds a stomped pedal's name (or the loop pedal's news) shows over the strip
+const CUE_DIGIT_TOP = 151; // the count-in's big digit: top-aligned, so it clears the strip's icons at 170
+const CUE_CELL_W = 5, CUE_CELL_H = 3, CUE_CELL_GAP = 1; // the recording cue's four bar cells
+const CUE_TEXT_GAP = 3; // between "rec" and its first cell
+const CUE_CELL_Y = 163; // roughly the middle of "rec"'s 8px row (top at 160)
 const NOD_SHOW = 1.2; // seconds the shopkeeper nods after a sale...
 const NOD_FPS = 4; // ...this many nods a second
 
@@ -75,11 +79,30 @@ export function loopLight(loop, t) {
   return { recording: 'red', playing: 'green' }[state] ?? 'dark';
 }
 
-// The words for the loop pedal's news over the strip. what: 'recording' (layer: the layer it's about
-// to record, from 1), 'full', 'cancelled', 'removed' or 'cleared'.
+// The words for the loop pedal's news over the strip. what: 'layer' (layer: the layer that just
+// landed, from 1), 'full', 'cancelled', 'removed' or 'cleared'.
 export function loopWords({ what, layer }) {
-  if (what === 'recording') return layer === 1 ? 'loop recording' : `layer ${layer}`;
+  if (what === 'layer') return `layer ${layer}`;
   return { full: 'loop full', cancelled: 'recording cancelled', removed: 'layer removed', cleared: 'loop cleared' }[what];
+}
+
+// What the loop's slot counts at band time t, in the news's place, while there's no news to show:
+// null with no loop or no take; while waiting for the bar line (t < take.from), { count } (4 down to
+// 1, one for each beat of the bar t falls in, so it follows the clock wherever R joined the count);
+// while recording, elapsed e = t - take.from (0 <= e < LOOP_LENGTH): on the last bar's beats 2-4,
+// { count, closing: true } (3, 2, 1, so you know when it closes); otherwise { bars: e / BAR } (0 up to
+// just under LOOP.bars, fractional).
+export function loopCue(loop, t) {
+  const take = loop?.take;
+  if (!take) return null;
+  if (t < take.from) {
+    const beat = Math.max(0, Math.min(3, Math.floor((t - Math.floor(t / BAR) * BAR) / BEAT)));
+    return { count: 4 - beat };
+  }
+  const e = t - take.from;
+  const lastBarFrom = (LOOP.bars - 1) * BAR;
+  if (e >= lastBarFrom + BEAT) return { count: 4 - Math.floor((e - lastBarFrom) / BEAT), closing: true };
+  return { bars: e / BAR };
 }
 
 // The trees: still when motion is reduced, rustling just after each bar line of a set, and otherwise
@@ -276,19 +299,55 @@ export function createRenderer(g, art) {
       }
     }
     // What you just did shows over the strip for a moment: the pedal stomped, or the loop pedal's
-    // news, whichever is newer.
+    // news, whichever is newer; failing that, the loop's own count-in or recording cue takes the same
+    // spot, so you always know where the loop pedal stands.
     const news = [];
     if (stomp) {
       news.push({
         time: stomp.time, x: STRIP_X + PEDALS.indexOf(stomp.id) * STRIP_STEP + 7,
-        words: `${stockItem(stomp.id).name.toLowerCase()} ${stomp.on ? 'on' : 'off'}`, good: stomp.on,
+        words: `${stockItem(stomp.id).name.toLowerCase()} ${stomp.on ? 'on' : 'off'}`, color: stomp.on ? C.gold : C.light,
       });
     }
-    if (loopSaid) news.push({ time: loopSaid.time, x: STRIP_X + LOOP_SLOT * STRIP_STEP + 7, words: loopWords(loopSaid), good: loopSaid.what === 'recording' });
+    if (loopSaid) {
+      news.push({
+        time: loopSaid.time, x: STRIP_X + LOOP_SLOT * STRIP_STEP + 7, words: loopWords(loopSaid),
+        color: loopSaid.what === 'layer' ? C.go : C.light,
+      });
+    }
     const shown = news.filter((n) => time - n.time >= 0 && time - n.time < STOMP_SHOW).sort((a, b) => b.time - a.time)[0];
     if (shown) {
       text(shown.words, shown.x + 1, 161, C.ink, 'center');
-      text(shown.words, shown.x, 160, shown.good ? C.gold : C.light, 'center');
+      text(shown.words, shown.x, 160, shown.color, 'center');
+    } else {
+      cue(loopCue(loop, t), STRIP_X + LOOP_SLOT * STRIP_STEP + 7);
+    }
+  }
+
+  // Draws the loop's count-in or recording cue, centred on the loop slot at x, where the news goes.
+  function cue(what, x) {
+    if (!what) return;
+    if (what.bars === undefined) {
+      g.font = '16px Silkscreen, monospace';
+      g.textAlign = 'center';
+      g.textBaseline = 'top';
+      g.fillStyle = C.ink;
+      g.fillText(String(what.count), Math.round(x) + 1, CUE_DIGIT_TOP + 1);
+      g.fillStyle = what.closing ? C.red : C.gold;
+      g.fillText(String(what.count), Math.round(x), CUE_DIGIT_TOP);
+      return;
+    }
+    g.font = FONT;
+    const w = g.measureText('rec').width;
+    const cellsW = LOOP.bars * CUE_CELL_W + (LOOP.bars - 1) * CUE_CELL_GAP;
+    const left = x - (w + CUE_TEXT_GAP + cellsW) / 2;
+    text('rec', left + 1, 161, C.ink);
+    text('rec', left, 160, C.red);
+    const bar = Math.floor(what.bars);
+    for (let i = 0; i < LOOP.bars; i++) {
+      const cx = left + w + CUE_TEXT_GAP + i * (CUE_CELL_W + CUE_CELL_GAP);
+      px(cx, CUE_CELL_Y, CUE_CELL_W, CUE_CELL_H, C.greyDark);
+      const fill = i < bar ? CUE_CELL_W : i === bar ? Math.round(CUE_CELL_W * (what.bars - bar)) : 0;
+      if (fill > 0) px(cx, CUE_CELL_Y, fill, CUE_CELL_H, C.red);
     }
   }
 
@@ -391,7 +450,9 @@ export function createRenderer(g, art) {
   //   opened), still (reduced motion), flocks (the birds, from createFlocks), gear (gear.js),
   //   stomp: null | { id, on, time } (the last pedal stomped, and when, on the page's clock),
   //   loop: null | the loop pedal's loop (looper.js) in the set, or in the shop while you try it,
-  //   loopSaid: null | { what, layer, time } (the loop pedal's last news, and when: see loopWords),
+  //   loopSaid: null | { what: 'layer' | 'full' | 'cancelled' | 'removed' | 'cleared', layer, time }
+  //     (the loop pedal's last news, and when: see loopWords; with none showing, loopCue takes its
+  //     place over the strip: the count-in, or the recording's progress),
   //   shop: the shop's state (shop.js) on the shop screen, debug: null | { reported, measured } }
   return function draw(view) {
     const { screen, set, scene, keys, t, time } = view;

@@ -1,17 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createRenderer, shapeTags, personFrame, youFrame, treeFrame, loopLight, loopWords, W, H } from '../src/render.js';
+import { createRenderer, shapeTags, personFrame, youFrame, treeFrame, loopLight, loopWords, loopCue, W, H } from '../src/render.js';
 import { createSet, runSet } from '../src/set.js';
 import { createScene, createFlocks, sceneNote, sceneLoopNote, CASE, PIGEONS, LOOP_PEDAL } from '../src/scene.js';
 import { createKeyState } from '../src/keys.js';
 import { goodSet } from '../src/bots.js';
 import { KINDS } from '../src/crowd.js';
 import { BAR, BEAT } from '../src/groove.js';
-import { INTEREST } from '../src/tuning.js';
+import { INTEREST, LOOP } from '../src/tuning.js';
 import { STOCK, PEDALS, INSTRUMENTS, freshGear, buy, stomp } from '../src/gear.js';
 import { createShop, choose, CARD, BUTTON } from '../src/shop.js';
-import { createLoop, record, step } from '../src/looper.js';
+import { createLoop, record, step, LOOP_LENGTH } from '../src/looper.js';
 import { stoodAt } from './helpers.js';
 
 // The real frame data, with a stand-in for the sheet's image.
@@ -35,7 +35,7 @@ function fakeContext() {
     },
     fillText(s, x, y) {
       texts.push(s);
-      positions.push({ s, x, y, align: this.textAlign });
+      positions.push({ s, x, y, align: this.textAlign, color: this.fillStyle });
     },
     measureText(s) {
       return { width: s.length * 6 };
@@ -116,7 +116,7 @@ test('every frame the renderer asks for is in the sheet, over a whole set, with 
     const gear = allGear(INSTRUMENTS[Math.floor(t) % INSTRUMENTS.length]);
     const stomped = { id: PEDALS[Math.floor(t) % PEDALS.length], on: t % 2 < 1, time: t * 1.3 - 0.5 };
     const loop = [null, createLoop(), loopOf(2), loopOf(1, t - 1), loopOf(3)][Math.floor(t) % 5]; // empty, waiting or recording, playing
-    const loopSaid = { what: ['recording', 'full', 'cancelled', 'removed', 'cleared'][Math.floor(t / 2) % 5], layer: 1 + (Math.floor(t) % 3), time: t * 1.3 - 0.2 };
+    const loopSaid = { what: ['layer', 'full', 'cancelled', 'removed', 'cleared'][Math.floor(t / 2) % 5], layer: 1 + (Math.floor(t) % 3), time: t * 1.3 - 0.2 };
     if (t % 1 < 0.37) sceneLoopNote(scene, 55 + (Math.floor(t) % 20), t + 0.1);
     for (const still of [false, true]) draw(view({ set, scene, t, bars: t / BAR, time: t * 1.3 - 0.01, still, flocks, gear, stomp: stomped, loop, loopSaid }));
   }
@@ -429,23 +429,133 @@ test("the strip's loop slot: its key, and a dot per layer it can hold, lit for e
   assert.equal(drawn(none, 'strip-loop').length, 0, 'not yours yet');
 });
 
-test("the loop pedal's news shows over its slot for a second, the newer over a stomp", () => {
+test("the loop pedal's news shows over its slot for a second, the newer over a stomp; a landed layer is green, a stomp gold or light", () => {
   assert.deepEqual(
-    [{ what: 'recording', layer: 1 }, { what: 'recording', layer: 2 }, { what: 'full' }, { what: 'cancelled' }, { what: 'removed' }, { what: 'cleared' }].map(loopWords),
-    ['loop recording', 'layer 2', 'loop full', 'recording cancelled', 'layer removed', 'loop cleared'],
+    [{ what: 'layer', layer: 1 }, { what: 'layer', layer: 2 }, { what: 'full' }, { what: 'cancelled' }, { what: 'removed' }, { what: 'cleared' }].map(loopWords),
+    ['layer 1', 'layer 2', 'loop full', 'recording cancelled', 'layer removed', 'loop cleared'],
   );
   const gear = allGear();
-  const at = (time, stomp) => {
+  const at = (time, stomp, said = { what: 'layer', layer: 2, time: 10 }) => {
     const g = fakeContext();
-    createRenderer(g, art)(view({ set: createSet(1), t: 1, time, gear, stomp, loopSaid: { what: 'recording', layer: 2, time: 10 } }));
-    return g.texts;
+    createRenderer(g, art)(view({ set: createSet(1), t: 1, time, gear, stomp, loopSaid: said }));
+    return g;
   };
-  assert.ok(at(10.5).includes('layer 2'));
-  assert.ok(!at(11.2).includes('layer 2'), 'gone after a second');
+  const shownIn = (g, s) => g.positions.find((p) => p.s === s && p.color !== data.colors.ink); // skip the ink shadow
+  assert.ok(at(10.5).texts.includes('layer 2'));
+  assert.ok(!at(11.2).texts.includes('layer 2'), 'gone after a second');
+  assert.equal(shownIn(at(10.5), 'layer 2').color, data.colors.go, "a landed layer's news is green");
+  assert.equal(shownIn(at(10.5, null, { what: 'full', time: 10 }), 'loop full').color, data.colors.light, "the loop's other news is plain");
+  assert.equal(shownIn(at(10.3, { id: 'delay', on: true, time: 10.3 }), 'delay on').color, data.colors.gold, 'a stomp on is gold');
+  assert.equal(shownIn(at(10.3, { id: 'delay', on: false, time: 10.3 }), 'delay off').color, data.colors.light, 'a stomp off is plain');
   const newer = at(10.5, { id: 'delay', on: true, time: 10.3 });
-  assert.ok(newer.includes('delay on') && !newer.includes('layer 2'), 'one at a time: the stomp came after');
+  assert.ok(newer.texts.includes('delay on') && !newer.texts.includes('layer 2'), 'one at a time: the stomp came after');
   const older = at(10.5, { id: 'delay', on: true, time: 9.8 });
-  assert.ok(older.includes('layer 2') && !older.includes('delay on'));
+  assert.ok(older.texts.includes('layer 2') && !older.texts.includes('delay on'));
+});
+
+test('loopCue is null with no loop, no take waiting or under way, or once the layer has landed', () => {
+  assert.equal(loopCue(null, 1), null);
+  assert.equal(loopCue(createLoop(), 1), null, 'no take');
+  const loop = createLoop();
+  record(loop, 0);
+  step(loop, loop.take.from + LOOP_LENGTH);
+  assert.equal(loopCue(loop, 1000), null, 'the layer landed; nothing left to count or record');
+});
+
+test('loopCue counts down while a recording waits: 4 on the bar\'s first beat, then 3, 2, 1, wherever R joined it', () => {
+  const loop = createLoop();
+  record(loop, 10 * BAR + 0.01); // just after bar line 10: arms from bar 11
+  assert.deepEqual(loopCue(loop, 10 * BAR + 0.01), { count: 4 });
+  assert.deepEqual(loopCue(loop, 10 * BAR + BEAT + 0.01), { count: 3 });
+  assert.deepEqual(loopCue(loop, 10 * BAR + 2 * BEAT + 0.01), { count: 2 });
+  assert.deepEqual(loopCue(loop, 10 * BAR + 3 * BEAT + 0.01), { count: 1 }, 'pressed or not, the count follows the clock');
+});
+
+test('loopCue reports elapsed bars while recording, fractional', () => {
+  const loop = createLoop();
+  record(loop, 0); // from = BAR
+  const half = loopCue(loop, BAR + 0.5 * BAR);
+  assert.deepEqual(Object.keys(half), ['bars']);
+  assert.ok(Math.abs(half.bars - 0.5) < 1e-9);
+  const most = loopCue(loop, BAR + 3.2 * BAR);
+  assert.deepEqual(Object.keys(most), ['bars'], "still short of the last bar's closing beats");
+  assert.ok(Math.abs(most.bars - 3.2) < 1e-9);
+});
+
+test("loopCue counts down 3, 2, 1 over the last bar's beats 2-4, exactly at the boundaries", () => {
+  const loop = createLoop();
+  record(loop, 0);
+  const from = loop.take.from;
+  assert.deepEqual(loopCue(loop, from + (LOOP.bars - 1) * BAR + BEAT - 1e-6), { bars: ((LOOP.bars - 1) * BAR + BEAT - 1e-6) / BAR }, 'a hair before: still just the bars');
+  assert.deepEqual(loopCue(loop, from + (LOOP.bars - 1) * BAR + BEAT), { count: 3, closing: true });
+  assert.deepEqual(loopCue(loop, from + (LOOP.bars - 1) * BAR + 2 * BEAT), { count: 2, closing: true });
+  assert.deepEqual(loopCue(loop, from + (LOOP.bars - 1) * BAR + 3 * BEAT), { count: 1, closing: true });
+});
+
+test('the count-in digit draws big and centred over the loop slot, gold counting in and red closing, clear of the strip', () => {
+  const gear = allGear();
+  const draw = (loop, t) => {
+    const g = fakeContext();
+    createRenderer(g, art)(view({ set: createSet(1), t, time: 1, gear, loop }));
+    return g;
+  };
+  const waiting = createLoop();
+  record(waiting, 10 * BAR + 0.01);
+  const g1 = draw(waiting, 10 * BAR + 0.01);
+  const digit = g1.positions.find((p) => p.s === '4' && p.color === data.colors.gold);
+  assert.ok(digit, 'counting in, gold');
+  assert.equal(digit.align, 'center');
+  assert.equal(digit.y, 151);
+  assert.ok(digit.y + 16 <= 170, 'clears the strip');
+  const shadow = g1.positions.find((p) => p.s === '4' && p.color === data.colors.ink);
+  assert.deepEqual([shadow.x - digit.x, shadow.y - digit.y], [1, 1], 'a 1px shadow, like the news');
+  const closing = createLoop();
+  record(closing, 0);
+  const g2 = draw(closing, closing.take.from + (LOOP.bars - 1) * BAR + BEAT);
+  assert.ok(g2.positions.find((p) => p.s === '3' && p.color === data.colors.red), 'closing, red');
+});
+
+test("the recording cue: 'rec' then a cell per bar, empty grey, filled red, the current one filling by its fraction", () => {
+  const gear = allGear();
+  const draw = (loop, t) => {
+    const g = fakeContext();
+    createRenderer(g, art)(view({ set: createSet(1), t, time: 1, gear, loop }));
+    return g;
+  };
+  const loop = createLoop();
+  record(loop, 0); // from = BAR
+  const g = draw(loop, BAR + 1.5 * BAR); // bar 0 done, bar 1 half full
+  assert.ok(g.texts.includes('rec'));
+  assert.equal(g.positions.find((p) => p.s === 'rec' && p.color === data.colors.red).y, 160);
+  const backgrounds = g.rects.filter(([, , w, h, c]) => w === 5 && h === 3 && c === data.colors.greyDark);
+  assert.equal(backgrounds.length, LOOP.bars, 'a background cell for every bar');
+  const xs = backgrounds.map(([x]) => x).sort((a, b) => a - b);
+  for (let i = 1; i < xs.length; i++) assert.ok(Math.abs(xs[i] - xs[i - 1] - 6) < 1, 'evenly spaced, a 1px gap between 5px cells');
+  const reds = g.rects.filter(([x, , , h, c]) => h === 3 && c === data.colors.red && xs.includes(x));
+  assert.equal(reds.length, 2, 'bar 0 full, bar 1 partly, bars 2 and 3 not started');
+  assert.equal(reds.find((r) => r[0] === xs[0])[2], 5, 'the done bar fills all the way');
+  assert.equal(reds.find((r) => r[0] === xs[1])[2], Math.round(5 * 0.5), "the current bar fills by its fraction, from the left");
+});
+
+test("the loop's count-in and recording cue show in the news's place, but a stomp or the loop's own news hides them", () => {
+  const gear = allGear();
+  const draw = (loop, t, over = {}) => {
+    const g = fakeContext();
+    createRenderer(g, art)(view({ set: createSet(1), t, time: 1, gear, loop, ...over }));
+    return g;
+  };
+  // '4' and 'rec' alone aren't safe to look for: the gear strip's own pedal keys include digits, so
+  // check the cue's own spot (the digit's row, y 151, or "rec" at y 160) instead.
+  const digitShown = (g) => g.positions.some((p) => p.y === 151);
+  const recShown = (g) => g.positions.some((p) => p.s === 'rec' && p.y === 160);
+  const waiting = createLoop();
+  record(waiting, 10 * BAR + 0.01);
+  assert.ok(digitShown(draw(waiting, 10 * BAR + 0.01)), 'the count shows with no news up');
+  assert.ok(!digitShown(draw(waiting, 10 * BAR + 0.01, { stomp: { id: 'delay', on: true, time: 0.5 } })), "a stomp's news hides it");
+  const recording = createLoop();
+  record(recording, 0);
+  assert.ok(recShown(draw(recording, BAR + 0.5 * BAR)), 'the recording cue shows with no news up');
+  assert.ok(!recShown(draw(recording, BAR + 0.5 * BAR, { loopSaid: { what: 'full', time: 0.5 } })), "the loop's own news hides it too");
 });
 
 test("your loop's notes rise faintly from the loop pedal as each plays, not before, and fade", () => {
