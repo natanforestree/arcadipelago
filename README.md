@@ -1,6 +1,6 @@
-# Games
+# Arcadipelago
 
-Little browser games, hosted on GitHub Pages at https://natanforestree.github.io/games/
+Little browser games, each on its own floating island, hosted on GitHub Pages at https://natanforestree.github.io/arcadipelago/
 
 ## Adding a game
 

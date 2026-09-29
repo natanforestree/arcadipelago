@@ -4,7 +4,7 @@ import { PHASES, weights, dominant } from './sky.js';
 import { bob, liftAt, frameAt, drift, twinkles, twinkleFrame, birdAt, shootingStarAt, LIFT, CLOUD_SPEEDS } from './motion.js';
 import { SIGN, layoutSign, placeSign } from './sign.js';
 
-export const TITLE = 'Games';
+export const TITLE = 'Arcadipelago';
 export const SUBTITLE = "Little things I've built.";
 const SUBTITLE_DY = 20; // the subtitle's top, below the title's
 
