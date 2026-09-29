@@ -170,7 +170,7 @@ The plan's prototype settled a few things this spec left open:
   - one hard four-note chord, clean, already peaks at −2.7 dB;
   - three layers of it, landing on the same beat you play it live, peaked at +9.3 dB.
 
-  The safety passes everything below about −3 dB untouched, so the game's mix measured the same with it, and it rounds louder peaks off smoothly. It isn't oversampled, so it adds no delay to any note, live or looped. That worst case, with the loop at 80%, now peaks at −0.2 dB even at full volume.
+  The safety passes everything below about −3 dB untouched, so the game's mix measured the same with it, and it rounds louder peaks off smoothly. It isn't oversampled, so it adds no delay to any note, live or looped. That worst case, with the loop at 80%, now peaks at −0.4 dB even at full volume.
 
 ## Not in this change
 
