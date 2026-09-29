@@ -9,6 +9,8 @@ import { readPng } from './png.js';
 import { KINDS, PATH_Y } from '../src/crowd.js';
 import { CROWD } from '../src/tuning.js';
 import { CASE } from '../src/scene.js';
+import { STOCK, PEDALS, INSTRUMENTS } from '../src/gear.js';
+import { CARD } from '../src/shop.js';
 
 const file = (f) => new URL(`../${f}`, import.meta.url);
 const data = JSON.parse(readFileSync(file('assets/sprites.json'), 'utf8'));
@@ -22,7 +24,11 @@ const FAMILIES = [
   ['sun', 1], ['ground', 1], ['pool', 1], ['case', 1], ['case-coin', 1],
   [/^roofs-back-\d$/, 5], [/^roofs-front-\d$/, 5], [/^train-\d$/, 5], [/^trees-\d$/, 3], [/^lamp-(off|on|flicker)$/, 3],
   [/^cloud-\d+-\d$/, data.clouds.length * 5],
-  [/^you-idle-\d$/, 2], [/^you-strum-\d$/, 3], [/^coin-\d$/, 2], [/^looper-\d$/, 2], [/^bird-\d$/, 2],
+  [/^coin-\d$/, 2], [/^looper-\d$/, 2], [/^bird-\d$/, 2],
+  ...INSTRUMENTS.flatMap((id) => [[new RegExp(`^you-${id}-idle-\\d$`), 2], [new RegExp(`^you-${id}-play-\\d$`), 3]]),
+  ...PEDALS.flatMap((id) => [[new RegExp(`^pedal-${id}-\\d$`), 2], [new RegExp(`^strip-${id}-\\d$`), 2]]),
+  ['amp', 1], ['shop-room', 1], ['shop-counter', 1], [/^keeper-\d$/, 4], ['tag-price', 1], ['tag-yours', 1],
+  ...STOCK.map((item) => [new RegExp(`^item-${item.id}-\\d$`), 2]),
   ...KINDS.flatMap((k) => ['left', 'right'].flatMap((d) => [
     [new RegExp(`^${k}-walk-\\d-${d}$`), 4], [new RegExp(`^${k}-stand-\\d-${d}$`), 2], [new RegExp(`^${k}-nod-\\d-${d}$`), 2],
   ])),
@@ -94,8 +100,10 @@ const opaqueAt = (name, x, y, sx, sy) => {
 };
 
 test('the art sits round the positions the rules use', () => {
-  const [left, , right] = cover('you-idle-0', 0, 0);
-  assert.ok(left < CROWD.playerX && CROWD.playerX < right, 'you sit at CROWD.playerX');
+  for (const id of INSTRUMENTS) {
+    const [left, , right] = cover(`you-${id}-idle-0`, 0, 0);
+    assert.ok(left < CROWD.playerX && CROWD.playerX < right, `you sit at CROWD.playerX with the ${id}`);
+  }
   assert.ok(opaqueAt('case', 0, 0, CASE[0], CASE[1]), 'coins land inside the open case');
   for (const [sx, sy] of CROWD.spots) {
     for (const k of KINDS) {
@@ -109,4 +117,41 @@ test('the art sits round the positions the rules use', () => {
     }
   }
   assert.ok(data.feet.you > PATH_Y, 'passers-by walk behind you');
+});
+
+test('your pedals stand in front of the crate, clear of the case and of every listener', () => {
+  const pedals = PEDALS.map((id) => `pedal-${id}-1`);
+  const [, , , bottom] = cover('you-acoustic-idle-0', 0, 0);
+  for (const name of pedals) {
+    const [l, t, r, b] = cover(name, 0, 0);
+    assert.ok(t >= data.feet.you && b <= 170, `${name} is on the ground in front of you, above the strip`);
+    for (let y = t; y < b; y++) {
+      for (let x = l; x < r; x++) {
+        if (!opaqueAt(name, 0, 0, x, y)) continue;
+        assert.ok(!opaqueAt('case', 0, 0, x, y), `${name} clear of the case`);
+        for (const [sx, sy] of CROWD.spots) {
+          for (const k of KINDS) assert.ok(!opaqueAt(`${k}-stand-0-${sx < CROWD.playerX ? 'right' : 'left'}`, sx, sy, x, y), `${name} clear of a ${k} at ${sx},${sy}`);
+        }
+      }
+    }
+  }
+  assert.ok(bottom <= data.feet.pedals);
+});
+
+test("the shop's stock stands apart, above the card, and the door and its sign are inside the screen", () => {
+  const boxes = STOCK.map((item) => [item.id, data.shop.items[item.id]]);
+  for (const [id, [x, y, w, h]] of boxes) {
+    assert.ok(x >= 0 && y - data.shop.lift - 8 >= 0 && x + w <= 320 && y + h <= CARD[1], `${id} above the card, with room for its pointer`);
+  }
+  for (const [a, [ax, ay, aw, ah]] of boxes) {
+    for (const [b, [bx, by, bw, bh]] of boxes) {
+      if (a < b) assert.ok(ax + aw <= bx || bx + bw <= ax || ay + ah <= by || by + bh <= ay, `${a} and ${b} don't overlap`);
+    }
+  }
+  const [dx, dy, dw, dh] = data.shop.door;
+  assert.ok(dx >= 0 && dy >= 0 && dx + dw <= 320 && dy + dh <= CARD[1]);
+  for (const id of PEDALS) {
+    const [lx, ly] = data.shop.leds[id], [x, y, w, h] = data.shop.items[id];
+    assert.ok(lx >= x && lx + 2 <= x + w && ly >= y && ly < y + h, `${id}'s light is on the pedal`);
+  }
 });

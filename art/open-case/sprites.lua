@@ -17,12 +17,19 @@
 --   stars      [[x, y], ...]: where the stars come out
 --   trainY     the distant train's bottom row
 --   caseCoins  [[x, y], ...]: where the coins in the case lie, in the order they land
---   feet       { you, looper, case }: the row where each meets the ground, to sort them among the people
+--   feet       { you, looper, case, amp, pedals }: the row where each meets the ground, to sort them
+--              among the people
+--   shop       the music shop's layout: items { id: [x, y, w, h] } (each item's box as it stands, for
+--              clicks and its tag), leds { id: [x, y] } (each rack pedal's 2x1 light), door [x, y, w, h]
+--              (the door and its sign, a click leaves), sign and board [x, y] (the middle of the top of
+--              the words on the sign and on the chalkboard), lift (pixels a chosen item rises)
 --   colors     the named colours the game draws with in code
 --   palette    every colour in the sheet (at most 64)
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.-)[^/]+$") or ""
 local D = dofile(here .. "draw.lua")
 local F = dofile(here .. "figures.lua")
+local G = dofile(here .. "gear.lua")
+local S = dofile(here .. "shop.lua")
 local L, C = D.L, D.C
 local W, H = D.W, D.H
 local STAGES = D.stages()
@@ -56,10 +63,22 @@ screen("ground", D.ground)
 screen("pool", function(b) D.path(b, true) end)
 for _, state in ipairs({ "off", "on", "flicker" }) do screen("lamp-" .. state, function(b) D.lamp(b, state) end) end
 
--- You and your things
-screen("you-idle-0", function(b) D.you(b, 0, 0) end)
-screen("you-idle-1", function(b) D.you(b, 1, 0) end)
-for f, strum in ipairs({ -2, 0, 2 }) do screen("you-strum-" .. (f - 1), function(b) D.you(b, 0, strum) end) end
+-- You and your things: you playing each instrument (a guitar's picking hand -2, 0 and 2; a keyboard's
+-- left hand, both, then the right), your pedals on the ground, the amp and the gear strip's icons
+for _, id in ipairs(G.INSTRUMENTS) do
+  local keys = G.KEYBOARDS[id]
+  for f = 0, 1 do screen(("you-%s-idle-%d"):format(id, f), function(b) G.you(b, id, f, nil) end) end
+  for f, play in ipairs(keys and { 0, 1, 2 } or { -2, 0, 2 }) do
+    screen(("you-%s-play-%d"):format(id, f - 1), function(b) G.you(b, id, 0, play) end)
+  end
+end
+for _, id in ipairs(G.PEDALS) do
+  for f = 0, 1 do
+    screen(("pedal-%s-%d"):format(id, f), function(b) G.pedal(b, id, f == 1) end)
+    add(("strip-%s-%d"):format(id, f), 7, 8, 0, 0, function(b) G.stripIcon(b, id, f == 1) end)
+  end
+end
+screen("amp", G.amp)
 screen("looper-0", function(b) D.looper(b, false) end)
 screen("looper-1", function(b) D.looper(b, true) end)
 screen("case", D.openCase)
@@ -91,6 +110,18 @@ for _, pose in ipairs({ "peck", "walk", "fly" }) do
   end
 end
 for f = 0, 1 do add("bird-" .. f, 7, 3, 3, 1, function(b) F.bird(b, f, 3, 1) end) end
+
+-- The music shop: the room, the counter (drawn over the shopkeeper), the shopkeeper breathing (0, 1)
+-- and nodding at a sale (2, 3), the stock as it stands and chosen, and the tags
+local STOCK = { "overdrive", "chorus", "tremolo", "delay", "reverb", "acoustic", "ukulele", "electric", "epiano", "synth" }
+screen("shop-room", S.room)
+screen("shop-counter", S.counter)
+for f = 0, 3 do screen("keeper-" .. f, function(b) S.keeper(b, f) end) end
+for _, id in ipairs(STOCK) do
+  for f = 0, 1 do screen(("item-%s-%d"):format(id, f), function(b) S.item(b, id, f == 1) end) end
+end
+add("tag-price", 5, 3, 0, 0, function(b) S.tag(b, false) end)
+add("tag-yours", 5, 3, 0, 0, function(b) S.tag(b, true) end)
 
 -------------------------------------------------------------------------------------------------
 -- Every colour drawn is in the flat palette, which stays within 64 colours.
@@ -192,7 +223,27 @@ local json = table.concat({
   '  "stars": ' .. list(stars, pair) .. ",",
   ('  "trainY": %d,'):format(D.TRAIN_Y),
   '  "caseCoins": ' .. list(D.caseCoinSpots(60), pair) .. ",",
-  ('  "feet": { "you": %d, "looper": %d, "case": %d },'):format(141 + D.YOU[2], D.LOOPER[2] + 6, D.CASE[2] + 9),
+  ('  "feet": { "you": %d, "looper": %d, "case": %d, "amp": %d, "pedals": %d },'):format(
+    141 + D.YOU[2], D.LOOPER[2] + 6, D.CASE[2] + 9, G.AMP[2] + 13, G.PEDAL_ROW[2] + 5),
+  '  "shop": {',
+  '    "items": { ' .. table.concat((function()
+    local out = {}
+    for i, id in ipairs(STOCK) do
+      local box = S.box(id)
+      out[i] = ('"%s": [%d, %d, %d, %d]'):format(id, box[1], box[2], box[3], box[4])
+    end
+    return out
+  end)(), ", ") .. " },",
+  '    "leds": { ' .. table.concat((function()
+    local out = {}
+    for i, id in ipairs(G.PEDALS) do out[i] = ('"%s": %s'):format(id, pair(S.led(id))) end
+    return out
+  end)(), ", ") .. " },",
+  ('    "door": [%d, %d, %d, %d],'):format(S.SIGN[1], S.SIGN[2], S.SIGN[3] - S.SIGN[1] + 1, S.DOOR[4] - S.SIGN[2] + 1),
+  ('    "sign": [%d, %d],'):format((S.SIGN[1] + S.SIGN[3]) // 2, S.SIGN[2] + 3),
+  ('    "board": [%d, %d],'):format((S.BOARD[1] + S.BOARD[3]) // 2, S.BOARD[2] + 6),
+  ('    "lift": %d'):format(S.LIFT),
+  "  },",
   '  "colors": {',
   table.concat(colors, ",\n"),
   "  },",

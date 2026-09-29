@@ -46,11 +46,12 @@ export function personFrame(p, t, time) {
   return `${p.kind}-stand-${frameOf(time / BREATH + p.id * 0.37, 2)}-${face}`;
 }
 
-// You: strumming for a moment after each note, and otherwise breathing.
-export function youFrame(scene, t, time) {
+// You with your instrument: playing for a moment after each note (a guitar's strum, a keyboard's
+// hands), and otherwise breathing.
+export function youFrame(scene, t, time, instrument) {
   const since = t - scene.lastNote;
-  if (since >= 0 && since < STRUM) return `you-strum-${Math.min(2, Math.floor((since / STRUM) * 3))}`;
-  return `you-idle-${frameOf(time / BREATH, 2)}`;
+  if (since >= 0 && since < STRUM) return `you-${instrument}-play-${Math.min(2, Math.floor((since / STRUM) * 3))}`;
+  return `you-${instrument}-idle-${frameOf(time / BREATH, 2)}`;
 }
 
 // The trees: still when motion is reduced, rustling just after each bar line of a set, and otherwise
@@ -120,7 +121,7 @@ export function createRenderer(g, art) {
   function figures({ set, scene, t, time }) {
     const beatPhase = set && t >= 0 ? (t % BAR) / BAR : 1;
     const things = [
-      { y: data.feet.you, draw: () => sprite(youFrame(scene, t, time), 0, 0) },
+      { y: data.feet.you, draw: () => sprite(youFrame(scene, t, time, 'acoustic'), 0, 0) },
       { y: data.feet.looper, draw: () => sprite(`looper-${beatPhase < 0.25 ? 1 : 0}`, 0, 0) },
       {
         y: data.feet.case,

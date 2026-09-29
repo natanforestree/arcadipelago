@@ -73,7 +73,9 @@ local PX = {
   c = C.coat[2], C = C.coat[1],
   b = C.brown[2], B = C.brown[1],
   u = C.blue[2], U = C.blue[1],
-  l = C.leaf[3], e = C.leaf[2], o = C.go,
+  l = C.leaf[3], e = C.leaf[2], E = C.leaf[1], o = C.go,
+  v = C.sky[4], V = C.sky[3], -- the reverb pedal's violet
+  n = C.path[2], N = C.path[1],
 }
 D.PX = PX
 
@@ -256,16 +258,27 @@ local function crate(b, dx, dy)
   rect(b, 138 + dx, 129 + dy, 145 + dx, 130 + dy, C.wood[1]) -- the hand-hold
 end
 
--- You on your crate. breath: 1 lowers your head a pixel (the idle's second frame). strum: the picking
--- hand's height, -2 (above the strings) to 2 (through them), 0 at rest.
-function D.you(b, breath, strum, dx, dy)
-  dx, dy = dx or D.YOU[1], dy or D.YOU[2]
+-- You on your crate, without anything to play: the crate, your legs, your body and your head.
+-- breath: 1 lowers your head a pixel (the idle's second frame). gear.lua draws each instrument on it.
+function D.youBody(b, breath, dx, dy)
   local function part(p, ddy) stamp(b, p[1] + dx, p[2] + dy + (ddy or 0), p[3]) end
   crate(b, dx, dy)
   part(FAR_LEG)
   part(NEAR_LEG)
   part(TORSO)
   part(HEAD, breath or 0)
+end
+
+-- The arms and hands that hold a guitar, for gear.lua's other guitars: the fretting arm and hand, the
+-- neck's steps, and the strumming arm and hand.
+D.GUITAR_HANDS = { fretArm = FRET_ARM, fretHand = FRET_HAND, neck = NECK, strumUpper = STRUM_UPPER, strumHand = STRUM_HAND }
+
+-- You on your crate with the acoustic guitar. breath: as for D.youBody. strum: the picking hand's
+-- height, -2 (above the strings) to 2 (through them), 0 at rest.
+function D.you(b, breath, strum, dx, dy)
+  dx, dy = dx or D.YOU[1], dy or D.YOU[2]
+  local function part(p, ddy) stamp(b, p[1] + dx, p[2] + dy + (ddy or 0), p[3]) end
+  D.youBody(b, breath, dx, dy)
   part(GUITAR)
   part(FRET_ARM)
   for _, n in ipairs(NECK) do rect(b, n[1] + dx, n[3] + dy, n[2] + dx, n[3] + 1 + dy, C.ink) end

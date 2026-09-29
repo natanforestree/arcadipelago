@@ -58,7 +58,7 @@ test('the title shows the name, the key layout and how to start, over the park a
   assert.ok(g.texts.includes('Open Case'));
   assert.ok(['A', 'W', "'", 'press any key'].every((s) => g.texts.includes(s)));
   assert.ok(g.rects.some(([x, y, w]) => x === 0 && y === 0 && w === W), 'the sky behind it');
-  for (const n of ['ground', 'lamp-off', 'you-idle-', 'case', 'sun']) assert.ok(drawn(g, n).length, n);
+  for (const n of ['ground', 'lamp-off', 'you-acoustic-idle-', 'case', 'sun']) assert.ok(drawn(g, n).length, n);
   assert.equal(drawn(g, 'pool').length, 0, 'the lamp is off at dusk');
 });
 
@@ -156,14 +156,14 @@ test('listeners face you once they stop, breathe standing, and nod on the beat o
   assert.equal(steps.size, 4, 'a walker steps through four frames as they go');
 });
 
-test('you strum on each note, then go back to breathing; the trees rustle on the bar line', () => {
+test('you play your instrument on each note, then go back to breathing; the trees rustle on the bar line', () => {
   const scene = createScene(1);
-  assert.match(youFrame(scene, 5, 5), /^you-idle-\d$/);
+  assert.match(youFrame(scene, 5, 5, 'acoustic'), /^you-acoustic-idle-\d$/);
   sceneNote(scene, 60, 0, 5, 3);
-  assert.equal(youFrame(scene, 5, 5), 'you-strum-0');
-  assert.equal(youFrame(scene, 5.1, 5.1), 'you-strum-1');
-  assert.equal(youFrame(scene, 5.17, 5.17), 'you-strum-2');
-  assert.match(youFrame(scene, 5.3, 5.3), /^you-idle-\d$/);
+  assert.equal(youFrame(scene, 5, 5, 'acoustic'), 'you-acoustic-play-0');
+  assert.equal(youFrame(scene, 5.1, 5.1, 'synth'), 'you-synth-play-1');
+  assert.equal(youFrame(scene, 5.17, 5.17, 'ukulele'), 'you-ukulele-play-2');
+  assert.match(youFrame(scene, 5.3, 5.3, 'epiano'), /^you-epiano-idle-\d$/);
   assert.equal(treeFrame(3 * BAR + 0.05, 1, true, false), 2);
   assert.notEqual(treeFrame(3 * BAR + 1, 1, true, false), 2);
   assert.notEqual(treeFrame(3 * BAR + 0.05, 1, false, false), 2, 'no rustle without a set');
