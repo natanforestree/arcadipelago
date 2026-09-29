@@ -487,5 +487,19 @@ test("in the shop, the loop pedal's light shows the loop you're trying, and its 
   assert.deepEqual(light(at(6 * BAR)), [data.colors.go]);
   const g = at(6 * BAR);
   assert.ok(g.texts.includes('R records 4 bars, then loops them under you.'));
-  assert.ok(g.texts.includes('R record   backspace undo   arrows choose   esc back'));
+  assert.ok(g.texts.includes('R record   backspace undo   esc back'));
+});
+
+test("the loop pedal's key line is no longer than another item's, so it never runs under the Buy button", () => {
+  const gear = { ...freshGear(), savings: 1000 };
+  const keysFor = (id) => {
+    const shop = createShop();
+    choose(shop, STOCK.findIndex((s) => s.id === id));
+    const g = fakeContext();
+    createRenderer(g, art)(view({ screen: 'shop', shop, gear, t: 0, time: 5 }));
+    return g.texts.find((s) => s.includes('esc back'));
+  };
+  const loopKeys = keysFor('loop');
+  const otherKeys = keysFor(STOCK.find((s) => s.kind !== 'loop').id);
+  assert.ok(loopKeys.length <= otherKeys.length, `${loopKeys} (${loopKeys.length}) vs ${otherKeys} (${otherKeys.length})`);
 });

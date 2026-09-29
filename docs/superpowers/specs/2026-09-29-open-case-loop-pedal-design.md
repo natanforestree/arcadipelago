@@ -160,7 +160,7 @@ The plan's prototype settled a few things this spec left open:
   It shows one message at a time: the newer of the loop's news and a pedal stomp.
 - **While a recording waits**, the light is red for the first half of each beat.
 - **In the shop:**
-  - the card's last line, while the loop pedal is chosen, is "R record   backspace undo   arrows choose   esc back";
+  - the card's last line, while the loop pedal is chosen, is "R record   backspace undo   esc back";
   - its light on the rack shows the loop you're trying;
   - the band there is the electric piano alone, at about two thirds of its level in a set;
   - buying the pedal while you try it keeps your loop going.
@@ -170,7 +170,7 @@ The plan's prototype settled a few things this spec left open:
   - one hard four-note chord, clean, already peaks at −2.7 dB;
   - three layers of it, landing on the same beat you play it live, peaked at +9.3 dB.
 
-  The safety passes everything below about −3 dB untouched, so the game's mix measured the same with it, and it rounds louder peaks off smoothly. That worst case, with the loop at 80%, now peaks at −0.2 dB even at full volume.
+  The safety passes everything below about −3 dB untouched, so the game's mix measured the same with it, and it rounds louder peaks off smoothly. It isn't oversampled, so it adds no delay to any note, live or looped. That worst case, with the loop at 80%, now peaks at −0.2 dB even at full volume.
 
 ## Not in this change
 

@@ -354,7 +354,7 @@ export function createRenderer(g, art) {
     text(words.price, CARD[0] + CARD[2] - 6, CARD[1] + 3, words.price === 'yours' ? C.go : C.gold, 'right');
     text(words.about, CARD[0] + 6, CARD[1] + 12, C.grey);
     text(words.says, CARD[0] + 6, CARD[1] + 21, words.button ? C.gold : C.light);
-    const keys = STOCK[shop.at].kind === 'loop' ? 'R record   backspace undo   arrows choose   esc back' : 'arrows choose   esc back to the park';
+    const keys = STOCK[shop.at].kind === 'loop' ? 'R record   backspace undo   esc back' : 'arrows choose   esc back to the park';
     text(keys, CARD[0] + 6, CARD[1] + 30, C.greyDark);
     if (words.button) {
       px(BUTTON[0], BUTTON[1], BUTTON[2], BUTTON[3], C.gold);

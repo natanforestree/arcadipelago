@@ -244,7 +244,10 @@ export function createAudio(storage) {
     const headroom = ctx.createGain(), safety = ctx.createWaveShaper();
     headroom.gain.value = 1 / SAFE_HEADROOM;
     safety.curve = safetyCurve();
-    safety.oversample = '4x'; // rounding off peaks makes highs that would otherwise fold back down as noise
+    // No oversampling: unlike 4x, it adds no delay to every note. The curve is straight below the
+    // knee, so the normal mix still passes through untouched; only the rare overload this exists
+    // for gets a little aliasing, a better trade than delay all the time.
+    safety.oversample = 'none';
     master.connect(headroom).connect(safety).connect(ctx.destination);
     // The tape wobble: a slow wave on the keys' and pad's pitch, off until the top layer joins.
     const lfo = ctx.createOscillator();
