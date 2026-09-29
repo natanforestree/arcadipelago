@@ -5,22 +5,28 @@
 // the audio is suspended, so the set's clock stops with it. Notes reach the set the moment they're
 // played, timed in seconds since the first note.
 //
+// Between sets, the end card leads to the music shop: your coins are saved, and your gear (gear.js)
+// changes how your notes sound, in the park and while you try things in the shop.
+//
 // URL options: ?sound (the sound check); ?debug (interest bars, the corner panel, and Run the bots on
 // the end card); ?seed=N (fixes the passers-by, and the park's windows, train and birds); ?bot=random or
 // ?bot=lick (the bot plays the set, audibly); ?sky=N (the park as it is N bars into a set, until a set
-// starts). With any of them, window.__openCase exposes the game for browser checks.
+// starts); ?coins=N (your savings are N on this page, and nothing bought on it is kept). With any of
+// them, window.__openCase exposes the game for browser checks.
 import { createAudio } from './audio.js';
 import { createInput } from './input.js';
-import { layoutPitches } from './keys.js';
+import { layoutPitches, shopKey } from './keys.js';
 import { createSet, stepSet, playNote, releaseNote, summary, runSet, momentsOf } from './set.js';
 import { crowdSize } from './crowd.js';
 import { createScene, createFlocks, sceneNote, sceneEvents, stepScene, FLIGHT } from './scene.js';
 import { createRenderer, W, H } from './render.js';
 import { randomBot, lickBot } from './bots.js';
 import { safeStorage } from './storage.js';
-import { readLog, logSet, logChoice } from './log.js';
+import { readLog, logSet, logChoice, readBuys, logBuy } from './log.js';
 import { soundCheck } from './soundcheck.js';
 import { loadArt } from './assets.js';
+import { PEDALS, loadGear, saveGear, earn, buy, play, stomp, stockItem } from './gear.js';
+import { createShop, move, action, trying, hit } from './shop.js';
 import { BAR } from './groove.js';
 import { DT, LAYERS } from './tuning.js';
 
@@ -36,7 +42,8 @@ const debug = params.has('debug');
 const bot = { random: randomBot, lick: lickBot }[params.get('bot')] ?? null;
 const fixedSeed = params.has('seed') ? Number.parseInt(params.get('seed'), 10) || 1 : null;
 const skyBar = params.has('sky') ? Math.max(0, Number.parseFloat(params.get('sky')) || 0) : 0;
-const anyDebug = debug || !!bot || fixedSeed !== null || params.has('sound') || params.has('sky');
+const debugSavings = params.has('coins') ? Math.max(0, Number.parseInt(params.get('coins'), 10) || 0) : null;
+const anyDebug = debug || !!bot || fixedSeed !== null || params.has('sound') || params.has('sky') || debugSavings !== null;
 
 const storage = safeStorage();
 const audio = createAudio(storage);
@@ -64,11 +71,20 @@ function game(art) {
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   const pageSeed = fixedSeed ?? Date.now() % 2147483647;
   const flocks = createFlocks(pageSeed);
+  const t0 = performance.now();
+  const pageTime = () => (performance.now() - t0) / 1000; // seconds since the page opened
 
-  let screen = 'title'; // 'ready' (waiting for your first note), 'playing', 'paused', 'over', 'thanks'
+  let screen = 'title'; // 'ready' (waiting for your first note), 'playing', 'paused', 'over', 'shop', 'thanks'
   let set = null, scene = createScene(pageSeed), start = 0, seed = 0;
   let botMoments = null, botNext = 0, botFed = 0;
   const latency = { reported: null, measured: null };
+  // Your savings and gear. With ?coins=N your savings are N, and nothing is kept.
+  const gear = loadGear(storage);
+  if (debugSavings !== null) gear.savings = debugSavings;
+  const keep = () => debugSavings === null && saveGear(storage, gear);
+  let shop = null; // the shop's state (shop.js) while you're in it
+  let stomped = null; // the last pedal stomped: { id, on, time } (its name shows over the gear strip)
+  let setPedals = new Set(); // every pedal that's been on during this set, for the log
 
   function fit() {
     const dpr = devicePixelRatio || 1;
@@ -90,7 +106,15 @@ function game(art) {
     start = at;
     audio.startBand(at);
     for (const { id, min } of LAYERS) audio.setLayer(id, min === 0, at);
+    setPedals = new Set(gear.on);
     screen = 'playing';
+  }
+
+  // Your notes play through your gear, or in the shop, through what you're trying.
+  function sound() {
+    const setup = shop ? trying(shop, gear) : gear;
+    if (audio.setInstrument(setup.instrument)) warmLayout();
+    for (const id of PEDALS) audio.setPedal(id, setup.on.includes(id));
   }
 
   function startBot() {
@@ -175,7 +199,7 @@ function game(art) {
     now: audio.now,
     gate: (e) => {
       if (screen === 'paused') return e.code === 'Escape' || e.code === 'KeyM';
-      if (screen !== 'ready' && screen !== 'playing') return false;
+      if (screen !== 'ready' && screen !== 'playing' && screen !== 'shop') return false;
       if (bot) return e.code === 'Escape' || e.code === 'KeyM';
       return true;
     },
@@ -202,10 +226,21 @@ function game(art) {
       else if (action === 'mute') {
         audio.toggleMute();
         mute.checked = audio.muted;
-      } else if (action === 'pause') pause(screen !== 'paused');
-      else warmLayout(); // octave, strength or scale lock changed
+      } else if (action === 'pause') {
+        if (screen === 'shop') leaveShop();
+        else pause(screen !== 'paused');
+      } else warmLayout(); // octave, strength or scale lock changed
+    },
+    onPedal: (id) => {
+      const on = stomp(gear, id);
+      if (on === null) return; // not yours yet: its key does nothing
+      keep();
+      if (on && set?.phase === 'playing') setPedals.add(id);
+      stomped = { id, on, time: pageTime() };
+      sound();
     },
   });
+  sound();
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) pause(true);
   });
@@ -226,9 +261,17 @@ function game(art) {
   function showEnd() {
     screen = 'over';
     const s = summary(set);
-    // The log is Nathan's own sets and choices, so a bot set (?bot=…) never touches it.
-    if (!bot) logSet(storage, { date: new Date().toISOString(), coins: s.coins, stopped: s.stopped });
+    // The log and the savings are Nathan's own, so a bot set (?bot=…) touches neither.
+    if (!bot) {
+      earn(gear, s.coins);
+      keep();
+      const pedals = PEDALS.filter((id) => setPedals.has(id));
+      logSet(storage, { date: new Date().toISOString(), coins: s.coins, stopped: s.stopped, instrument: gear.instrument, pedals });
+    }
     document.getElementById('end-coins').textContent = `${s.coins} coin${s.coins === 1 ? '' : 's'} in the case.`;
+    document.getElementById('end-saved').textContent = `Saved: ${gear.savings} coin${gear.savings === 1 ? '' : 's'}.`;
+    document.getElementById('end-saved').hidden = !!bot;
+    document.getElementById('shop').hidden = !!bot;
     document.getElementById('end-stopped').textContent = `${s.stopped} ${s.stopped === 1 ? 'person' : 'people'} stopped to listen.`;
     const names = { jogger: 'A jogger', oldman: 'An old man', student: 'A student', commuter: 'A commuter' };
     document.getElementById('end-longest').textContent = s.longest
@@ -241,11 +284,16 @@ function game(art) {
     document.getElementById('again').focus();
   }
 
+  // The test log, newest first: the sets, and what was bought.
   function showLog() {
-    const list = document.getElementById('log');
-    list.replaceChildren(...readLog(storage).slice().reverse().map((e) => {
+    const sets = readLog(storage).map((e) => ({
+      date: e.date,
+      text: `${e.coins} coins, ${e.stopped} stopped, ${[e.instrument ?? 'acoustic', ...(e.pedals ?? [])].join(' + ')}, ${e.choice ?? 'no choice yet'}`,
+    }));
+    const buys = readBuys(storage).map((e) => ({ date: e.date, text: `bought the ${stockItem(e.id)?.name.toLowerCase() ?? e.id} for ${e.price}` }));
+    document.getElementById('log').replaceChildren(...[...sets, ...buys].sort((a, b) => b.date.localeCompare(a.date)).map((e) => {
       const li = document.createElement('li');
-      li.textContent = `${e.date.slice(0, 16).replace('T', ' ')}: ${e.coins} coins, ${e.stopped} stopped, ${e.choice ?? 'no choice yet'}`;
+      li.textContent = `${e.date.slice(0, 16).replace('T', ' ')}: ${e.text}`;
       return li;
     }));
   }
@@ -266,6 +314,63 @@ function game(art) {
     screen = 'thanks';
     document.getElementById('thanks').hidden = false;
   });
+  document.getElementById('shop').addEventListener('click', () => {
+    logChoice(storage, 'shop');
+    end.hidden = true;
+    audio.stopBand();
+    set = null;
+    scene = createScene(pageSeed);
+    shop = createShop();
+    screen = 'shop';
+    sound();
+  });
+
+  // The shop: the arrow keys choose, Enter buys (or plays an instrument you own), Esc or the door
+  // leaves for the park, ready for the next set.
+  function leaveShop() {
+    shop = null;
+    screen = 'ready';
+    canvas.style.cursor = '';
+    sound();
+  }
+  function shopDo(what) {
+    if (what === 'left' || what === 'right') move(shop, what === 'left' ? -1 : 1);
+    else if (what === 'enter') {
+      const act = action(shop, gear);
+      if (act?.act === 'buy' && buy(gear, act.id)) {
+        if (debugSavings === null) logBuy(storage, { date: new Date().toISOString(), id: act.id, price: stockItem(act.id).price });
+        shop.soldAt = pageTime();
+        audio.coin();
+      } else if (act?.act === 'play') play(gear, act.id);
+      keep();
+    }
+    sound();
+  }
+  addEventListener('keydown', (e) => {
+    if (screen !== 'shop' || e.metaKey || e.ctrlKey || e.altKey) return;
+    const what = shopKey(e.code, e.repeat);
+    if (what === undefined) return;
+    e.preventDefault();
+    if (what) shopDo(what);
+  });
+  // A click in the shop, in scene pixels: an item chooses it, the card's button presses Enter, and the
+  // door leaves.
+  const inShop = (e) => {
+    const r = canvas.getBoundingClientRect();
+    return screen === 'shop' ? hit(art.data.shop, shop, gear, ((e.clientX - r.left) / r.width) * W, ((e.clientY - r.top) / r.height) * H) : null;
+  };
+  canvas.addEventListener('click', (e) => {
+    const target = inShop(e);
+    if (target?.hit === 'item') {
+      shop.at = target.at;
+      sound();
+    } else if (target?.hit === 'button') shopDo('enter');
+    else if (target?.hit === 'door') leaveShop();
+  });
+  canvas.addEventListener('mousemove', (e) => {
+    canvas.style.cursor = inShop(e) ? 'pointer' : '';
+  });
+
   document.getElementById('bots').addEventListener('click', () => {
     const r = runSet(seed, randomBot(seed)).coins, l = runSet(seed, lickBot(seed)).coins;
     document.getElementById('bots-result').textContent = `Random bot: ${r}. Lick bot: ${l}. You: ${set.coins}.`;
@@ -276,11 +381,11 @@ function game(art) {
       get screen() { return screen; },
       get set() { return set; },
       get scene() { return scene; },
-      audio, input, latency, art, flocks,
+      get shop() { return shop; },
+      audio, input, latency, art, flocks, gear,
     };
   }
 
-  const t0 = performance.now();
   const frame = (now) => {
     try {
       if (set && screen === 'playing') {
@@ -298,7 +403,8 @@ function game(art) {
       draw({
         screen: screen === 'thanks' || screen === 'over' ? 'playing' : screen,
         set, scene, keys: input.keys, t: set ? set.t : 0, bars: set ? set.t / BAR : skyBar,
-        time: (now - t0) / 1000, still: reducedMotion.matches, flocks, debug: debug ? latency : null,
+        time: (now - t0) / 1000, still: reducedMotion.matches, flocks, gear, stomp: stomped, shop,
+        debug: debug ? latency : null,
       });
       out.drawImage(off, 0, 0, canvas.width, canvas.height);
     } catch (err) {
