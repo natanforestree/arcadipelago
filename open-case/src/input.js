@@ -5,7 +5,8 @@
 //   onNote({ code, pitch, strength, legato, at, timeStamp })  at: the audio time to sound it
 //   onRelease({ code, at })
 //   onControl(action, down)  'ring' (down and up), and on key down: 'octaveDown', 'octaveUp',
-//                            'softer', 'louder', 'lock' (only when they change something), 'mute', 'pause'
+//                            'softer', 'louder', 'lock' (only when they change something), 'mute',
+//                            'pause', 'loop' (R) and 'undo' (Backspace)
 //   onPedal(id)              a pedal key (2 to 6) went down: 'overdrive' to 'reverb'
 // gate(event) runs first on every game key going down; returning false swallows the key (the key
 // that dismisses the title card plays no note).
@@ -16,6 +17,9 @@
 // every note.
 import { NOTE_KEYS, CONTROL_KEYS, PEDAL_KEYS, createKeyState, noteFor, applyControl } from './keys.js';
 import { PLAY } from './tuning.js';
+
+// The controls that go straight to the caller, changing nothing in the key state.
+const CALLER_CONTROLS = new Set(['ring', 'mute', 'pause', 'loop', 'undo']);
 
 export function createInput(target, { now, onNote, onRelease, onControl, onPedal = () => {}, gate = () => true }) {
   const keys = createKeyState();
@@ -33,7 +37,7 @@ export function createInput(target, { now, onNote, onRelease, onControl, onPedal
       return;
     }
     if (action) {
-      if (action === 'ring' || action === 'mute' || action === 'pause' || applyControl(keys, action)) onControl(action, true);
+      if (CALLER_CONTROLS.has(action) || applyControl(keys, action)) onControl(action, true);
       return;
     }
     if (held.has(e.code)) return;

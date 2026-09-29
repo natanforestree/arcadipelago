@@ -151,3 +151,15 @@ test('keys 2 to 6 stomp the pedals, once per press, and the gate can swallow the
   h.down('Digit6');
   assert.deepEqual(h.got, [['pedal', 'overdrive'], ['pedal', 'delay']]);
 });
+
+test('R and Backspace go to the caller once per press, the browser does nothing with them, and the gate can swallow them', () => {
+  let open = true;
+  const h = harness({ gate: () => open });
+  assert.equal(h.down('KeyR'), true);
+  h.down('KeyR', { repeat: true });
+  assert.equal(h.down('Backspace'), true, "Backspace doesn't go back a page");
+  h.up('KeyR');
+  open = false;
+  h.down('KeyR');
+  assert.deepEqual(h.got, [['loop', true], ['undo', true]]);
+});

@@ -69,3 +69,12 @@ test('in the shop the arrows choose and Enter buys, once however long it is held
   assert.equal(shopKey('Enter', true), null, 'a held Enter repeating does nothing more');
   assert.equal(shopKey('KeyA', false), undefined, 'not a shop key: the note keys still play');
 });
+
+test('R records a loop and Backspace undoes; neither is a note key', () => {
+  assert.equal(CONTROL_KEYS.KeyR, 'loop');
+  assert.equal(CONTROL_KEYS.Backspace, 'undo');
+  assert.ok(!('KeyR' in NOTE_KEYS) && !('Backspace' in NOTE_KEYS) && !('KeyR' in PEDAL_KEYS));
+  const ks = createKeyState();
+  assert.equal(applyControl(ks, 'loop'), false, 'they change nothing in the key state');
+  assert.equal(applyControl(ks, 'undo'), false);
+});

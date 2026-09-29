@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createShop, chosen, move, action, card, trying, hit, CARD, BUTTON } from '../src/shop.js';
+import { createShop, chosen, choose, move, action, card, trying, hit, CARD, BUTTON } from '../src/shop.js';
 import { STOCK, ACOUSTIC, freshGear, buy, stomp, play } from '../src/gear.js';
 
 const withSavings = (savings) => ({ ...freshGear(), savings });
@@ -76,4 +76,38 @@ test('a click chooses an item, presses the card button, or leaves by the door', 
   shop.at = at('delay');
   assert.equal(hit(layout, shop, gear, BUTTON[0] + 2, BUTTON[1] + 2), null, 'no button when there is nothing to do');
   assert.equal(hit(layout, shop, gear, CARD[0] + 2, CARD[1] + 2), null, 'the rest of the card');
+});
+
+test("the loop pedal's card: a line on what R does, Enter to buy, and once it's yours, R", () => {
+  const gear = withSavings(80);
+  assert.deepEqual(card(shopOn('loop'), gear), {
+    name: 'Loop pedal', price: '100 coins', about: 'R records 4 bars, then loops them under you.',
+    says: 'Not enough coins yet (you have 80)', button: null,
+  });
+  gear.savings = 100;
+  assert.deepEqual(action(shopOn('loop'), gear), { act: 'buy', id: 'loop' });
+  buy(gear, 'loop');
+  assert.deepEqual(card(shopOn('loop'), gear), {
+    name: 'Loop pedal', price: 'yours', about: 'R records 4 bars, then loops them under you.', says: 'On your board: R', button: null,
+  });
+  assert.equal(action(shopOn('loop'), gear), null);
+});
+
+test('choosing the loop pedal starts a loop to try it with, yours or not; moving on throws the loop away', () => {
+  const gear = withSavings(0);
+  const shop = createShop();
+  assert.equal(shop.loop, null);
+  for (let i = 0; i < at('loop'); i++) move(shop, 1);
+  assert.equal(chosen(shop).id, 'loop', 'after the reverb on the rack');
+  assert.ok(shop.loop && shop.loop.layers.length === 0, 'an empty loop');
+  shop.loop.layers.push({ from: 0, notes: [] });
+  choose(shop, at('loop'));
+  assert.equal(shop.loop.layers.length, 1, 'choosing it again keeps the loop');
+  assert.deepEqual(trying(shop, gear), { instrument: ACOUSTIC, on: [] }, 'you hear your own instrument and pedals over it');
+  move(shop, 1);
+  assert.equal(shop.loop, null);
+  move(shop, -1);
+  assert.equal(shop.loop.layers.length, 0, 'back again, the loop starts empty');
+  choose(shop, at('synth'));
+  assert.equal(shop.loop, null, 'a click on something else throws it away too');
 });

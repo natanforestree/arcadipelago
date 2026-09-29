@@ -1,6 +1,6 @@
 // GarageBand's Musical Typing layout. Keys are named by their physical position (KeyboardEvent.code),
 // so the layout is the same on any keyboard. At octave 0, A is C4 (MIDI 60). Keys 2 to 6 stomp your
-// pedals, and in the shop the arrow keys and Enter choose and buy.
+// pedals, R and Backspace work the loop pedal, and in the shop the arrow keys and Enter choose and buy.
 //
 //   W E   T Y U   O P        C# D#   F# G# A#   C# D#
 //  A S D F G H J K L ; '     C  D  E  F  G  A  B  C  D  E  F
@@ -14,7 +14,7 @@ export const NOTE_KEYS = {
 
 export const CONTROL_KEYS = {
   KeyZ: 'octaveDown', KeyX: 'octaveUp', KeyC: 'softer', KeyV: 'louder',
-  Space: 'ring', Digit1: 'lock', KeyM: 'mute', Escape: 'pause',
+  Space: 'ring', Digit1: 'lock', KeyM: 'mute', Escape: 'pause', KeyR: 'loop', Backspace: 'undo',
 };
 
 // Each pedal's key, which never changes: Digit2 overdrive to Digit6 reverb (tuning.js SHOP).
@@ -54,8 +54,8 @@ export function noteFor(code, ks) {
   return pitch >= PLAY.lowest && pitch <= PLAY.highest ? pitch : null;
 }
 
-// Applies a control key's action to the key state. Returns true if the state changed. (Ring, mute and
-// pause belong to the caller; they don't change the key state.)
+// Applies a control key's action to the key state. Returns true if the state changed. (Ring, mute,
+// pause, loop and undo belong to the caller; they don't change the key state.)
 export function applyControl(ks, action) {
   const before = `${ks.octave},${ks.strength},${ks.lock}`;
   if (action === 'octaveDown') ks.octave = Math.max(PLAY.octaveMin, ks.octave - 1);
