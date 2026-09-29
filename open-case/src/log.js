@@ -1,26 +1,39 @@
-// The test log: this computer remembers the last LOG_SIZE sets (the date, coins, how many stopped,
-// and whether Nathan chose Another set or Stop here), under open-case-log in local storage.
+// The test log: this computer remembers the last LOG_SIZE sets (the date, coins, how many stopped, the
+// instrument played, the pedals that were on at any point, and whether Nathan chose Another set, Stop
+// here or Visit the shop), under open-case-log in local storage; and the last LOG_SIZE things he
+// bought, with their dates, under open-case-buys.
 import { LOG_SIZE } from './tuning.js';
 
-const KEY = 'open-case-log';
+const KEY = 'open-case-log', BUYS = 'open-case-buys';
 
-export function readLog(storage) {
+function readList(storage, key) {
   try {
-    const list = JSON.parse(storage.get(KEY) ?? '[]');
+    const list = JSON.parse(storage.get(key) ?? '[]');
     return Array.isArray(list) ? list : [];
   } catch {
     return []; // unreadable: start afresh
   }
 }
 
-// A set just ended: { date, coins, stopped }. Its choice is filled in when a button is pressed.
+export const readLog = (storage) => readList(storage, KEY);
+export const readBuys = (storage) => readList(storage, BUYS);
+
+// A set just ended: { date, coins, stopped, instrument, pedals }. Its choice is filled in when a
+// button is pressed.
 export function logSet(storage, entry) {
   const list = readLog(storage);
   list.push({ ...entry, choice: null });
   storage.set(KEY, JSON.stringify(list.slice(-LOG_SIZE)));
 }
 
-// 'another' or 'stop', for the latest set.
+// Something bought in the shop: { date, id, price }.
+export function logBuy(storage, entry) {
+  const list = readBuys(storage);
+  list.push(entry);
+  storage.set(BUYS, JSON.stringify(list.slice(-LOG_SIZE)));
+}
+
+// 'another', 'stop' or 'shop', for the latest set.
 export function logChoice(storage, choice) {
   const list = readLog(storage);
   if (!list.length) return;

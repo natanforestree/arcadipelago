@@ -134,3 +134,17 @@ export const PARK = {
   flockCross: 8, // seconds a flock takes to cross
   pigeonsAway: 4, // bars the pigeons stay away after a loud note scatters them
 };
+
+// The music shop (gear.js): what each thing costs in coins, and the key that stomps each pedal. The
+// pedals are listed in the order they chain, overdrive first, which is also the order of their keys.
+export const SHOP = {
+  overdrive: { price: 40, key: 2 },
+  chorus: { price: 50, key: 3 },
+  tremolo: { price: 50, key: 4 },
+  delay: { price: 70, key: 5 },
+  reverb: { price: 80, key: 6 },
+  ukulele: { price: 60 },
+  electric: { price: 150 },
+  epiano: { price: 200 },
+  synth: { price: 250 },
+};

@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createSet, stepSet, playNote, momentsOf, endTime } from '../src/set.js';
 import { BAR } from '../src/groove.js';
 import { DT } from '../src/tuning.js';
@@ -69,4 +70,14 @@ test('the set lasts 60 bars, then fades a bar, the listeners still there tip onc
 test('key moments come in time order, a key going up before the next goes down', () => {
   const m = momentsOf([{ t: 0.5, pitch: 62, strength: 3, len: 0.5 }, { t: 0, pitch: 60, strength: 3, len: 0.5 }]);
   assert.deepEqual(m.map((x) => [x.t, x.note ? x.note.pitch : 'up']), [[0, 60], [0.5, 'up'], [0.5, 62], [1, 'up']]);
+});
+
+test("gear only changes how you sound: the crowd's rules never see it", () => {
+  // The rules (the set, the ears, the crowd, the groove, the bots) import nothing from the shop, the
+  // gear or the sound, so a set played with every pedal on scores exactly as one with none.
+  for (const f of ['set', 'listen', 'crowd', 'groove', 'bots']) {
+    const src = readFileSync(new URL(`../src/${f}.js`, import.meta.url), 'utf8');
+    const imports = [...src.matchAll(/from '\.\/([a-z]+)\.js'/g)].map((m) => m[1]);
+    for (const other of imports) assert.ok(!['gear', 'shop', 'audio', 'main'].includes(other), `${f}.js imports ${other}.js`);
+  }
 });

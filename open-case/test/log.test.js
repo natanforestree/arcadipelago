@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readLog, logSet, logChoice } from '../src/log.js';
+import { readLog, logSet, logChoice, readBuys, logBuy } from '../src/log.js';
 import { LOG_SIZE } from '../src/tuning.js';
 
 function memoryStorage() {
@@ -36,4 +36,17 @@ test('an unreadable log starts afresh, and a choice with no set logged does noth
   assert.deepEqual(readLog(s), []);
   s.set('open-case-log', '{"a":1}');
   assert.deepEqual(readLog(s), []);
+});
+
+test('each set logs the instrument and the pedals used; each thing bought is logged with its date', () => {
+  const s = memoryStorage();
+  logSet(s, { date: '2026-09-29T20:00:00Z', coins: 40, stopped: 6, instrument: 'ukulele', pedals: ['delay'] });
+  logChoice(s, 'shop');
+  logBuy(s, { date: '2026-09-29T20:04:00Z', id: 'reverb', price: 80 });
+  assert.deepEqual(readLog(s), [{ date: '2026-09-29T20:00:00Z', coins: 40, stopped: 6, instrument: 'ukulele', pedals: ['delay'], choice: 'shop' }]);
+  assert.deepEqual(readBuys(s), [{ date: '2026-09-29T20:04:00Z', id: 'reverb', price: 80 }]);
+  for (let i = 0; i < LOG_SIZE + 3; i++) logBuy(s, { date: String(i), id: 'delay', price: 70 });
+  assert.equal(readBuys(s).length, LOG_SIZE);
+  s.set('open-case-buys', 'nope');
+  assert.deepEqual(readBuys(s), []);
 });
