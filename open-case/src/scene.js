@@ -1,15 +1,15 @@
 // What's on screen besides the set itself, as plain data updated from what happens: the note trail
-// (and your loop's, fainter), coins flying into the case, the gold link of a callback, and the park's
-// life (the sunset over the set, the lit windows, the train, the pigeons by your case and the birds
-// overhead). Pure, so it's
-// tested in Node; render.js draws it. Times are seconds on the set's clock, except the birds' and the
-// pigeons' pecking, which run on the page's clock (`time`).
+// (and your loop's, fainter), coins flying into the case, the gold link of a callback, and the
+// park's life (the sunset over the set, the lit windows, the train, the pigeons by your case and
+// the birds overhead). Pure, so it's tested in Node; render.js draws it. Times are seconds on the
+// set's clock, except the birds' and the pigeons' pecking, which run on the page's clock (`time`).
 import { createRng, nextRandom, randomBetween } from './rng.js';
 import { BAR } from './groove.js';
 import { PARK, RULES } from './tuning.js';
 
 export const GUITAR = [152, 128]; // where notes float up from
-export const LOOP_PEDAL = [133, 152]; // where your loop's notes float up from (art/open-case/gear.lua G.LOOP_PEDAL)
+// Where your loop's notes float up from (art/open-case/gear.lua G.LOOP_PEDAL).
+export const LOOP_PEDAL = [133, 152];
 export const CASE = [161, 160]; // where coins land
 // Where the pigeons peck: their feet, clear of the gear strip's loop slot (render.js).
 export const PIGEONS = [[222, 172], [235, 176], [248, 170]];
@@ -35,7 +35,8 @@ export function createScene(seed = 1) {
   const rng = createRng((seed ^ PARK_SEED) >>> 0);
   return {
     trail: [], flights: [], caseCoins: 0, gold: null, clapFrom: -1,
-    loopTrail: [], // your loop's notes, { pitch, t }, in time order (t can be a moment ahead: they're scheduled ahead)
+    // your loop's notes, { pitch, t }, in time order (t may be a moment ahead: scheduled that way)
+    loopTrail: [],
     lastNote: -Infinity, // when you last played a note (you strum)
     scaredAt: null, // when a loud note last scattered the pigeons
     flyFrom: 1, // how far through the walk back they were when last scattered (1: at home)

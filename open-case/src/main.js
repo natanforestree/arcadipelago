@@ -94,7 +94,8 @@ function game(art) {
   // The loop pedal's loop in a set, empty at each set's start (in the shop, the one you try it with
   // is shop.loop). Its times are band time: the audio clock since the band's first 16th, `start`.
   let loop = createLoop();
-  let loopSaid = null; // the loop pedal's last news: { what, layer, time } (it shows over the gear strip)
+  // the loop pedal's last news: { what, layer, time } (it shows over the gear strip)
+  let loopSaid = null;
   let setLayers = 0; // layers recorded this set, for the log
   let ringHeld = false; // whether Space is down, for a loop that starts while it is
   let shopBand = false; // whether the band is playing in the shop, for trying the loop pedal
@@ -303,10 +304,16 @@ function game(art) {
       else if (e.type === 'coin') audio.coin(start + set.t + FLIGHT);
       else if (e.type === 'end') {
         audio.endBand(start + set.t);
-        // A recording still under way is dropped; the loop's layers fade out with the band.
+        // Stepped to the set's own end time first: a take finishing exactly then still becomes a
+        // layer (and counts, as the frame loop's own step would have counted it); only a take not
+        // finished by then is dropped, its would-be layer's notes cut off. The loop's layers (kept
+        // or not) fade out with the band either way.
         if (loop.take) {
-          undo(loop);
-          audio.stopLoop(loop.layers.length);
+          if (step(loop, set.t) === 'layer') setLayers++;
+          else {
+            undo(loop);
+            audio.stopLoop(loop.layers.length);
+          }
         }
         const crowd = crowdSize(set.crowd);
         if (crowd > 0) audio.clap(crowd, start + set.t + BAR * 0.5);

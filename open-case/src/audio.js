@@ -21,7 +21,8 @@ const MUTE_KEY = 'open-case-muted', VOLUME_KEY = 'open-case-volume';
 const PICK = [0.35, 0.55, 0.8, 1]; // loudness by pick strength 1-4
 const BRIGHT = [0.2, 0.35, 0.55, 0.8]; // the acoustic's pick's brightness by strength
 const BAND_LEVEL = 0.55; // the band bus's level under your instrument
-const TRY_LEVEL = 0.35; // ...and in the shop, where the electric piano plays alone while you try the loop pedal
+// ...and in the shop, where the electric piano plays alone while you try the loop pedal.
+const TRY_LEVEL = 0.35;
 // The percussion standing in for the drums: on only while the drums slot is off. Lo-fi and soft, not
 // a metronome: a shaker, a finger snap and a low tap, not a beeping tone.
 const PERC_SHAKER_HZ = 7000; // the shaker: bright but soft noise
@@ -173,7 +174,8 @@ export function createAudio(storage) {
   const pedalOn = Object.fromEntries(PEDALS.map((id) => [id, false]));
   const plucks = new Map(); // `${pitch}:${strength}` -> AudioBuffer, for the instrument you play
   const voices = new Map(); // key code -> the voice sounding: { g, sources, release }
-  const looped = new Set(); // your loop's voices, sounding or about to: { g, sources, release, start, end, layer }
+  // your loop's voices, sounding or about to: { g, sources, release, start, end, layer }
+  const looped = new Set();
   const ringing = new Set(); // voices whose key is up but Space holds them
   let ring = false;
   let muted = storage.get(MUTE_KEY) === '1';

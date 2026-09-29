@@ -67,8 +67,8 @@ export function youFrame(scene, t, time, instrument) {
 }
 
 // The loop pedal's light at band time t (loop: looper.js, or null): dark while the loop is empty,
-// red blinking on the beat while a recording waits for its bar line, red while it records, and green
-// while the loop plays.
+// red blinking on the beat while a recording waits for its bar line, red while it records, and
+// green while the loop plays.
 export function loopLight(loop, t) {
   const state = loop ? loopState(loop, t) : 'empty';
   if (state === 'waiting') return frameOf(t / (BEAT / 2), 2) === 0 ? 'red' : 'dark';
@@ -336,7 +336,8 @@ export function createRenderer(g, art) {
       const chosen = i === shop.at, lift = chosen ? S.lift : 0, [x, y, w] = S.items[item.id];
       sprite(`item-${item.id}-${chosen ? 1 : 0}`, 0, 0);
       if (heard.includes(item.id)) px(S.leds[item.id][0], S.leds[item.id][1] - lift, 2, 1, C.light);
-      const light = item.kind === 'loop' ? loopLight(shop.loop, t) : 'dark'; // the loop pedal you're trying
+      // the loop pedal you're trying
+      const light = item.kind === 'loop' ? loopLight(shop.loop, t) : 'dark';
       if (light !== 'dark') px(S.leds.loop[0], S.leds.loop[1] - lift, 2, 2, light === 'red' ? C.red : C.go);
       sprite(owns(gear, item.id) ? 'tag-yours' : 'tag-price', x + w - 1, y + 3 - lift);
       if (chosen) {
