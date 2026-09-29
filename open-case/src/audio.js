@@ -9,6 +9,8 @@
 //     (its slot): switching a layer is a fade on that bus at a bar line.
 //   - Your loop (looper.js): its notes are scheduled a moment ahead with the band's, each a voice of
 //     its own through your instrument and pedals, and they fade and stop with the band.
+//   - Its count-in (countIn): a soft stick click on each beat after R, up to the bar line, so you can
+//     hear when the recording is about to start; never through your pedals, never recorded.
 //   - Vinyl crackle, a dusty filter over the band, the tape wobble, coins landing and applause.
 //   - A safety before the speakers, so a loop stacked on your playing can't clip.
 // Browsers only allow sound after a key press or click, so start() is called from inside one
@@ -34,6 +36,17 @@ const PERC_SNAP_LEVEL = 0.32;
 const PERC_TAP_HZ = 95; // the low tap: a soft thud, like a hand on the guitar's body
 const PERC_TAP_DROP_HZ = 55; // ...its pitch dropping quickly
 const PERC_TAP_LEVEL = 0.4;
+// The loop pedal's count-in: a soft, woody stick click, quieter than the band's snare, never through
+// your pedals and never recorded.
+const COUNT_BURST_HZ = 2500; // a noise burst, narrow and bright...
+const COUNT_BURST_Q = 2;
+const COUNT_BURST_LEN = 0.025;
+const COUNT_BURST_LEVEL = 0.09;
+const COUNT_TONE_HZ = 1000; // ...with a little pitch under it, dropping as it dies away
+const COUNT_TONE_DROP_HZ = 700;
+const COUNT_TONE_LEN = 0.03;
+const COUNT_TONE_LEVEL = 0.05;
+const COUNT_ATTACK = 0.002; // soft, so it ticks rather than beeps
 
 // Each instrument's voicing. `pluck` is a guitar's string: how long it rings (seconds to fall 60 dB), its pick's
 // brightness by strength, where the pick meets the string (a share of its length from the bridge),
@@ -176,6 +189,8 @@ export function createAudio(storage) {
   const voices = new Map(); // key code -> the voice sounding: { g, sources, release }
   // your loop's voices, sounding or about to: { g, sources, release, start, end, layer }
   const looped = new Set();
+  // a count-in counting a recording in, one per call to countIn: { g, layer, end }
+  const countIns = new Set();
   const ringing = new Set(); // voices whose key is up but Space holds them
   let ring = false;
   let muted = storage.get(MUTE_KEY) === '1';
@@ -675,7 +690,8 @@ export function createAudio(storage) {
   }
 
   // Stops your loop's voices from one layer (or every layer) now: those sounding let go, and those
-  // scheduled but not yet started are cut off before they sound.
+  // scheduled but not yet started are cut off before they sound. A count-in still counting that layer
+  // in (or every layer) is cut off too, so any of its clicks not yet sounded never sound.
   function stopLoop(layer = null) {
     if (!ctx) return;
     for (const v of looped) {
@@ -684,6 +700,30 @@ export function createAudio(storage) {
       if (v.start > ctx.currentTime) v.g.disconnect();
       damp(v, ctx.currentTime);
     }
+    for (const v of countIns) {
+      if (layer !== null && v.layer !== layer) continue;
+      countIns.delete(v);
+      v.g.disconnect();
+    }
+  }
+
+  // A count-in: a stick click at each band time (now the audio clock, main.js having added the band's
+  // start) in `ats` not already past, counting the recording arming on `layer` in. The clicks go
+  // through one gain of their own into master, never the band bus (its level differs in the shop) and
+  // never a pedal (they're not your instrument, and never recorded). stopLoop cuts them off.
+  function countIn(ats, layer) {
+    if (!ctx) return;
+    const g = ctx.createGain();
+    g.countIn = layer; // named, so the tests can follow it, like the pedals
+    g.connect(master);
+    let end = ctx.currentTime;
+    for (const at of ats) {
+      if (at < ctx.currentTime) continue;
+      burst(g, at, { len: COUNT_BURST_LEN, freq: COUNT_BURST_HZ, q: COUNT_BURST_Q, vol: COUNT_BURST_LEVEL });
+      tone(g, at, { len: COUNT_TONE_LEN, type: 'triangle', freq: COUNT_TONE_HZ, to: COUNT_TONE_DROP_HZ, vol: COUNT_TONE_LEVEL, attack: COUNT_ATTACK });
+      end = Math.max(end, at + COUNT_TONE_LEN + 0.05);
+    }
+    countIns.add({ g, layer, end });
   }
 
   // A layer slot switched on or off, at a bar line (or at once, from the sound check).
@@ -717,6 +757,7 @@ export function createAudio(storage) {
       burst(bus.keys, t, { len: 0.004 + Math.random() * 0.01, type: 'highpass', freq: 2000 + Math.random() * 4000, vol: 0.05 + Math.random() * 0.12 });
     }
     for (const v of looped) if (v.end < t) looped.delete(v);
+    for (const v of countIns) if (v.end < t) countIns.delete(v);
     // Your loop's notes, never in the past: after a stall, what's already late is skipped.
     const from = Math.max(loopDone, t - loopAt), to = Math.min(t + GROOVE.ahead, stopAt) - loopAt;
     if (!loopDue || to <= from) return [];
@@ -759,7 +800,7 @@ export function createAudio(storage) {
 
   return {
     start, now, warm, noteOn, noteOff, setRing, setInstrument, setPedal, startBand, tryBand, endBand, stopBand, stopLoop,
-    setLayer, update, coin, clap, reportedLatency, heardAt,
+    countIn, setLayer, update, coin, clap, reportedLatency, heardAt,
     get started() {
       return !!ctx;
     },

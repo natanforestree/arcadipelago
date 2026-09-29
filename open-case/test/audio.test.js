@@ -31,6 +31,8 @@ function withAudio(fn) {
       const i = LAYERS.findIndex((l) => l.id === id);
       return gains[2 + (i < 0 ? LAYERS.length : i)];
     };
+    ctx.master = () => gains[0];
+    ctx.band = () => gains[1];
     return ctx;
   };
   try {
@@ -651,3 +653,69 @@ test("a safety before the speakers leaves the game's sound as it was, and rounds
     assert.ok(safety, 'the last thing before the speakers');
     assert.equal(safety.from[0].gain.value, 1 / 4, 'fed at a quarter, for the headroom');
   }));
+
+test('countIn schedules a click at each given time, into its own gain feeding master, never a pedal or the band', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    const before = ctx().started.length;
+    audio.countIn([1, 1.75, 2.5], 0);
+    const started = ctx().started.slice(before);
+    assert.ok(started.length > 0, 'the clicks sound');
+    assert.deepEqual([...new Set(started.map((s) => s.t))].sort((a, b) => a - b), [1, 1.75, 2.5]);
+    const cg = downstream(started[0].node).find((n) => n.countIn !== undefined);
+    assert.ok(cg, "its own gain, named like the pedals so the tests can follow it");
+    assert.deepEqual(cg.outs, [ctx().master()], 'into master, not a pedal or the band');
+    for (const s of started) assert.equal(nextPedal(s.node), null, 'never through a pedal');
+  }));
+
+test('a count-in time already in the past is skipped', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    ctx().currentTime = 2;
+    const before = ctx().started.length;
+    audio.countIn([1, 1.5, 3], 0);
+    const started = ctx().started.slice(before);
+    assert.deepEqual([...new Set(started.map((s) => s.t))], [3], 'only the one not already past');
+  }));
+
+test("stopLoop(layer) cuts off that layer's count-in before its clicks sound, and leaves another layer's alone", () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    const before0 = ctx().started.length;
+    audio.countIn([1, 2], 0);
+    const clicks0 = ctx().started.slice(before0);
+    const before1 = ctx().started.length;
+    audio.countIn([1, 2], 1);
+    const clicks1 = ctx().started.slice(before1);
+    const cueGain = (s) => downstream(s.node).find((n) => n.countIn !== undefined);
+    audio.stopLoop(0);
+    assert.ok(clicks0.every((s) => cueGain(s).cut), "layer 0's count-in is cut off");
+    assert.ok(clicks1.every((s) => !cueGain(s).cut), "layer 1's is left alone");
+  }));
+
+test('stopLoop() with no layer, and stopBand(), cut off every count-in', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    audio.startBand(0);
+    const before = ctx().started.length;
+    audio.countIn([1, 2], 0);
+    audio.countIn([1, 2], 1);
+    const clicks = ctx().started.slice(before);
+    const cueGain = (s) => downstream(s.node).find((n) => n.countIn !== undefined);
+    audio.stopLoop();
+    assert.ok(clicks.every((s) => cueGain(s).cut), 'stopLoop() with no layer cuts off every one');
+    const before2 = ctx().started.length;
+    audio.countIn([3, 4], 0);
+    const more = ctx().started.slice(before2);
+    audio.stopBand();
+    assert.ok(more.every((s) => cueGain(s).cut), 'stopBand() cuts off every count-in too');
+  }));
+
+test('countIn does nothing without a started context', () => {
+  const audio = createAudio(memoryStorage());
+  assert.doesNotThrow(() => audio.countIn([1, 2], 0));
+});
