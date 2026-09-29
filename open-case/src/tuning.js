@@ -148,3 +148,7 @@ export const SHOP = {
   epiano: { price: 200 },
   synth: { price: 250 },
 };
+
+// The loop pedal (looper.js): a loop is one pass of the chords, up to `layers` deep, and a note up to
+// `early` 16ths before a recording's first bar line still counts, played just as early.
+export const LOOP = { bars: 4, layers: 3, early: 1 };

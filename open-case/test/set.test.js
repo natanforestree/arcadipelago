@@ -72,12 +72,13 @@ test('key moments come in time order, a key going up before the next goes down',
   assert.deepEqual(m.map((x) => [x.t, x.note ? x.note.pitch : 'up']), [[0, 60], [0.5, 'up'], [0.5, 62], [1, 'up']]);
 });
 
-test("gear only changes how you sound: the crowd's rules never see it", () => {
+test("gear only changes how you sound: the crowd's rules never see it, or the loop", () => {
   // The rules (the set, the ears, the crowd, the groove, the bots) import nothing from the shop, the
-  // gear or the sound, so a set played with every pedal on scores exactly as one with none.
+  // gear, the loop pedal or the sound, so a set played with every pedal on, or over a loop, scores
+  // exactly as one without.
   for (const f of ['set', 'listen', 'crowd', 'groove', 'bots']) {
     const src = readFileSync(new URL(`../src/${f}.js`, import.meta.url), 'utf8');
     const imports = [...src.matchAll(/from '\.\/([a-z]+)\.js'/g)].map((m) => m[1]);
-    for (const other of imports) assert.ok(!['gear', 'shop', 'audio', 'main'].includes(other), `${f}.js imports ${other}.js`);
+    for (const other of imports) assert.ok(!['gear', 'shop', 'audio', 'main', 'looper'].includes(other), `${f}.js imports ${other}.js`);
   }
 });
