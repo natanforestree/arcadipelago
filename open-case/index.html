@@ -9,22 +9,22 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Silkscreen&display=swap" rel="stylesheet">
   <style>
-    html, body { margin: 0; height: 100%; overflow: hidden; background: #120e22; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #121230; }
     body { display: grid; place-items: center; }
     canvas { display: block; image-rendering: crisp-edges; image-rendering: pixelated; }
     canvas[hidden] { display: none; }
-    body, button, input { font: 12px/1.6 Silkscreen, monospace; color: #fff2dc; }
+    body, button, input { font: 12px/1.6 Silkscreen, monospace; color: #fff2cc; }
     a { color: #c9b8e8; }
     a.back { position: fixed; top: 8px; left: 10px; text-decoration: none; }
-    a.back:hover, a.back:focus { color: #fff2dc; }
+    a.back:hover, a.back:focus { color: #fff2cc; }
     .note { position: fixed; inset: 0; margin: auto; height: fit-content; padding: 0 16px; text-align: center; }
     .note[hidden], .card[hidden] { display: none; }
-    .card { position: fixed; inset: 0; margin: auto; width: min(420px, calc(100vw - 32px)); height: fit-content; max-height: calc(100vh - 32px); overflow: auto; padding: 20px; box-sizing: border-box; background: #1b1430ee; border: 2px solid #4a2d66; display: grid; gap: 8px; }
+    .card { position: fixed; inset: 0; margin: auto; width: min(420px, calc(100vw - 32px)); height: fit-content; max-height: calc(100vh - 32px); overflow: auto; padding: 20px; box-sizing: border-box; background: #1c1626ee; border: 2px solid #663276; display: grid; gap: 8px; }
     .card h2 { margin: 0; font-size: 16px; text-align: center; }
     .card p { margin: 0; }
     .card .row { display: flex; gap: 12px; justify-content: center; margin-top: 8px; }
-    .card button { padding: 6px 12px; background: #33245a; border: 2px solid #6a3468; cursor: pointer; }
-    .card button:hover, .card button:focus-visible { background: #4a2d66; }
+    .card button { padding: 6px 12px; background: #43286a; border: 2px solid #93406f; cursor: pointer; }
+    .card button:hover, .card button:focus-visible { background: #663276; }
     .card label { display: flex; gap: 8px; align-items: center; }
     .card input[type=range] { flex: 1; }
     #log { margin: 0; padding-left: 20px; font-size: 10px; }

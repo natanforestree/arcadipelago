@@ -6,19 +6,21 @@
 // played, timed in seconds since the first note.
 //
 // URL options: ?sound (the sound check); ?debug (interest bars, the corner panel, and Run the bots on
-// the end card); ?seed=N (fixes the passers-by); ?bot=random or ?bot=lick (the bot plays the set,
-// audibly). With any of them, window.__openCase exposes the game for browser checks.
+// the end card); ?seed=N (fixes the passers-by, and the park's windows, train and birds); ?bot=random or
+// ?bot=lick (the bot plays the set, audibly); ?sky=N (the park as it is N bars into a set, until a set
+// starts). With any of them, window.__openCase exposes the game for browser checks.
 import { createAudio } from './audio.js';
 import { createInput } from './input.js';
 import { layoutPitches } from './keys.js';
 import { createSet, stepSet, playNote, releaseNote, summary, runSet, momentsOf } from './set.js';
 import { crowdSize } from './crowd.js';
-import { createScene, sceneNote, sceneEvents, stepScene, FLIGHT } from './scene.js';
+import { createScene, createFlocks, sceneNote, sceneEvents, stepScene, FLIGHT } from './scene.js';
 import { createRenderer, W, H } from './render.js';
 import { randomBot, lickBot } from './bots.js';
 import { safeStorage } from './storage.js';
 import { readLog, logSet, logChoice } from './log.js';
 import { soundCheck } from './soundcheck.js';
+import { loadArt } from './assets.js';
 import { BAR } from './groove.js';
 import { DT, LAYERS } from './tuning.js';
 
@@ -33,7 +35,8 @@ const params = new URLSearchParams(location.search);
 const debug = params.has('debug');
 const bot = { random: randomBot, lick: lickBot }[params.get('bot')] ?? null;
 const fixedSeed = params.has('seed') ? Number.parseInt(params.get('seed'), 10) || 1 : null;
-const anyDebug = debug || !!bot || fixedSeed !== null || params.has('sound');
+const skyBar = params.has('sky') ? Math.max(0, Number.parseFloat(params.get('sky')) || 0) : 0;
+const anyDebug = debug || !!bot || fixedSeed !== null || params.has('sound') || params.has('sky');
 
 const storage = safeStorage();
 const audio = createAudio(storage);
@@ -41,19 +44,28 @@ const touchOnly = matchMedia('(pointer: coarse)').matches && !matchMedia('(any-p
 
 if (touchOnly) document.getElementById('phone').hidden = false;
 else if (params.has('sound')) soundCheck(audio, { debug: anyDebug });
-else game();
+else {
+  // The art loads before the title card shows; if it can't, say something went wrong.
+  loadArt().then(game, (err) => {
+    console.error(err);
+    document.getElementById('message').hidden = false;
+  });
+}
 
-function game() {
+function game(art) {
   const canvas = document.getElementById('game');
   const out = canvas.getContext('2d', { alpha: false });
   const off = document.createElement('canvas');
   off.width = W;
   off.height = H;
-  const draw = createRenderer(off.getContext('2d'));
+  const draw = createRenderer(off.getContext('2d'), art);
   const end = document.getElementById('end');
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const pageSeed = fixedSeed ?? Date.now() % 2147483647;
+  const flocks = createFlocks(pageSeed);
 
   let screen = 'title'; // 'ready' (waiting for your first note), 'playing', 'paused', 'over', 'thanks'
-  let set = null, scene = createScene(), start = 0, seed = 0;
+  let set = null, scene = createScene(pageSeed), start = 0, seed = 0;
   let botMoments = null, botNext = 0, botFed = 0;
   const latency = { reported: null, measured: null };
 
@@ -73,7 +85,7 @@ function game() {
   function begin(at) {
     seed = fixedSeed ?? Date.now() % 2147483647;
     set = createSet(seed);
-    scene = createScene();
+    scene = createScene(seed);
     start = at;
     audio.startBand(at);
     for (const { id, min } of LAYERS) audio.setLayer(id, min === 0, at);
@@ -102,7 +114,7 @@ function game() {
       const m = botMoments[botFed];
       if (m.note) {
         playNote(set, m.note.pitch, m.note.strength, m.t);
-        if (set.phase === 'playing') sceneNote(scene, m.note.pitch, set.listen.notes.length - 1, m.t);
+        if (set.phase === 'playing') sceneNote(scene, m.note.pitch, set.listen.notes.length - 1, m.t, m.note.strength);
       } else releaseNote(set, m.t);
     }
   }
@@ -177,7 +189,7 @@ function game() {
       }
       if (set?.phase === 'playing') {
         playNote(set, n.pitch, n.strength, n.at - start);
-        sceneNote(scene, n.pitch, set.listen.notes.length - 1, n.at - start);
+        sceneNote(scene, n.pitch, set.listen.notes.length - 1, n.at - start, n.strength);
       }
     },
     onRelease: (r) => {
@@ -242,7 +254,7 @@ function game() {
     end.hidden = true;
     audio.stopBand();
     set = null;
-    scene = createScene();
+    scene = createScene(pageSeed);
     if (bot) startBot();
     else screen = 'ready';
   });
@@ -263,7 +275,7 @@ function game() {
       get screen() { return screen; },
       get set() { return set; },
       get scene() { return scene; },
-      audio, input, latency,
+      audio, input, latency, art, flocks,
     };
   }
 
@@ -284,7 +296,8 @@ function game() {
       latency.reported = audio.reportedLatency();
       draw({
         screen: screen === 'thanks' || screen === 'over' ? 'playing' : screen,
-        set, scene, keys: input.keys, t: set ? set.t : 0, time: (now - t0) / 1000, debug: debug ? latency : null,
+        set, scene, keys: input.keys, t: set ? set.t : 0, bars: set ? set.t / BAR : skyBar,
+        time: (now - t0) / 1000, still: reducedMotion.matches, flocks, debug: debug ? latency : null,
       });
       out.drawImage(off, 0, 0, canvas.width, canvas.height);
     } catch (err) {
