@@ -1,7 +1,7 @@
 # Open Case: the art repaint (design spec)
 
 **Date:** 2026-09-28
-**Status:** Nathan approved the look (the flat style sample, his busker in a black beanie, black shirt and forest green pants: "looks great!") and the order (art, then the looper, then Regulars). The ambient motion below is from the chat ("is the background going to be dynamic? clouds moving maybe some birds flying"). This written spec is waiting for his review; the implementation plan comes after that.
+**Status:** Approved by Nathan ("ready for the art repaint") and built from `docs/superpowers/plans/2026-09-28-open-case-art.md`. The look is the flat style sample he approved (his busker in a black beanie, black shirt and forest green pants: "looks great!"). The ambient motion is from the chat ("is the background going to be dynamic? clouds moving maybe some birds flying"). Order: art, then the looper, then Regulars.
 
 The playable test draws everything as code-made rectangles. This change repaints the game in the flat style Nathan chose from his reference picture, the one `art/open-case/style-sample.lua` shows:
 - flat colour, at most two tones per material;
@@ -80,6 +80,24 @@ The **tab icon** is redrawn flat to match. The front-page island stays in the si
 - A mid-set screenshot still makes every listener's reaction readable at a glance, with the background moving.
 - The frame rate stays smooth.
 - Nathan's verdict after a few sets.
+
+## What the build settled
+
+The plan's prototype settled a few things this spec left open:
+- **The sky steps one band at a time.** Each stage's seven bands change top first, every 2 bars, so the whole sky never changes at once. Each stage is complete at its bar (0, 15, 30, 45, 60). The rooftops and the train darken with the horizon's band, and each cloud with its own band.
+- **Unlit windows don't show.** Each lights at its own seeded bar.
+- **Two clocks.** What follows the set runs on the set's clock: the sunset, windows, lamp, stars, train, the trees' rustle, the nods and the pigeons' scatter. The clouds, the birds, the sway, breathing and the pigeons' pecking run on the page's clock, so the title screen is live. The birds come from the page's seed, which `?seed=N` fixes.
+- **Reactions are pale bubbles with a sign**, over a flat dark shadow so they read against the sun:
+  - repeat: a yawn's Zs;
+  - off key: a frown;
+  - callback: a grin;
+  - taste: bouncing notes;
+  - random: a question mark;
+  - silence: dots;
+  - loud: a wince;
+  - recognised: a tick.
+- **Reduced motion also stops the lamp's flicker.**
+- **`?sky=N`** shows the park N bars into a set, for checking the sunset.
 
 ## Not in this change
 

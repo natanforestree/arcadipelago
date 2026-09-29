@@ -79,17 +79,18 @@ That writes the editable `art/snake-icon.aseprite` and the `snake/icon.png` the 
 
 `open-case/` is a busking game, a work in progress. You improvise on the computer keyboard, laid out like GarageBand's Musical Typing, over a lo-fi loop, and passers-by stop, stay and tip according to what you play. Repeating yourself bores them, off-key notes on strong beats make them frown, and an earlier idea brought back changed earns a coin. The band gains layers as the crowd grows. The design spec is `docs/superpowers/specs/2026-09-28-open-case-design.md`.
 
-- Tests (Node 22, no dependencies): `cd open-case && npm test`. The headline test plays a scripted honest set against a random bot and a lick bot over ten seeds.
+- Tests (Node 22, no dependencies): `cd open-case && npm test`. The headline test plays a scripted honest set against a random bot and a lick bot over ten seeds. The art tests check the committed sprite sheet against what the game draws.
 - Debug:
   - `?sound` is the sound check: the loop with a switch per layer, and the guitar on the keys.
   - `?debug` shows each listener's interest and the last rule they heard, and a corner panel with the audio delay. On the end card it adds Run the bots and the test log.
   - `?seed=N` fixes the passers-by.
   - `?bot=random` or `?bot=lick` plays a whole set by itself.
-- Tuning: the rules, the crowd, the tips and the feel are in `open-case/src/tuning.js`; the synth's voicing is in `open-case/src/audio.js`, and a few view timings are in `scene.js` and `render.js`.
-- Art: the game is drawn in code for now. The tab icon and a style sample have scripts in `art/open-case/`, and `palette.lua` holds their colours. The style sample shows the look Nathan picked for the repaint: flat colour, no outlines, no dithering.
+  - `?sky=N` shows the park as it is N bars into a set (until a set starts), to check the sunset without playing three minutes.
+- Tuning: the rules, the crowd, the tips and the feel are in `open-case/src/tuning.js`, and so are the park's sunset and background timings (`PARK`); the synth's voicing is in `open-case/src/audio.js`, and a few view timings are in `scene.js` and `render.js`.
+- Art: flat colour, no outlines, no dithering, the look Nathan picked from a reference picture. The game draws from one sprite sheet, `open-case/assets/sprites.png`, with its frame and layout data in `sprites.json`. `art/open-case/sprites.lua` writes both from the shared drawing code: `draw.lua` (the park, you and your things) and `figures.lua` (the passers-by, their reactions, the pigeons and the birds). `palette.lua` holds every colour, at most 64. The style sample and the tab icon have scripts there too. Rebuild everything from the repo root (it's deterministic: an unchanged script rebuilds its files byte for byte):
 
   ```sh
-  for s in icon style-sample; do /Applications/Aseprite.app/Contents/MacOS/aseprite -b --script art/open-case/$s.lua; done
+  for s in sprites icon style-sample; do /Applications/Aseprite.app/Contents/MacOS/aseprite -b --script art/open-case/$s.lua; done
   ```
 
   The style sample writes `art/open-case/preview-style.png` and `preview-oldman.gif`. Previews aren't committed.

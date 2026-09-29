@@ -214,6 +214,8 @@ This computer remembers the last 50 sets: the date, coins, how many stopped, and
 
 **Update (2026-09-28):** Nathan saw the 16-bit sample and chose a different direction from a reference picture he found: flat colour, no outlines, no dithering, about a dozen colours per figure, figures about 46 px tall at 320×180. The sample script was redrawn in that style; the repaint aims at it.
 
+**Update (2026-09-28):** the flat-style repaint is built; see `2026-09-28-open-case-art-design.md`. The game now draws from a sprite sheet made by `art/open-case/sprites.lua`.
+
 Made by Aseprite scripts in `art/open-case/`, like the other games' art, and shown to Nathan. As the README says of previews, it isn't committed.
 
 - **A still** of the park at dusk, at 320×180, in layers at different depths: sky, distant rooftops, near trees, the path. You're on the crate with the guitar, with the open case holding a few coins, and the looper.
