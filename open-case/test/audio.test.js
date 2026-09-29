@@ -32,7 +32,7 @@ function withAudio(fn) {
       return gains[2 + (i < 0 ? LAYERS.length : i)];
     };
     ctx.master = () => gains[0];
-    ctx.band = () => gains[1];
+    ctx.gainCount = () => gains.length;
     return ctx;
   };
   try {
@@ -719,3 +719,29 @@ test('countIn does nothing without a started context', () => {
   const audio = createAudio(memoryStorage());
   assert.doesNotThrow(() => audio.countIn([1, 2], 0));
 });
+
+test('countIn makes and keeps nothing when every time is already past (R on the last beat, say)', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    ctx().currentTime = 5;
+    const before = { started: ctx().started.length, gains: ctx().gainCount() };
+    audio.countIn([1, 2, 3], 0);
+    assert.equal(ctx().started.length, before.started, 'no click sounds');
+    assert.equal(ctx().gainCount(), before.gains, 'no gain made for it either');
+  }));
+
+test('update() forgets a count-in once its clicks are done, so stopLoop no longer finds one to cut off', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    audio.startBand(0);
+    const before = ctx().started.length;
+    audio.countIn([1], 0);
+    const clicks = ctx().started.slice(before);
+    const cueGain = (s) => downstream(s.node).find((n) => n.countIn !== undefined);
+    ctx().currentTime = 1.2; // well past the click's own end
+    audio.update(() => []);
+    audio.stopLoop(0);
+    assert.ok(clicks.every((s) => !cueGain(s).cut), 'already forgotten by update(), so stopLoop had nothing left to cut');
+  }));

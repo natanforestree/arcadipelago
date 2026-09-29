@@ -151,24 +151,22 @@ The plan's prototype settled a few things this spec left open:
 - **The strip's loop slot** comes straight after the reverb's: the icon, "R", and three dots. The pigeons moved 26 pixels to the right to make room.
 - **Looped notes rise faintly from just over the loop pedal**, higher notes a little higher. They drift up and to the left, away from your own notes, which drift right toward the crowd, and fade in 3 seconds.
 - **The news over the strip:**
-  - R counts you in rather than saying so at once: a big gold 4 3 2 1 over the loop's slot, one digit a
-    beat, with a soft stick click on each beat after R up to the bar line;
-  - while it records, "rec" and four bar cells fill in as the bars go by; over the last bar's beats 2 to
-    4 they give way to a big red 3 2 1, so you know when it closes;
+  - R counts you in rather than saying so at once: a big gold 4 3 2 1 over the loop's slot, one digit a beat, with a soft stick click on each beat after R up to the bar line;
+  - while it records, "rec" and four bar cells fill in as the bars go by; over the last bar's beats 2 to 4 they give way to a big red 3 2 1, so you know when it closes;
   - the layer lands: "layer 1", "layer 2" or "layer 3", in green;
   - "loop full";
   - "recording cancelled" (Backspace during a recording);
   - "layer removed";
   - "loop cleared".
 
-  It shows one message at a time: the newer of the loop's news and a pedal stomp, over the count-in or
-  the recording cue.
+  It shows one message at a time: the newer of the loop's news and a pedal stomp; while one is showing, it takes the count-in or the recording cue's place, rather than sitting over it.
 - **While a recording waits**, the light is red for the first half of each beat.
 - **In the shop:**
   - the card's last line, while the loop pedal is chosen, is "R record   backspace undo   esc back";
   - its light on the rack shows the loop you're trying;
   - the band there is the electric piano alone, at about two thirds of its level in a set;
-  - buying the pedal while you try it keeps your loop going.
+  - buying the pedal while you try it keeps your loop going;
+  - the stick clicks count you in there too, over the electric piano; there's no on-screen count-in or recording cue in the shop.
 - **An empty recording still counts as a layer.** Four bars with no notes take a layer, and Backspace takes it off.
 - **The loop sits a little under you**, at 80% of your live level.
 - **A safety before the speakers** keeps stacked loops from clipping. Measured offline at the default volume:

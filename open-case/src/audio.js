@@ -46,7 +46,7 @@ const COUNT_TONE_HZ = 1000; // ...with a little pitch under it, dropping as it d
 const COUNT_TONE_DROP_HZ = 700;
 const COUNT_TONE_LEN = 0.03;
 const COUNT_TONE_LEVEL = 0.05;
-const COUNT_ATTACK = 0.002; // soft, so it ticks rather than beeps
+const COUNT_ATTACK = 0.002; // a quick onset, like a stick, not a slow swell
 
 // Each instrument's voicing. `pluck` is a guitar's string: how long it rings (seconds to fall 60 dB), its pick's
 // brightness by strength, where the pick meets the string (a share of its length from the bridge),
@@ -707,18 +707,20 @@ export function createAudio(storage) {
     }
   }
 
-  // A count-in: a stick click at each band time (now the audio clock, main.js having added the band's
-  // start) in `ats` not already past, counting the recording arming on `layer` in. The clicks go
-  // through one gain of their own into master, never the band bus (its level differs in the shop) and
-  // never a pedal (they're not your instrument, and never recorded). stopLoop cuts them off.
+  // A count-in: a stick click at each audio-clock time in `ats` not already past, counting the
+  // recording arming on `layer` in. The clicks go through one gain of their own into master, never the
+  // band bus (its level differs in the shop) and never a pedal (they're not your instrument, and never
+  // recorded). stopLoop cuts them off. Nothing is made or kept if every time is already past (R pressed
+  // on the last beat, say, or the shop's band starting before its first click).
   function countIn(ats, layer) {
     if (!ctx) return;
+    const ahead = ats.filter((at) => at >= ctx.currentTime);
+    if (!ahead.length) return;
     const g = ctx.createGain();
     g.countIn = layer; // named, so the tests can follow it, like the pedals
     g.connect(master);
     let end = ctx.currentTime;
-    for (const at of ats) {
-      if (at < ctx.currentTime) continue;
+    for (const at of ahead) {
       burst(g, at, { len: COUNT_BURST_LEN, freq: COUNT_BURST_HZ, q: COUNT_BURST_Q, vol: COUNT_BURST_LEVEL });
       tone(g, at, { len: COUNT_TONE_LEN, type: 'triangle', freq: COUNT_TONE_HZ, to: COUNT_TONE_DROP_HZ, vol: COUNT_TONE_LEVEL, attack: COUNT_ATTACK });
       end = Math.max(end, at + COUNT_TONE_LEN + 0.05);
