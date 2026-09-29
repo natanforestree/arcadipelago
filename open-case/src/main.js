@@ -19,7 +19,7 @@ import { createAudio } from './audio.js';
 import { createInput } from './input.js';
 import { layoutPitches, shopKey } from './keys.js';
 import { createSet, stepSet, playNote, releaseNote, summary, runSet, momentsOf } from './set.js';
-import { crowdSize } from './crowd.js';
+import { crowdSize, personName } from './crowd.js';
 import { createScene, createFlocks, sceneNote, sceneLoopNote, sceneEvents, stepScene, FLIGHT } from './scene.js';
 import { createRenderer, W, H } from './render.js';
 import { randomBot, lickBot } from './bots.js';
@@ -348,9 +348,8 @@ function game(art) {
     document.getElementById('end-saved').hidden = !!bot;
     document.getElementById('shop').hidden = !!bot;
     document.getElementById('end-stopped').textContent = `${s.stopped} ${s.stopped === 1 ? 'person' : 'people'} stopped to listen.`;
-    const names = { jogger: 'A jogger', elder: 'An old man', student: 'A student', commuter: 'A commuter' };
     document.getElementById('end-longest').textContent = s.longest
-      ? `${names[s.longest.kind]} stayed longest: ${Math.round(s.longest.seconds)} seconds.`
+      ? `${personName(s.longest.kind, art.data.looks[s.longest.kind][s.longest.look])} stayed longest: ${Math.round(s.longest.seconds)} seconds.`
       : 'Nobody stayed this time.';
     document.getElementById('end-debug').hidden = !debug;
     document.getElementById('bots-result').textContent = '';

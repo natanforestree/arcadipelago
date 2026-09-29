@@ -1,7 +1,7 @@
 # Open Case: passers-by who look like different people (design spec)
 
 **Date:** 2026-09-29
-**Status:** Nathan picked "same tastes, new people" and agreed the design in chat. He asked to skip a preview of the line-up ("no need to show me the lineup, go ahead and write up the spec"). This written spec is waiting for his review; the implementation plan comes after that.
+**Status:** Nathan picked "same tastes, new people" and agreed the design in chat. He asked to skip a preview of the line-up ("no need to show me the lineup, go ahead and write up the spec"), then for the plan. Built from `docs/superpowers/plans/2026-09-29-open-case-passers-by.md`.
 
 Nathan: "can we add more variation with the specators? i am seeing the same thre eones over and ove and it would be nice if it seemed like actual random people walking by, also add some female characters, i think they are all male currently and its a little strange".
 
@@ -118,6 +118,14 @@ The intended line-up. The build may change a colour to fit the palette or to rea
 ## How we'll know it works
 
 Nathan plays a few sets and it feels like a street: different people of every kind, women and men, and the same face rarely comes round. He can still tell a jogger from a commuter without thinking. **If six looks a kind feels too few**, adding more is art, and the deck takes any number. **If a kind stops reading at a glance**, its sign gets bolder.
+
+## What the build settled
+
+The plan's prototype settled a few things the line-up left open:
+- **A few colours changed** to read better. The jogger's running cap is charcoal, since a white one read as pale hair. The white-haired elder's coat is charcoal too: the dark green was the hedge's own colour. The student in box braids wears teal, not yellow, next to the yellow backpack every student carries. "Navy" is the palette's deep blue.
+- **Ten new colours:** tan and deep brown skin, a rose, a teal, auburn and blonde. The sheet has 49 of its 64 colours, 550 frames, and weighs 74 KB.
+- **The closest two looks of a kind** still differ in 150 pixels. The art tests ask for at least 60.
+- **The skirts:** the commuter's skirt suit and the student's denim skirt come to the knee, with bare legs below. The other women wear trousers, leggings, running shorts or a long coat.
 
 ## Not in this change
 
