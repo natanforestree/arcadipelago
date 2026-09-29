@@ -3,7 +3,8 @@
 // Coins and the rest are reported in c.out as { type, person, coins? } for the set to collect.
 //
 // Each person: { id, kind, look (which of the kind's people they are, 0 to LOOKS - 1), dir (+1 walking
-//   right), x, y, state, listening, heard, interest, budget, stayed, spot, lastRule, reaction: { rule, t } | null, done }
+//   right), x, y, state, listening, heard, interest, budget, stayed, spot, lastRule,
+//   reaction: { rule, t } | null, done }
 // state: 'passing' (walking by, maybe listening), 'joining' (hooked, walking to a spot), 'stopped',
 // 'leaving'. The crowd is everyone joining or stopped.
 import { CROWD, INTEREST, TIPS, RULES } from './tuning.js';
