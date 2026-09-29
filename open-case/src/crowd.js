@@ -2,25 +2,32 @@
 // hooked, and leave bored or happy. Their interest moves with what the ears hear (listen.js events).
 // Coins and the rest are reported in c.out as { type, person, coins? } for the set to collect.
 //
-// Each person: { id, kind, dir (+1 walking right), x, y, state, listening, heard, interest, budget,
-//   stayed, spot, lastRule, reaction: { rule, t } | null, done }
+// Each person: { id, kind, look (which of the kind's people they are, 0 to LOOKS - 1), dir (+1 walking
+//   right), x, y, state, listening, heard, interest, budget, stayed, spot, lastRule, reaction: { rule, t } | null, done }
 // state: 'passing' (walking by, maybe listening), 'joining' (hooked, walking to a spot), 'stopped',
 // 'leaving'. The crowd is everyone joining or stopped.
 import { CROWD, INTEREST, TIPS, RULES } from './tuning.js';
 import { createRng, nextRandom, randomBetween } from './rng.js';
 
 export const KINDS = ['jogger', 'elder', 'student', 'commuter'];
+export const LOOKS = 6; // each kind's people, three women and three men (art/open-case/figures.lua)
+const LOOK_SEED = 0x9e3779b9; // mixed into the set's seed for the looks' own stream
 export const PATH_Y = 146; // where passers-by walk
 
 export function createCrowd(seed) {
   return {
     rng: createRng(seed),
+    // Looks are dealt from a stream of their own, so they never move the draws above: a set's kinds,
+    // sides, budgets and arrival times are as they were before people had looks.
+    lookRng: createRng((seed ^ LOOK_SEED) >>> 0),
+    decks: Object.fromEntries(KINDS.map((k) => [k, []])), // each kind's looks still to deal, in order
+    lastLook: {}, // each kind's look dealt last
     people: [],
     nextId: 1,
     nextArrival: CROWD.firstArrival,
     open: true, // new people still arrive
     stoppedEver: 0,
-    longest: null, // { kind, seconds }: whoever has stayed longest
+    longest: null, // { kind, look, seconds }: whoever has stayed longest
     out: [],
   };
 }
@@ -29,13 +36,41 @@ export const inCrowd = (p) => p.state === 'joining' || p.state === 'stopped';
 export const crowdSize = (c) => c.people.reduce((n, p) => n + (inCrowd(p) ? 1 : 0), 0);
 const hearing = (p) => p.listening || inCrowd(p);
 
+// How the end card names someone of `kind`, who (the look's) is 'woman' or 'man': "A jogger", or for
+// the elder, "An old woman" or "An old man".
+export function personName(kind, who) {
+  if (kind === 'elder') return who === 'woman' ? 'An old woman' : 'An old man';
+  return `A ${kind}`;
+}
+
+// Deals an arriving `kind` a look, like a card: the first in the kind's deck that no one on screen is
+// wearing. A deck that's run out, or that has only looks someone's wearing left, is refilled with all
+// of them, shuffled, never starting with the look just dealt. So everyone of a kind comes by before any
+// comes back, and no two people on screen look the same (at most 5 others are there when one arrives).
+export function dealLook(c, kind) {
+  const worn = new Set(c.people.filter((p) => p.kind === kind).map((p) => p.look));
+  if (!c.decks[kind].some((l) => !worn.has(l))) {
+    const deck = [...Array(LOOKS).keys()];
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = Math.floor(nextRandom(c.lookRng) * (i + 1));
+      [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+    if (deck[0] === c.lastLook[kind]) deck.push(deck.shift());
+    c.decks[kind] = deck;
+  }
+  const look = c.decks[kind].find((l) => !worn.has(l));
+  c.decks[kind].splice(c.decks[kind].indexOf(look), 1);
+  c.lastLook[kind] = look;
+  return look;
+}
+
 function arrive(c, t) {
   // Always the same draws in the same order, so the k-th arrival is the same person whatever you play.
   const kind = KINDS[Math.floor(nextRandom(c.rng) * KINDS.length)];
   const dir = nextRandom(c.rng) < 0.5 ? 1 : -1;
   const budget = randomBetween(c.rng, CROWD.budgetMin, CROWD.budgetMax);
   c.people.push({
-    id: c.nextId++, kind, dir, x: dir > 0 ? -CROWD.edge : CROWD.width + CROWD.edge, y: PATH_Y,
+    id: c.nextId++, kind, look: dealLook(c, kind), dir, x: dir > 0 ? -CROWD.edge : CROWD.width + CROWD.edge, y: PATH_Y,
     state: 'passing', listening: false, heard: 0, walkedOn: false,
     interest: INTEREST.start + INTEREST.draw * crowdSize(c), budget, stayed: 0, spot: -1,
     lastRule: '', reaction: null, done: false, arrivedAt: t,
@@ -126,7 +161,7 @@ export function stepCrowd(c, dt, t) {
       if (p.state === 'passing') p.x += p.dir * kind.speed * (p.listening ? CROWD.listenSlow : 1) * dt;
     } else if (p.state === 'joining' || p.state === 'stopped') {
       p.stayed += dt;
-      if (!c.longest || p.stayed > c.longest.seconds) c.longest = { kind: p.kind, seconds: p.stayed };
+      if (!c.longest || p.stayed > c.longest.seconds) c.longest = { kind: p.kind, look: p.look, seconds: p.stayed };
       if (p.state === 'joining') {
         const [sx, sy] = CROWD.spots[p.spot];
         const step = kind.speed * dt;

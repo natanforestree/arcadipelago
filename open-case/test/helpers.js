@@ -43,11 +43,12 @@ export function runCrowd(c, t, seconds, each = () => {}) {
   return t;
 }
 
-// A listener standing in the crowd at spot `spot`, for tests that need one without hooking them.
+// A listener standing in the crowd at spot `spot` (the kind's look 0 unless `over` says), for tests
+// that need one without hooking them.
 export function stoodAt(c, kind, spot, over = {}) {
   const [x, y] = CROWD.spots[spot];
   const p = {
-    id: c.nextId++, kind, dir: 1, x, y, state: 'stopped', listening: false, heard: 0, walkedOn: true,
+    id: c.nextId++, kind, look: 0, dir: 1, x, y, state: 'stopped', listening: false, heard: 0, walkedOn: true,
     interest: 0.9, budget: 999, stayed: 0, spot, lastRule: '', reaction: null, done: false, arrivedAt: 0, ...over,
   };
   c.people.push(p);

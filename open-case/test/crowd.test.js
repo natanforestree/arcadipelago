@@ -1,17 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createCrowd, hear, crowdSize, endTips, KINDS } from '../src/crowd.js';
+import { createCrowd, hear, crowdSize, endTips, dealLook, personName, KINDS, LOOKS } from '../src/crowd.js';
 import { CROWD, INTEREST, TIPS, DT } from '../src/tuning.js';
 import { runCrowd, stoodAt } from './helpers.js';
 
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) <= eps;
 
-// Everyone who came by in the first `seconds`, in order: kind, side and arrival time.
+// Everyone who came by in the first `seconds`, in order: kind, look, side, budget and arrival time.
 function arrivals(seed, seconds = 120, each) {
   const c = createCrowd(seed), seen = new Map();
   runCrowd(c, 0, seconds, (t) => {
     each?.(c, t);
-    for (const p of c.people) if (!seen.has(p.id)) seen.set(p.id, { kind: p.kind, dir: p.dir, at: p.arrivedAt });
+    for (const p of c.people) if (!seen.has(p.id)) seen.set(p.id, { kind: p.kind, look: p.look, dir: p.dir, budget: p.budget, at: p.arrivedAt });
   });
   return [...seen.values()];
 }
@@ -26,6 +26,66 @@ test('passers-by come from the seed: the same seed brings the same people at the
     const gap = a[i].at - a[i - 1].at;
     assert.ok(gap >= 6 - DT && gap <= 10 + DT, `gap ${gap}`);
   }
+});
+
+test("looks don't move the crowd's draws: seed 7 brings the same people, sides, budgets and times as before looks", () => {
+  // From the code before passers-by had looks: [kind, dir, budget, arrival time], to 4 places.
+  const before = [
+    ['jogger', 1, 177.2289, 2.0167], ['student', 1, 115.9479, 10.8167], ['student', -1, 90.9379, 17.7833],
+    ['commuter', -1, 83.6565, 24.4167], ['elder', -1, 95.5596, 31.9], ['jogger', -1, 82.895, 41.8167],
+    ['jogger', 1, 125.7482, 48.4], ['jogger', -1, 126.4453, 57.45], ['student', -1, 134.9257, 65.95],
+    ['commuter', 1, 80.993, 75.65], ['elder', 1, 70.5727, 83.0833], ['elder', 1, 116.2395, 92.1667],
+  ];
+  const now = arrivals(7).slice(0, before.length).map((p) => [p.kind, p.dir, +p.budget.toFixed(4), +p.at.toFixed(4)]);
+  assert.deepEqual(now, before);
+});
+
+test('each arrival is dealt a look like a card: all of a kind come by before any comes back, never one twice running', () => {
+  for (const seed of [1, 2, 3, 7, 11]) {
+    const a = arrivals(seed, 600);
+    assert.deepEqual(arrivals(seed, 600), a, 'the same seed deals the same looks');
+    for (const kind of KINDS) {
+      const looks = a.filter((p) => p.kind === kind).map((p) => p.look);
+      assert.ok(looks.every((l) => Number.isInteger(l) && l >= 0 && l < LOOKS), `${kind}: ${looks}`);
+      for (let i = 0; i + LOOKS <= looks.length; i += LOOKS) {
+        assert.equal(new Set(looks.slice(i, i + LOOKS)).size, LOOKS, `seed ${seed}, ${kind}: each ${LOOKS} in turn are all different (${looks})`);
+      }
+      looks.forEach((l, i) => i > 0 && assert.notEqual(l, looks[i - 1], `seed ${seed}, ${kind}: never twice running (${looks})`));
+    }
+  }
+});
+
+test('no two people on screen look the same, even when everyone stays', () => {
+  for (const seed of [3, 5, 8]) {
+    arrivals(seed, 600, (c) => {
+      for (const p of c.people) if (p.listening) p.interest = 1; // everyone who hears you stops
+      const worn = c.people.map((p) => `${p.kind} ${p.look}`);
+      assert.equal(new Set(worn).size, worn.length, `seed ${seed}: ${worn}`);
+    });
+  }
+});
+
+test("a deck whose every look left is on screen is refilled, and the look just dealt doesn't start the new deck", () => {
+  const c = createCrowd(1);
+  stoodAt(c, 'jogger', 0, { look: 4 });
+  c.decks.jogger = [4];
+  const look = dealLook(c, 'jogger');
+  assert.notEqual(look, 4, "the one left is being worn, so it isn't dealt");
+  assert.equal(c.decks.jogger.length, LOOKS - 1, 'a fresh deck, less the look dealt');
+  for (let i = 0; i < 50; i++) {
+    const d = createCrowd(i);
+    const first = dealLook(d, 'student');
+    d.decks.student = [];
+    assert.notEqual(dealLook(d, 'student'), first, `seed ${i}: a new deck never starts with the look just dealt`);
+  }
+});
+
+test('the end card names who stayed: a jogger, a student, a commuter, an old woman or an old man', () => {
+  assert.equal(personName('jogger', 'woman'), 'A jogger');
+  assert.equal(personName('student', 'man'), 'A student');
+  assert.equal(personName('commuter', 'woman'), 'A commuter');
+  assert.equal(personName('elder', 'woman'), 'An old woman');
+  assert.equal(personName('elder', 'man'), 'An old man');
 });
 
 test('never more than 6 on screen: with 6 listening, nobody new arrives until one leaves', () => {
@@ -143,7 +203,7 @@ test('below 0.2 anyone leaves, showing what lost them', () => {
 
 test('when their time is up they leave, tipping 2 if happy (the elder 3), nothing if not', () => {
   const c = createCrowd(1);
-  stoodAt(c, 'student', 0, { budget: 5, interest: 0.9 });
+  stoodAt(c, 'student', 0, { budget: 5, interest: 0.9, look: 3 });
   stoodAt(c, 'elder', 1, { budget: 5, interest: 0.9 });
   stoodAt(c, 'jogger', 2, { budget: 5, interest: 0.4 });
   runCrowd(c, 0, 5.1);
@@ -151,6 +211,7 @@ test('when their time is up they leave, tipping 2 if happy (the elder 3), nothin
   assert.deepEqual(coins, [['student', TIPS.happy, 'happy'], ['elder', TIPS.happyElder, 'happy']]);
   assert.ok(c.people.filter((p) => p.state !== 'passing').every((p) => p.state === 'leaving'));
   assert.equal(c.longest.kind, 'student');
+  assert.equal(c.longest.look, 3, 'and which student');
   assert.ok(near(c.longest.seconds, 5, 0.05));
 });
 
