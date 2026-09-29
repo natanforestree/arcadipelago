@@ -36,7 +36,9 @@ export function fakeAudioContext() {
         (to.from ??= []).push(n); // what feeds a node or a setting (a wave into a gain, say)
         return to;
       },
-      disconnect() {},
+      disconnect() {
+        n.cut = true; // cut off from everything it fed
+      },
       ...extra,
     };
     return n;

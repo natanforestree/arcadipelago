@@ -1,10 +1,12 @@
-// The sound check (/open-case/?sound): the loop with a switch per layer, and your instrument on the
+// The sound check (/open-case/?sound): the band with a switch per layer, and your instrument on the
 // keys, so the sounds and the beat can be judged by ear before anything else. Every instrument and
-// pedal in the shop can be tried here, without buying it (keys 2 to 6 stomp the pedals too). No
-// crowd, no set: the loop plays until you leave.
+// pedal in the shop can be tried here, without buying it (keys 2 to 6 stomp the pedals too), and the
+// loop pedal (R records, Backspace undoes). No crowd, no set: the band plays until you leave.
 import { createInput } from './input.js';
 import { layoutPitches } from './keys.js';
 import { STOCK } from './gear.js';
+import { createLoop, record, note, release, ring, step, undo, due, loopState } from './looper.js';
+import { LOOP } from './tuning.js';
 
 // Browsers don't treat these as user activation (Chrome doesn't for a lone modifier, no browser does
 // for Esc), so starting an AudioContext from one leaves it suspended.
@@ -17,13 +19,17 @@ export function soundCheck(audio, { debug }) {
   document.getElementById('game').hidden = true;
   const boxes = [...panel.querySelectorAll('input[data-layer]')];
   let started = false, measured = null;
+  const loop = createLoop();
+  let bandAt = 0; // the band's first 16th, on the audio clock: the loop's times count from it
+  const bandTime = () => audio.now() - bandAt;
 
   const begin = () => {
     if (started) return;
     started = true;
     audio.start();
     warm();
-    audio.startBand(audio.now() + 0.1);
+    bandAt = audio.now() + 0.1;
+    audio.startBand(bandAt);
     for (const box of boxes) audio.setLayer(box.dataset.layer, box.checked);
     document.getElementById('sound-start').hidden = true;
   };
@@ -33,7 +39,7 @@ export function soundCheck(audio, { debug }) {
   const warm = () => audio.warm(layoutPitches(input.keys), input.keys.strength);
   for (const item of STOCK) {
     if (item.kind === 'instrument') choice.add(new Option(item.name, item.id));
-    else {
+    else if (item.kind === 'pedal') {
       const label = document.createElement('label'), box = document.createElement('input');
       box.type = 'checkbox';
       box.dataset.pedal = item.id;
@@ -60,6 +66,7 @@ export function soundCheck(audio, { debug }) {
     now: audio.now,
     onNote: (n) => {
       audio.noteOn(n.code, n.pitch, n.strength, n.at, n.legato);
+      if (started) note(loop, n.at - bandAt, n.code, n);
       // A strummed note's `at` is deliberately later than now (the strum gap); only notes that sound
       // at once tell us the true key-to-sound latency.
       if (n.at <= audio.now()) {
@@ -67,11 +74,20 @@ export function soundCheck(audio, { debug }) {
         if (heard !== null) measured = heard - n.timeStamp;
       }
     },
-    onRelease: (r) => audio.noteOff(r.code, r.at),
+    onRelease: (r) => {
+      audio.noteOff(r.code, r.at);
+      release(loop, r.at - bandAt, r.code);
+    },
     onControl: (action, down) => {
-      if (action === 'ring') audio.setRing(down);
-      else if (action === 'mute') audio.toggleMute();
-      else if (action !== 'pause') warm();
+      if (action === 'ring') {
+        audio.setRing(down);
+        ring(loop, bandTime(), down);
+      } else if (action === 'mute') audio.toggleMute();
+      else if (action === 'loop') {
+        if (started) record(loop, bandTime());
+      } else if (action === 'undo') {
+        if (undo(loop)) audio.stopLoop(loop.layers.length);
+      } else if (action !== 'pause') warm();
     },
     onPedal: (id) => {
       const box = pedals.querySelector(`[data-pedal="${id}"]`);
@@ -79,12 +95,14 @@ export function soundCheck(audio, { debug }) {
       audio.setPedal(id, box.checked);
     },
   });
-  if (debug) window.__openCase = { audio, input, get measured() { return measured; } };
+  if (debug) window.__openCase = { audio, input, loop, get measured() { return measured; } };
 
   const frame = () => {
-    audio.update();
+    if (started) step(loop, bandTime());
+    audio.update((from, to) => due(loop, from, to));
     const reported = audio.reportedLatency();
     latency.textContent = `Octave ${input.keys.octave}, pick ${input.keys.strength} of 4${input.keys.lock ? ', scale lock on' : ''}. `
+      + `Loop: ${loopState(loop, bandTime())}, ${loop.layers.length} of ${LOOP.layers} layers. `
       + `Browser's reported audio delay: ${reported == null ? 'not reported' : `${reported.toFixed(0)} ms`}. `
       + `Last key to sound: ${measured == null ? 'play a note' : `${measured.toFixed(0)} ms`}.`;
     requestAnimationFrame(frame);

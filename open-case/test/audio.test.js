@@ -1,10 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createAudio, pluckSamples, softClip, VOICING } from '../src/audio.js';
+import { createAudio, pluckSamples, softClip, safetyCurve, VOICING } from '../src/audio.js';
 import { fakeAudioContext } from './fake-audio.js';
 import { BAR, BEAT, timeOf16th } from '../src/groove.js';
 import { PLAY, GROOVE, LAYERS } from '../src/tuning.js';
 import { PEDALS, INSTRUMENTS } from '../src/gear.js';
+import { createLoop, record, note, release, step, due, LOOP_LENGTH } from '../src/looper.js';
 
 function memoryStorage() {
   const m = new Map();
@@ -480,4 +481,141 @@ test('the delay echoes on the dotted 8th and fades over three or four repeats', 
     const loop = downstream(line).find((n) => n.gain && n.outs.includes(line));
     const repeat = loop.gain.value;
     assert.ok(repeat ** 3 > 0.03 && repeat ** 5 < 0.01, `each echo ${repeat} of the one before`);
+  }));
+
+// A loop with a layer recorded from bar line `bar` (band time): each note is [seconds after the bar
+// line, pitch, seconds held].
+function loopWith(bar, notes, loop = createLoop()) {
+  record(loop, bar * BAR - 0.5);
+  notes.forEach(([at, pitch, len], i) => {
+    note(loop, bar * BAR + at, `k${i}`, { pitch, strength: 3, legato: false });
+    release(loop, bar * BAR + at + len, `k${i}`);
+  });
+  step(loop, bar * BAR + LOOP_LENGTH);
+  return loop;
+}
+// The sounds started since the `before`-th that are your instrument's (they go on into the pedals),
+// not the band's.
+const yours = (ctx, before = 0) => ctx().started.slice(before).filter((s) => nextPedal(s.node));
+// Runs the audio clock on in frames from its time now to `until`, handing update the loop's notes;
+// returns the looped notes scheduled, each with the time it was scheduled at.
+function runLoop(ctx, audio, loop, until) {
+  const out = [];
+  while (ctx().currentTime < until) {
+    ctx().currentTime += 1 / 60;
+    for (const n of audio.update((from, to) => due(loop, from, to))) out.push({ ...n, when: ctx().currentTime });
+  }
+  return out;
+}
+
+test("your loop's notes are scheduled a moment ahead with the band, each once a time round, never in the past", () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    audio.startBand(0.5);
+    const loop = loopWith(1, [...Array(16).keys()].map((i) => [i * BEAT, 60 + (i % 5), 0.2]));
+    const heard = runLoop(ctx, audio, loop, 0.5 + BAR + 3 * LOOP_LENGTH - 0.5);
+    for (const n of heard) assert.ok(n.at >= n.when - 1e-9 && n.at <= n.when + GROOVE.ahead + 1e-9, `${n.at} scheduled at ${n.when}`);
+    assert.equal(heard.length, 32, 'the 16 notes, twice round');
+    heard.forEach((n, i) => {
+      const want = 0.5 + BAR + LOOP_LENGTH * (1 + Math.floor(i / 16)) + (i % 16) * BEAT;
+      assert.ok(Math.abs(n.at - want) < 1e-9, `note ${i} at ${n.at}, wanted ${want}`);
+    });
+    assert.deepEqual(yours(ctx).map((s) => s.t), heard.map((n) => n.at), 'each one sounds, as a plucked note');
+  }));
+
+test('a looped note is a voice of its own through your instrument and pedals: a live note on its pitch, or Space, never cuts it off', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    audio.setInstrument('synth');
+    audio.startBand(0);
+    const loop = loopWith(1, [[0, 60, 2]]);
+    ctx().currentTime = BAR + LOOP_LENGTH - 0.1;
+    const before = ctx().started.length;
+    const [n] = audio.update((from, to) => due(loop, from, to));
+    const sources = yours(ctx, before).map((s) => s.node);
+    assert.ok(sources.length > 0);
+    assert.equal(nextPedal(sources[0]).pedal, PEDALS[0], 'into the pedals');
+    assert.ok(downstream(sources[0]).includes(ctx().destination));
+    ctx().currentTime = n.at + 0.5;
+    audio.setRing(true);
+    audio.noteOn('KeyA', 60, 3, ctx().currentTime, false);
+    audio.noteOff('KeyA', ctx().currentTime + 0.1);
+    audio.setRing(false);
+    const stops = ctx().stopped.filter((s) => sources.includes(s.node));
+    assert.ok(stops.length > 0 && stops.every((s) => s.t >= n.at + 2 - 1e-9), 'it lets go after its own 2 seconds');
+    assert.ok(stops.every((s) => s.t <= n.at + 2 + VOICING.synth.release * 2 + 1e-9));
+  }));
+
+test("taking off a layer stops its notes at once: those sounding let go, and those not yet started never sound", () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    audio.setInstrument('synth');
+    audio.startBand(0);
+    const loop = loopWith(1, [[0, 60, 4]]);
+    loopWith(1, [[0.1, 64, 4], [0.15, 67, 4]], loop); // a second layer, from the same bar line
+    ctx().currentTime = BAR + LOOP_LENGTH - 0.01;
+    const before = ctx().started.length;
+    audio.update((from, to) => due(loop, from, to)); // schedules all three
+    const layerOf = (pitch) => yours(ctx, before).filter((s) => Math.abs(s.node.frequency.value - 440 * 2 ** ((pitch - 69) / 12)) < 0.01).map((s) => s.node);
+    ctx().currentTime = BAR + LOOP_LENGTH + 0.12; // the first two have started, the third hasn't
+    audio.stopLoop(1);
+    const gainOf = (osc) => downstream(osc).find((g) => g.gain?.events?.length && g.kind === 'gain');
+    const cut = (pitch) => layerOf(pitch).map((o) => ctx().stopped.filter((s) => s.node === o).at(-1).t);
+    assert.ok(cut(64).every((t) => t <= ctx().currentTime + VOICING.synth.release * 2 + 1e-9), 'the sounding note of layer 2 lets go now');
+    assert.ok(gainOf(layerOf(67)[0]).cut, "layer 2's note still to come is cut off before it sounds");
+    assert.ok(cut(60).every((t) => t >= BAR + LOOP_LENGTH + 4 - 1e-9), 'layer 1 plays on');
+  }));
+
+test('your loop fades out with the band at the end of the set, is scheduled no further, and stops with the band', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    audio.setInstrument('synth');
+    audio.startBand(0);
+    const loop = loopWith(1, [...Array(8).keys()].map((i) => [i * 1.5, 60, 0.5]));
+    const end = BAR + LOOP_LENGTH + 5;
+    audio.endBand(end);
+    const heard = runLoop(ctx, audio, loop, end + BAR + 5);
+    assert.ok(heard.length > 0 && heard.every((n) => n.at < end + BAR), 'nothing after the fade');
+    const fades = downstream(yours(ctx)[0].node).flatMap((g) => g.gain?.events?.filter(([how, v]) => how === 'linear' && v === 0) ?? []);
+    assert.deepEqual(fades, [['linear', 0, end + BAR]], 'it fades over the last bar');
+    ctx().currentTime = end + 0.5;
+    const sounding = yours(ctx).filter((s) => s.t > end - 1 && s.t < end + 0.5).map((s) => s.node);
+    assert.ok(sounding.length > 0);
+    audio.stopBand();
+    for (const node of sounding) assert.ok(ctx().stopped.filter((s) => s.node === node).at(-1).t <= end + 0.5 + VOICING.synth.release * 2 + 1e-9);
+    assert.deepEqual(audio.update((from, to) => due(loop, from, to)), [], 'and nothing more is scheduled');
+  }));
+
+test("in the shop, the band plays its electric piano alone, softer, so you can try the loop pedal over it", () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    audio.tryBand(1);
+    const last = (g) => g.gain.events.at(-1)[1];
+    for (const { id } of LAYERS) assert.equal(last(ctx().busGain(id)), id === 'keys' ? 1 : 0, id);
+    assert.equal(last(ctx().busGain('perc')), 0, 'no stand-in percussion either');
+    const band = ctx().busGain('keys').outs[0];
+    const tryLevel = band.gain.events.filter(([how, , t]) => how === 'set' && t === 1).at(-1)[1];
+    audio.startBand(5);
+    const setLevel = band.gain.events.filter(([how, , t]) => how === 'set' && t === 5).at(-1)[1];
+    assert.ok(tryLevel > 0 && tryLevel < setLevel * 0.7, `${tryLevel} next to ${setLevel} in a set`);
+  }));
+
+test("a safety before the speakers leaves the game's sound as it was, and rounds off what a loop stacks on top", () =>
+  withAudio((ctx) => {
+    const curve = safetyCurve(), n = curve.length;
+    const at = (x) => curve[Math.round(((x / 4 + 1) / 2) * (n - 1))]; // the curve at input level x (it takes up to 4x full scale)
+    for (const x of [0, 0.1, -0.3, 0.5, 0.69]) assert.ok(Math.abs(at(x) - x) < 1e-3, `${x} passes untouched`);
+    assert.ok(at(1) > 0.8 && at(1) < 0.95, `full scale rounds off a little: ${at(1)}`);
+    assert.ok(at(4) <= 0.95 && at(-4) >= -0.95 && at(4) > 0.94, 'four times over still never clips, with room to spare');
+    for (let i = 1; i < n; i++) assert.ok(curve[i] >= curve[i - 1], 'never folds back');
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    const safety = downstream(playOn(ctx, audio, 'acoustic')[0].node).find((x) => x.kind === 'shaper' && x.outs.includes(ctx().destination));
+    assert.ok(safety, 'the last thing before the speakers');
+    assert.equal(safety.from[0].gain.value, 1 / 4, 'fed at a quarter, for the headroom');
   }));

@@ -7,7 +7,10 @@
 //   - The band: electric piano, drums, bass, hats and pad from groove.js's patterns, scheduled a
 //     little ahead of the audio clock, as Last Light's score is. Each layer plays into its own bus
 //     (its slot): switching a layer is a fade on that bus at a bar line.
+//   - Your loop (looper.js): its notes are scheduled a moment ahead with the band's, each a voice of
+//     its own through your instrument and pedals, and they fade and stop with the band.
 //   - Vinyl crackle, a dusty filter over the band, the tape wobble, coins landing and applause.
+//   - A safety before the speakers, so a loop stacked on your playing can't clip.
 // Browsers only allow sound after a key press or click, so start() is called from inside one
 // (main.js). M mutes; the volume and mute are remembered.
 import { bandAt, timeOf16th, midiToHz, BAR, BEAT } from './groove.js';
@@ -18,6 +21,7 @@ const MUTE_KEY = 'open-case-muted', VOLUME_KEY = 'open-case-volume';
 const PICK = [0.35, 0.55, 0.8, 1]; // loudness by pick strength 1-4
 const BRIGHT = [0.2, 0.35, 0.55, 0.8]; // the acoustic's pick's brightness by strength
 const BAND_LEVEL = 0.55; // the band bus's level under your instrument
+const TRY_LEVEL = 0.35; // ...and in the shop, where the electric piano plays alone while you try the loop pedal
 // The percussion standing in for the drums: on only while the drums slot is off. Lo-fi and soft, not
 // a metronome: a shaker, a finger snap and a low tap, not a beeping tone.
 const PERC_SHAKER_HZ = 7000; // the shaker: bright but soft noise
@@ -85,6 +89,17 @@ const DELAY_TONE = 2800; // Hz: each echo a little darker
 const REVERB_TIME = 2.4; // seconds for the hall to fall 60 dB
 const REVERB_MIX = 0.5;
 
+// Your loop sits a little under your live playing.
+const LOOP_LEVEL = 0.8;
+// The safety before the speakers: everything passes untouched up to SAFE_KNEE (about -3 dB; the
+// game's own sound peaks around there, a hard chord at the default volume), and louder peaks round
+// off toward SAFE_CEILING, up to SAFE_HEADROOM times over full scale (+12 dB: three layers of a hard
+// chord on top of the same chord played live). The ceiling is a hair under full scale because the
+// shaper's own smoothing overshoots it a little.
+const SAFE_KNEE = 0.7;
+const SAFE_CEILING = 0.95;
+const SAFE_HEADROOM = 4;
+
 // A plucked string's samples: up to `ring` + 0.3 seconds of a string at `hz`, picked at strength 1-4,
 // cut short once it's inaudible. Karplus-Strong with an all-pass for exact tuning; the loop loses
 // enough each period for the fundamental to fall 60 dB over `ring`.
@@ -129,6 +144,17 @@ export function pluckSamples(rate, hz, strength = 3, { ring = PLAY.ring, bright 
   return out;
 }
 
+// The safety's curve, for input scaled down by SAFE_HEADROOM: back up to the sound's own level, then
+// straight through up to SAFE_KNEE, and rounding off smoothly above it, never past SAFE_CEILING.
+export function safetyCurve(n = 4097) {
+  const curve = new Float32Array(n), room = SAFE_CEILING - SAFE_KNEE;
+  for (let i = 0; i < n; i++) {
+    const x = SAFE_HEADROOM * ((i / (n - 1)) * 2 - 1), a = Math.abs(x);
+    curve[i] = Math.sign(x) * (a <= SAFE_KNEE ? a : SAFE_KNEE + room * Math.tanh((a - SAFE_KNEE) / room));
+  }
+  return curve;
+}
+
 // The overdrive's clipping curve: straight for quiet input, rounding off smoothly toward +-1.
 export function softClip(k = OD_CURVE, n = 1025) {
   const curve = new Float32Array(n);
@@ -140,18 +166,21 @@ export function createAudio(storage) {
   let ctx = null, master = null, band = null, noise = null, wobble = null;
   const bus = {}; // a gain per layer: the layer slots
   const inputs = {}; // a gain per instrument, into its tone filters and on into the pedals
+  const loopIns = {}; // a gain per instrument for your loop's notes, into its input: the loop's fade
   const pedals = {}; // id -> { input, output, set(on, at) }
   let tremoloDepth = null, tremoloWave = null;
   let instrument = 'acoustic';
   const pedalOn = Object.fromEntries(PEDALS.map((id) => [id, false]));
   const plucks = new Map(); // `${pitch}:${strength}` -> AudioBuffer, for the instrument you play
   const voices = new Map(); // key code -> the voice sounding: { g, sources, release }
+  const looped = new Set(); // your loop's voices, sounding or about to: { g, sources, release, start, end, layer }
   const ringing = new Set(); // voices whose key is up but Space holds them
   let ring = false;
   let muted = storage.get(MUTE_KEY) === '1';
   let volume = Number(storage.get(VOLUME_KEY) ?? 0.8);
   if (!(volume >= 0 && volume <= 1)) volume = 0.8;
   let loopAt = -1, next16 = 0, stopAt = Infinity, crackleAt = 0;
+  let loopDone = 0; // your loop's notes are scheduled up to this band time
   const level = () => (muted ? 0 : volume);
 
   function start() {
@@ -164,7 +193,6 @@ export function createAudio(storage) {
     ctx = new AC({ latencyHint: 'interactive' }); // the lowest delay the browser can keep up with
     master = ctx.createGain();
     master.gain.value = level();
-    master.connect(ctx.destination);
     // The dusty filter over the band: no deep lows, soft highs.
     const hp = ctx.createBiquadFilter(), lp = ctx.createBiquadFilter();
     hp.type = 'highpass';
@@ -207,8 +235,17 @@ export function createAudio(storage) {
         node = node.connect(f);
       }
       node.connect(pedals[PEDALS[0]].input);
+      loopIns[id] = ctx.createGain();
+      loopIns[id].gain.value = LOOP_LEVEL;
+      loopIns[id].connect(inputs[id]);
     }
     newTremoloWave(ctx.currentTime);
+    // The safety between everything and the speakers.
+    const headroom = ctx.createGain(), safety = ctx.createWaveShaper();
+    headroom.gain.value = 1 / SAFE_HEADROOM;
+    safety.curve = safetyCurve();
+    safety.oversample = '4x'; // rounding off peaks makes highs that would otherwise fold back down as noise
+    master.connect(headroom).connect(safety).connect(ctx.destination);
     // The tape wobble: a slow wave on the keys' and pad's pitch, off until the top layer joins.
     const lfo = ctx.createOscillator();
     lfo.frequency.value = 0.55;
@@ -370,18 +407,18 @@ export function createAudio(storage) {
     if (ctx && VOICING[instrument].pluck) for (const p of pitches) bufferFor(p, strength);
   }
 
-  // The voices, one per note: each starts at `at` into its instrument's input and returns what damp()
-  // needs to stop it, { g: its gain, sources: what to stop }.
-  function pluckVoice(pitch, strength, at, legato) {
+  // The voices, one per note: each starts at `at` into `to` (its instrument's input, or the loop's way
+  // into it) and returns what damp() needs to stop it, { g: its gain, sources: what to stop }.
+  function pluckVoice(pitch, strength, at, legato, to) {
     const src = ctx.createBufferSource(), g = ctx.createGain();
     src.buffer = bufferFor(pitch, strength);
     g.gain.value = PICK[strength - 1] * (legato ? PLAY.legatoGain : 1);
-    src.connect(g).connect(inputs[instrument]);
+    src.connect(g).connect(to);
     src.start(at, legato ? 0.012 : 0); // a hammer-on has no pick attack
     return { g, sources: [src] };
   }
 
-  function epianoVoice(pitch, strength, at, legato) {
+  function epianoVoice(pitch, strength, at, legato, to) {
     const f = midiToHz(pitch), vel = PICK[strength - 1] * (legato ? PLAY.legatoGain : 1);
     const note = ctx.createOscillator(), bend = ctx.createOscillator(), bite = ctx.createGain(), g = ctx.createGain();
     const bell = ctx.createOscillator(), ding = ctx.createGain();
@@ -397,7 +434,7 @@ export function createAudio(storage) {
     g.gain.setValueAtTime(0, at);
     g.gain.linearRampToValueAtTime(vel * EP_LEVEL, at + 0.003);
     g.gain.setTargetAtTime(0, at + 0.003, decay);
-    note.connect(g).connect(inputs.epiano);
+    note.connect(g).connect(to);
     bell.connect(ding).connect(g);
     const sources = [note, bend, bell];
     for (const o of sources) {
@@ -407,7 +444,7 @@ export function createAudio(storage) {
     return { g, sources };
   }
 
-  function synthVoice(pitch, strength, at, legato) {
+  function synthVoice(pitch, strength, at, legato, to) {
     const f = midiToHz(pitch), vel = PICK[strength - 1];
     const filter = ctx.createBiquadFilter(), g = ctx.createGain(), sources = [];
     const between = ([lo, hi]) => f * (lo + (hi - lo) * vel);
@@ -430,7 +467,7 @@ export function createAudio(storage) {
     g.gain.setValueAtTime(0, at);
     g.gain.linearRampToValueAtTime(loud, at + 0.01);
     g.gain.setTargetAtTime(loud * 0.75, at + 0.01, 0.3);
-    filter.connect(g).connect(inputs.synth);
+    filter.connect(g).connect(to);
     return { g, sources };
   }
 
@@ -448,7 +485,7 @@ export function createAudio(storage) {
         damp(v, start);
       }
     }
-    const voice = VOICES[instrument](pitch, strength, start, legato);
+    const voice = VOICES[instrument](pitch, strength, start, legato, inputs[instrument]);
     voices.set(code, { ...voice, release: VOICING[instrument].release, pitch, start });
   }
 
@@ -578,27 +615,68 @@ export function createAudio(storage) {
     }
   }
 
-  // The band starts with your first note: 16th 0 sounds at `at`.
-  function startBand(at) {
+  // The band starts with your first note: 16th 0 sounds at `at`. Your loop starts empty with it.
+  function startBand(at, level = BAND_LEVEL) {
     if (!ctx) return;
     loopAt = at;
     next16 = 0;
     stopAt = Infinity;
+    loopDone = 0;
     newTremoloWave(at);
-    band.gain.cancelScheduledValues(at);
-    band.gain.setValueAtTime(BAND_LEVEL, at);
+    for (const g of [band, ...Object.values(loopIns)]) {
+      g.gain.cancelScheduledValues(at);
+      g.gain.setValueAtTime(g === band ? level : LOOP_LEVEL, at);
+    }
   }
 
-  // The end of the set: the band fades out over a bar from `at`, and stops.
+  // The band in the shop, while you try the loop pedal: its electric piano alone (the keys layer, with
+  // no stand-in percussion), softly, from `at`.
+  function tryBand(at) {
+    if (!ctx) return;
+    startBand(at, TRY_LEVEL);
+    for (const { id } of LAYERS) bus[id].gain.setTargetAtTime(id === 'keys' ? 1 : 0, at, 0.02);
+    bus.perc.gain.setTargetAtTime(0, at, 0.02);
+    wobble.gain.setTargetAtTime(0, at, 0.5);
+  }
+
+  // The end of the set: the band and your loop fade out over a bar from `at`, and stop.
   function endBand(at) {
     if (!ctx) return;
-    band.gain.setValueAtTime(BAND_LEVEL, at);
-    band.gain.linearRampToValueAtTime(0, at + BAR);
+    for (const g of [band, ...Object.values(loopIns)]) {
+      g.gain.setValueAtTime(g === band ? BAND_LEVEL : LOOP_LEVEL, at);
+      g.gain.linearRampToValueAtTime(0, at + BAR);
+    }
     stopAt = at + BAR;
   }
 
+  // Stops the band and your loop at once: nothing more is scheduled, and what's still sounding fades
+  // out quickly.
   function stopBand() {
     loopAt = -1;
+    if (!ctx) return;
+    band.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+    stopLoop();
+  }
+
+  // A looped note: a voice of its own through your instrument and pedals (so it never cuts off a note
+  // you're playing, even on the same key), letting go `len` seconds after it starts at `at`.
+  function loopNote({ pitch, strength, legato, len, layer, at }) {
+    const release = VOICING[instrument].release;
+    const v = { ...VOICES[instrument](pitch, strength, at, legato, loopIns[instrument]), release, start: at, end: at + len + release * 2, layer };
+    damp(v, at + len);
+    looped.add(v);
+  }
+
+  // Stops your loop's voices from one layer (or every layer) now: those sounding let go, and those
+  // scheduled but not yet started are cut off before they sound.
+  function stopLoop(layer = null) {
+    if (!ctx) return;
+    for (const v of looped) {
+      if (layer !== null && v.layer !== layer) continue;
+      looped.delete(v);
+      if (v.start > ctx.currentTime) v.g.disconnect();
+      damp(v, ctx.currentTime);
+    }
   }
 
   // A layer slot switched on or off, at a bar line (or at once, from the sound check).
@@ -610,9 +688,12 @@ export function createAudio(storage) {
     if (id === 'drums') bus.perc.gain.setTargetAtTime(on ? 0 : 1, Math.max(at, ctx.currentTime), 0.02);
   }
 
-  // Called every frame: schedules the band's 16ths due in the next GROOVE.ahead seconds, and the crackle.
-  function update() {
-    if (!ctx || ctx.state !== 'running' || loopAt < 0) return;
+  // Called every frame: schedules the band's 16ths due in the next GROOVE.ahead seconds, the crackle,
+  // and your loop's notes due by then. loopDue(from, to) gives the looped notes starting between two
+  // band times (seconds since the band's first 16th), as looper.js's due does. Returns the looped
+  // notes it scheduled, each with `at`, its time on the audio clock.
+  function update(loopDue = null) {
+    if (!ctx || ctx.state !== 'running' || loopAt < 0) return [];
     const t = ctx.currentTime;
     // After a stall, skip what's already late rather than playing it all at once.
     while (loopAt + timeOf16th(next16) < t - 0.1) next16++;
@@ -628,6 +709,14 @@ export function createAudio(storage) {
       crackleAt = t + 0.03 + Math.random() * 0.25;
       burst(bus.keys, t, { len: 0.004 + Math.random() * 0.01, type: 'highpass', freq: 2000 + Math.random() * 4000, vol: 0.05 + Math.random() * 0.12 });
     }
+    for (const v of looped) if (v.end < t) looped.delete(v);
+    // Your loop's notes, never in the past: after a stall, what's already late is skipped.
+    const from = Math.max(loopDone, t - loopAt), to = Math.min(t + GROOVE.ahead, stopAt) - loopAt;
+    if (!loopDue || to <= from) return [];
+    loopDone = to;
+    const notes = loopDue(from, to).map((n) => ({ ...n, at: loopAt + n.t }));
+    for (const n of notes) loopNote(n);
+    return notes;
   }
 
   function coin(at = now()) {
@@ -662,8 +751,8 @@ export function createAudio(storage) {
   }
 
   return {
-    start, now, warm, noteOn, noteOff, setRing, setInstrument, setPedal, startBand, endBand, stopBand, setLayer,
-    update, coin, clap, reportedLatency, heardAt,
+    start, now, warm, noteOn, noteOff, setRing, setInstrument, setPedal, startBand, tryBand, endBand, stopBand, stopLoop,
+    setLayer, update, coin, clap, reportedLatency, heardAt,
     get started() {
       return !!ctx;
     },
