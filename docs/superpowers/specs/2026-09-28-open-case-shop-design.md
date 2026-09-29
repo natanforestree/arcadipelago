@@ -1,7 +1,7 @@
 # Open Case: the music shop (design spec)
 
 **Date:** 2026-09-28
-**Status:** Nathan agreed the design in chat ("perfect", "yup looks good!"). This written spec is waiting for his review; the implementation plan comes after that.
+**Status:** Nathan agreed the design in chat ("perfect", "yup looks good!") and approved this written spec ("go ahead and continue with subagents.. i trust your judgement"). The plan is `docs/superpowers/plans/2026-09-28-open-case-shop.md`.
 
 Nathan's ask: "instead of just the loop we should add a few things that you can buy in a shop with the money you make … a music shop with different guitar pedals and loop pedal and instruments and what not."
 
