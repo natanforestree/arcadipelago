@@ -5,7 +5,7 @@
 // question of which slot to replace, open over the pad. studioHit says what a click lands on;
 // drawStudio draws it all with render.js's tools.
 import { READY, clockOf, chordOf, bassNote, keyNote, noteLetter, padChordName, SOUNDS, BASS_C } from './beats.js';
-import { PARTS, DRUMS, COLUMNS, rhythmOf, isChosen } from './studio.js';
+import { PARTS, DRUMS, COLUMNS, rhythmOf, isChosen, chosenBeat } from './studio.js';
 import { STUDIO } from './tuning.js';
 
 // Where everything is, [x, y, w, h] in scene pixels.
@@ -26,6 +26,8 @@ const LANES = { drums: [144, 10], bass: [156, 9], chords: [167, 10] }; // each l
 const inside = ([x, y, w, h], px, py) => px >= x && px < x + w && py >= y && py < y + h;
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 export const moodShort = (id) => ({ C: 'C maj', D: 'D dor', E: 'E phr', F: 'F lyd', G: 'G mix', A: 'A min' })[id];
+// A beat's name cut to fit a short space (the top bar, a row of the list): 9 letters at most.
+const shortName = (name) => (name.length > 9 ? `${name.slice(0, 8)}.` : name);
 
 // The list's rows over the pad: the ready-made beats on the left, your slots on the right, and its
 // buttons along the bottom.
@@ -92,7 +94,7 @@ export function drawStudio(d, studio, t) {
   // The top bar: the beat's name (click for the list), the tabs, the settings.
   px(0, 0, 320, 19, C.dusk);
   px(NAME[0], NAME[1], NAME[2], NAME[3], studio.list ? C.charcoal : C.night);
-  text(beat.name.length > 9 ? `${beat.name.slice(0, 8)}.` : beat.name, NAME[0] + 3, NAME[1] + 3, C.light);
+  text(shortName(beat.name), NAME[0] + 3, NAME[1] + 3, C.light);
   text('v', NAME[0] + NAME[2] - 7, NAME[1] + 3, C.grey);
   for (const [id, [x, y, w, h]] of Object.entries(TAB_BOXES)) {
     const on = id === part, colour = id === 'mix' ? [C.gold, C.goldDark] : tone[id];
@@ -241,21 +243,25 @@ function strip({ px, text, C }, studio, t, tone) {
   if (t >= 0) px(x0 + Math.round(pos * step), top, 1, y0 + h - top, C.light);
 }
 
-// The list of beats (or, with every slot full, which of yours to replace), over the pad.
+// The list of beats (or, with every slot full, which of yours to replace), over the pad. Each row is a
+// beat's name and, at its end, its tempo and key; the beat your sets play is named in green, and said
+// under the rows (a row is too short for the word as well).
 function list({ px, text, C }, studio) {
   const [x0, y0, w, h] = PAD, asking = studio.asking;
   px(x0, y0, w, h, C.ink);
   text(asking ? 'your slots are full: replace which?' : 'ready-made', x0 + 6, y0 + 3, C.gold);
   if (!asking) text('yours', x0 + 122, y0 + 3, C.gold);
-  const row = ([x, y, rw], name, open, chosen, empty) => {
+  const row = ([x, y, rw], beat, open, chosen) => {
     if (open) px(x - 2, y - 1, rw, LIST_ROW, C.charcoal);
-    text(name, x, y + 1, empty ? C.greyDark : C.light);
-    if (chosen) text('busking', x + rw - 6, y + 1, C.go, 'right');
+    if (!beat) return text('empty', x, y + 1, C.greyDark);
+    text(shortName(beat.name), x, y + 1, chosen ? C.go : C.light);
+    text(`${beat.bpm} ${moodShort(beat.mood)}`, x + rw - 6, y + 1, C.grey, 'right');
   };
   if (!asking) {
-    READY.forEach((b, i) => row(listBox(i, 0), b.name, studio.open.ready === b.id, isChosen(studio, { ready: b.id })));
+    READY.forEach((b, i) => row(listBox(i, 0), b, studio.open.ready === b.id, isChosen(studio, { ready: b.id })));
   }
-  studio.beats.slots.forEach((b, i) => row(listBox(i, 1), b ? b.name : 'empty', studio.open.slot === i, b && isChosen(studio, { slot: i }), !b));
+  studio.beats.slots.forEach((b, i) => row(listBox(i, 1), b, studio.open.slot === i, b && isChosen(studio, { slot: i })));
+  text(`busking: ${chosenBeat(studio.beats).name}`, x0 + 6, y0 + 14 + STUDIO.slots * LIST_ROW + 1, C.go);
   if (asking) {
     text('esc: leave them all', x0 + 6, y0 + h - 12, C.grey);
     return;

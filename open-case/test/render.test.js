@@ -13,8 +13,8 @@ import { STOCK, PEDALS, INSTRUMENTS, freshGear, buy, stomp } from '../src/gear.j
 import { createShop, choose, CARD, BUTTON } from '../src/shop.js';
 import { createLoop, record, step, loopLength } from '../src/looper.js';
 import { stoodAt } from './helpers.js';
-import { createStudio, setTab } from '../src/studio.js';
-import { STRIP } from '../src/studioview.js';
+import { createStudio, setTab, newBeat } from '../src/studio.js';
+import { STRIP, PAD } from '../src/studioview.js';
 const { bar: BAR, beat: BEAT } = LOFI_CLOCK;
 const LOOP_LENGTH = loopLength(createLoop());
 
@@ -700,10 +700,22 @@ test("the studio's strip: every part's notes in its own lane and colour, the cho
 
 test('the list of beats, and the question when your slots are full, over the pad', () => {
   const studio = createStudio({ slots: Array(6).fill(null), chosen: null });
+  newBeat(studio);
   studio.list = true;
   const g = fakeContext();
   createRenderer(g, art)(view({ screen: 'studio', studio, t: 0 }));
-  for (const s of ['ready-made', 'yours', 'Lo-fi', 'Bossa nova', 'Funk', 'Reggae', 'Slow ballad', 'empty', 'busking', 'new', 'busk to this', 'close']) assert.ok(g.texts.includes(s), s);
+  for (const s of ['ready-made', 'yours', 'Lo-fi', 'Funk', 'Reggae', 'Beat 1', 'empty', 'new', 'busk to this', 'close']) assert.ok(g.texts.includes(s), s);
+  // Each beat's tempo and key beside its name, in the list's grey; a long name is cut to fit.
+  const C = data.colors, inList = (s) => g.positions.find((p) => p.s === s && p.y > PAD[1]);
+  for (const [name, about] of [['Lo-fi', '80 C maj'], ['Bossa no.', '132 A min'], ['Funk', '100 D dor'], ['Reggae', '76 A min'], ['Slow bal.', '68 C maj'], ['Beat 1', '90 A min']]) {
+    const n = inList(name), a = g.positions.find((p) => p.s === about && p.y === n?.y);
+    assert.ok(n && a, `${name}: ${about}, on its row`);
+    assert.ok(a.x > n.x && a.align === 'right' && a.color === C.grey, `${about}: at the row's end, in grey`);
+  }
+  // The beat your sets play: its name in the busking green, and said under the rows.
+  assert.equal(inList('Lo-fi').color, C.go);
+  assert.equal(inList('Beat 1').color, C.light);
+  assert.ok(g.texts.includes('busking: Lo-fi'));
   studio.list = false;
   studio.asking = { make: 'copy' };
   const q = fakeContext();

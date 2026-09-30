@@ -104,6 +104,7 @@ const CHORUS_DRY = 0.8;
 const TREMOLO_DEPTH = 0.35; // the volume swings this share either way, on the 8th notes
 const DELAY_BEATS = 0.75; // the echo's time, in beats of the band's beat: a dotted 8th
 const PUMP_DEPTH = 0.7; // at full Pump, the chords, bass and Pad drop to 30% on a kick...
+const PUMP_DOWN = 0.005; // ...over about this many seconds (a step can click on a held chord)...
 const PUMP_BACK = 0.25; // ...and come back with this time constant, in beats
 const HISS_LEVEL = 0.02; // the Vinyl's quiet hiss under its crackle
 const CUT_FADE = 0.005; // seconds: how quickly a note painted over in the studio fades to silence
@@ -623,8 +624,9 @@ export function createAudio(storage) {
     src.start(t, Math.random() * 1.5, len + 0.05);
   }
 
-  // A band note's way into its slot, through its tone: below 0.5 a lowpass closing towards its pitch
-  // (darker), above it a shelf lifting its highs (brighter); at 0.5 (or with none) the sound itself.
+  // A band note's way into its slot, through its tone: below 0.5 a lowpass (darker) whose cutoff falls
+  // from TONE_DARK_HZ x 32 (6.4 kHz) just under 0.5 to TONE_DARK_HZ (200 Hz) at 0, whatever the note's
+  // pitch; above it a shelf lifting its highs (brighter); at 0.5 (or with none) the sound itself.
   function toned(out, tone) {
     if (tone === undefined || tone === 0.5) return out;
     const fl = ctx.createBiquadFilter();
@@ -775,13 +777,13 @@ export function createAudio(storage) {
     }
   }
 
-  // The Pump: on a kick at `at`, the chords, the bass and the Pad drop by the beat's Pump and come
-  // back over about an 8th note.
+  // The Pump: on a kick at `at`, the chords, the bass and the Pad drop by the beat's Pump within a few
+  // ms (all but there by PUMP_DOWN) and come back over about an 8th note.
   function duck(at) {
     const depth = beat.mix.pump * PUMP_DEPTH;
     if (!depth) return;
     for (const g of Object.values(pump)) {
-      g.gain.setValueAtTime(1 - depth, at);
+      g.gain.setTargetAtTime(1 - depth, at, PUMP_DOWN / 3);
       g.gain.setTargetAtTime(1, at + 0.01, clock.beat * PUMP_BACK);
     }
   }
@@ -892,7 +894,10 @@ export function createAudio(storage) {
   function tryBand(at, b = LOFI) {
     if (!ctx) return;
     startBand(at, b, TRY_LEVEL);
-    for (const { id } of LAYERS) bus[id].gain.setTargetAtTime(id === 'keys' ? 1 : 0, at, 0.02);
+    for (const { id } of LAYERS) {
+      layerOn[id] = id === 'keys'; // so the Pump doesn't follow the kicks of drums nobody hears
+      bus[id].gain.setTargetAtTime(layerOn[id] ? 1 : 0, at, 0.02);
+    }
     bus.perc.gain.setTargetAtTime(0, at, 0.02);
     wobble.gain.setTargetAtTime(0, at, 0.5);
   }

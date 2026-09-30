@@ -4,7 +4,8 @@
 //
 // Keys: A S D F the drum strips, A to K the bass notes or chords; up and down turn the rhythm wheel;
 // Tab the next part; Backspace (held) erases, Shift+Backspace clears the part; Z and X move the bass
-// pad down or up an octave; Cmd+Z (Ctrl+Z) undoes; Esc closes the list, or leaves.
+// pad down or up an octave; Cmd+Z (Ctrl+Z) undoes (with Shift it's redo elsewhere, and there's no
+// redo, so it does nothing); Esc closes the list, or leaves.
 import {
   PARTS, DRUMS, LENGTHS, press, moveTo, letGo, setErase, turnRhythm, nextTab, setTab, clearPart, undoChange, moveRange, nextSound,
   setTempo, setSwing, setMood, setLength, setLevel, setPump, toggleMute, togglePad, toggleVinyl, openBeat, newBeat, buskTo, replaceSlot,
@@ -17,11 +18,11 @@ const PAD_KEYS = ['KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyG', 'KeyH', 'KeyJ', 'KeyK'
 const KEY_VEL = 0.7, KEY_TONE = 0.5; // a drum played from its key, and a note or chord's tone
 const DRAG = { bpm: 2, swing: 2, mood: 10, bars: 12 }; // pixels of drag for each step of a setting
 
-// A key goes down. Returns what main.js should do beyond the studio: 'leave', 'busk' (save the
-// choice), or null. `held` is the controls' own state: { key } for a pad key held.
+// A key goes down. Returns what main.js should do beyond the studio: 'leave' (Esc, with nothing
+// open to close), or null. `held` is the controls' own state: { key } for a pad key held.
 export function keyDown(studio, held, e, t) {
   if (e.repeat) return null;
-  if ((e.metaKey || e.ctrlKey) && e.code === 'KeyZ') {
+  if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.code === 'KeyZ') {
     undoChange(studio);
     return null;
   }
@@ -49,8 +50,10 @@ export function keyDown(studio, held, e, t) {
   return null;
 }
 
+// A key comes up. macOS never sends the keyup of a key let go while Cmd is held, so Cmd coming up
+// lets go of the pad key held (as input.js does for notes), or it would paint on.
 export function keyUp(studio, held, e) {
-  if (e.code === held.key) {
+  if (e.code === held.key || (e.key === 'Meta' && held.key)) {
     letGo(studio);
     held.key = null;
   }

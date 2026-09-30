@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   LOFI, LOFI_CLOCK, READY, MOODS, KITS, BASSES, CHORD_SOUNDS, clockOf, setBars, bandAt, inKey, isStrong, isOff16th, keyNote, chordName,
-  padChordName, chordOf, readyBeat,
+  padChordName, chordOf, readyBeat, cleanBeat, cloneBeat, blankBeat,
 } from '../src/beats.js';
 
 const near = (a, b) => Math.abs(a - b) < 1e-9;
@@ -175,4 +175,42 @@ test('a shorter beat comes round sooner; the stand-in percussion keeps to the ba
     else if (k === 4 || k === 12) assert.deepEqual(voices, ['shaker', 'snap']);
     else assert.deepEqual(voices, ['shaker']);
   }
+});
+
+// A beat of your own with a hit in each part, as it might be stored.
+const stored = () => ({
+  ...blankBeat('Mine'), drums: [{ s: 0, drum: 'kick', vel: 1 }], bass: [{ s: 0, degree: 0, len: 4, vel: 0.8, tone: 0.5 }],
+  chords: [{ s: 0, degree: 2, len: 16, vel: 0.5, tone: 0.5 }],
+});
+
+test('a stored beat that is off in any way is left out: numbers, sounds, hits and parts', () => {
+  assert.ok(cleanBeat(stored()), 'a sound one is kept');
+  const off = [
+    (b) => (b.bpm = NaN), (b) => (b.bpm = 200), (b) => (b.swing = 0.9), (b) => (b.mix.levels.drums = -1), (b) => (b.mix.pump = Infinity),
+    (b) => (b.drums[0].vel = NaN), (b) => (b.bass[0].degree = 1.5), (b) => (b.bass[0].len = 0), (b) => (b.chords[0].tone = 2),
+    (b) => (b.sounds.drums = 'nope'), (b) => (b.sounds.bass = 'toString'), (b) => (b.sounds.chords = '__proto__'),
+    (b) => (b.drums[0].drum = 'cowbell'), (b) => (b.drums[0].s = 64), (b) => { b.bars = 1; b.bass[0].s = 16; },
+    (b) => (b.drums = {}), (b) => (b.bass = 'x'), (b) => (b.chords = null), (b) => (b.drums = [null]),
+  ];
+  for (const change of off) {
+    const b = stored();
+    change(b);
+    assert.equal(cleanBeat(b), null, String(change));
+  }
+});
+
+test("a stored chord's own notes must be MIDI notes in the key, or it falls back to its degree's chord", () => {
+  const withNotes = (notes, name = 'X') => ({ ...stored(), chords: [{ s: 0, degree: 2, len: 16, vel: 0.5, tone: 0.5, notes, name }] });
+  const kept = cleanBeat(withNotes([48, 52, 55]));
+  assert.deepEqual([kept.chords[0].notes, kept.chords[0].name], [[48, 52, 55], 'X'], 'its own, as stored');
+  for (const [notes, name] of [[[49, 52, 55]], [[48, 52.5]], [[-2, 48]], [[128]], [[]], ['C'], [null], [[48, 52, 55], 7]]) {
+    const b = cleanBeat(withNotes(notes, name));
+    assert.ok(b, `${JSON.stringify(notes)}: the beat is kept`);
+    assert.deepEqual([b.chords[0].notes, b.chords[0].name], [undefined, undefined], `${JSON.stringify(notes)}: its notes and name dropped`);
+    assert.deepEqual(chordOf(b, b.chords[0]), chordOf(b, { degree: 2 }), "the degree's chord");
+  }
+});
+
+test('every ready-made beat passes the check, as it is', () => {
+  for (const b of READY) assert.deepEqual(cleanBeat(b), cloneBeat(b), b.id);
 });

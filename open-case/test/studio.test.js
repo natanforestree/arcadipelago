@@ -326,6 +326,12 @@ test('your beats and the chosen one come back after a reload; anything unreadabl
   assert.equal(chosenBeat(loadBeats(memoryStorage())), LOFI, 'nothing stored: the lo-fi');
 });
 
+test('a storage that throws when it is read leaves your slots empty and your sets on the lo-fi', () => {
+  const beats = loadBeats({ get() { throw new Error('denied'); }, set() {} });
+  assert.deepEqual(beats, { slots: Array(STUDIO.slots).fill(null), chosen: null });
+  assert.equal(chosenBeat(beats), LOFI);
+});
+
 test('the wheel turns round the 16 rhythms; Tab goes round the parts; nothing to hold on the Mix tab', () => {
   const studio = blank();
   studio.rhythm.drums = 15;

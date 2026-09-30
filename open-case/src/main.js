@@ -315,7 +315,10 @@ function game(art) {
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       pause(true);
-      if (screen === 'studio') letGoStudio();
+      if (screen === 'studio') {
+        letGoStudio();
+        keepBeats(); // the frame loop stops while the page is hidden, so it wouldn't keep them
+      }
     }
   });
   addEventListener('blur', () => {

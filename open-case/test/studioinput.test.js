@@ -208,3 +208,22 @@ test('with every slot full, the same fader drag asks which slot to replace and c
   assert.equal(LOFI.mix.levels.drums, 1);
   assert.deepEqual(beats.slots.map((b) => b.name), ['Beat 1', 'Beat 2', 'Beat 3', 'Beat 4', 'Beat 5', 'Beat 6']);
 });
+
+test('Cmd+Shift+Z (Ctrl+Shift+Z) is redo elsewhere, so it does not undo', () => {
+  const studio = blank(), held = { key: null };
+  setTempo(studio, 100);
+  keyDown(studio, held, key('KeyZ', { metaKey: true, shiftKey: true }), 0);
+  keyDown(studio, held, key('KeyZ', { ctrlKey: true, shiftKey: true }), 0);
+  assert.equal(studio.beat.bpm, 100);
+  keyDown(studio, held, key('KeyZ', { ctrlKey: true }), 0);
+  assert.equal(studio.beat.bpm, 90, 'Ctrl+Z still undoes');
+});
+
+test("Cmd coming up lets go of a held pad key, whose own keyup macOS never sends while Cmd is down", () => {
+  const studio = blank(), held = { key: null };
+  keyDown(studio, held, key('KeyA'), 0);
+  assert.ok(studio.held);
+  keyUp(studio, held, key('MetaLeft', { key: 'Meta' }));
+  assert.equal(studio.held, null);
+  assert.equal(held.key, null);
+});

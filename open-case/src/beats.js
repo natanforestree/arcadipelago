@@ -351,28 +351,36 @@ export function blankBeat(name) {
 }
 
 // A beat read back from storage, checked from top to bottom: the beat as a beat of your own, or null
-// if anything about it is off (it's ignored, and the game carries on).
+// if anything about it is off (it's ignored, and the game carries on). A chord's own notes are kept
+// (with its name) only if they're MIDI notes in the key; if not, it plays its degree's chord.
 export function cleanBeat(raw) {
   const num = (x, lo, hi) => typeof x === 'number' && Number.isFinite(x) && x >= lo && x <= hi;
   const int = (x, lo, hi) => Number.isInteger(x) && x >= lo && x <= hi;
   const flag = (x) => typeof x === 'boolean';
+  const sound = (list, id) => typeof id === 'string' && Object.hasOwn(list, id); // never 'toString' and the like
+  const ownNotes = (h) => Array.isArray(h.notes) && h.notes.length > 0 && h.notes.every((n) => int(n, 0, 127) && inKey(n))
+    && (h.name === undefined || typeof h.name === 'string');
   try {
     if (!raw || typeof raw !== 'object' || typeof raw.name !== 'string' || !raw.name || raw.name.length > 24) return null;
     if (!num(raw.bpm, 60, 140) || !num(raw.swing, 0.5, 0.75) || !MOODS.some((m) => m.id === raw.mood) || ![1, 2, 4].includes(raw.bars)) return null;
     const { sounds: so, mix: m } = raw;
-    if (!KITS[so?.drums] || !BASSES[so?.bass] || !CHORD_SOUNDS[so?.chords]) return null;
+    if (!sound(KITS, so?.drums) || !sound(BASSES, so?.bass) || !sound(CHORD_SOUNDS, so?.chords)) return null;
     const parts = ['drums', 'bass', 'chords'];
     if (!m || !parts.every((p) => num(m.levels?.[p], 0, 1) && flag(m.muted?.[p])) || !num(m.pump, 0, 1) || !flag(m.pad) || !flag(m.vinyl)) return null;
     const end = raw.bars * 16;
     const ok = {
       drums: (h) => int(h.s, 0, end - 1) && ['kick', 'snare', 'hats', 'perc'].includes(h.drum) && num(h.vel, 0, 1),
       bass: (h) => int(h.s, 0, end - 1) && int(h.degree, -14, 21) && int(h.len, 1, 64) && num(h.vel, 0, 1) && num(h.tone, 0, 1),
-      chords: (h) => int(h.s, 0, end - 1) && int(h.degree, -14, 21) && int(h.len, 1, 64) && num(h.vel, 0, 1) && num(h.tone, 0, 1)
-        && (h.notes === undefined || (Array.isArray(h.notes) && h.notes.length > 0 && h.notes.every((n) => int(n, 0, 127))))
-        && (h.name === undefined || typeof h.name === 'string'),
+      chords: (h) => int(h.s, 0, end - 1) && int(h.degree, -14, 21) && int(h.len, 1, 64) && num(h.vel, 0, 1) && num(h.tone, 0, 1),
     };
     if (!parts.every((p) => Array.isArray(raw[p]) && raw[p].length <= 512 && raw[p].every((h) => h && ok[p](h)))) return null;
-    return cloneBeat(raw);
+    const beat = cloneBeat(raw);
+    for (const h of beat.chords) {
+      if (ownNotes(h)) continue;
+      delete h.notes;
+      delete h.name;
+    }
+    return beat;
   } catch {
     return null;
   }

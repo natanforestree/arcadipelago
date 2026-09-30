@@ -824,7 +824,26 @@ test('with the Pump up, the chords, bass and Pad duck on each kick, but only onc
     audio.setLayer('drums', true, 1);
     runBand(ctx, audio, 5);
     const kicks = [0, 7, 10].map((s) => 3 + LOFI_CLOCK.timeOf16th(s)); // bar 1's kicks
-    for (const at of kicks) assert.ok(bass.gain.events.some(([how, v, t]) => how === 'set' && Math.abs(v - 0.3) < 1e-9 && Math.abs(t - at) < 1e-9), `ducked at ${at}`);
+    for (const at of kicks) {
+      const ok = ([how, v, t, tc]) => how === 'target' && Math.abs(v - 0.3) < 1e-9 && Math.abs(t - at) < 1e-9 && tc > 0 && tc <= 0.005;
+      assert.ok(bass.gain.events.some(ok), `ducked at ${at}, over a few ms`);
+    }
+    assert.ok(!bass.gain.events.some(([how]) => how === 'set'), 'never in one step, which can click on a held chord');
+  }));
+
+test("in the shop after a set, the Pump doesn't follow the kicks of drums nobody hears", () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    const pumped = { ...LOFI, mix: { ...LOFI.mix, pump: 1 } };
+    audio.startBand(0, pumped);
+    for (const { id } of LAYERS) audio.setLayer(id, true, 0); // the set ended with every layer in
+    audio.stopBand();
+    const keys = ctx().busGain('keys').from[0]; // the Pump's gain feeding the chords' slot
+    const before = keys.gain.events.length;
+    audio.tryBand(0.5, pumped); // only the chords are heard in the shop
+    runBand(ctx, audio, 4);
+    assert.equal(keys.gain.events.length, before, 'no pumping');
   }));
 
 test('with the Vinyl off there is no crackle, no hiss and no tape wobble', () =>
