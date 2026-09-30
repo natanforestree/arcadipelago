@@ -14,7 +14,7 @@ import { createShop, choose, CARD, BUTTON } from '../src/shop.js';
 import { createLoop, record, step, loopLength } from '../src/looper.js';
 import { stoodAt } from './helpers.js';
 import { createStudio, setTab, newBeat, startNaming, typeName, saveName } from '../src/studio.js';
-import { STRIP, PAD, NAME_FIELD } from '../src/studioview.js';
+import { STRIP, PAD, NAME_FIELD, SETTINGS, arrowsIn } from '../src/studioview.js';
 const { bar: BAR, beat: BEAT } = LOFI_CLOCK;
 const LOOP_LENGTH = loopLength(createLoop());
 
@@ -704,6 +704,50 @@ test("the studio screen: the top bar, the wheel, the buttons and each tab's pad"
   for (const s of ['Dm', 'Em', 'F', 'Am', 'Bdim', 'electric piano']) assert.ok(chords.texts.includes(s), s);
   const mix = drawOn('mix');
   for (const s of ['pump', 'pad', 'vinyl', 'm']) assert.ok(mix.texts.includes(s), s);
+});
+
+// The rectangles drawn inside box [x, y, w, h].
+const rectsIn = (g, [x, y, w, h]) => g.rects.filter(([rx, ry, rw, rh]) => rx >= x && ry >= y && rx + rw <= x + w && ry + rh <= y + h);
+
+test("the tempo's and the swing's ▲▼ are drawn beside their label and number, clear of both, the one that can't step dimmed", () => {
+  const studio = createStudio({ slots: Array(6).fill(null), chosen: null });
+  newBeat(studio);
+  const C = data.colors;
+  // The widths of the letters' ink in Silkscreen at 8px, as Chrome draws them (its measured width
+  // less the pixel it leaves at each side): the labels, and the widest and narrowest numbers.
+  const INK = { bpm: 17, 140: 15, swing: 27, '75%': 17, 60: 10, off: 14, key: 16, 'C maj': 27, bars: 22, 4: 4 };
+  const drawAt = (bpm, swing) => {
+    Object.assign(studio.beat, { bpm, swing, mood: 'C' }); // C maj: the widest key
+    const g = fakeContext();
+    createRenderer(g, art)(view({ screen: 'studio', studio, t: 0 }));
+    return g;
+  };
+  for (const [bpm, swing, lit] of [[140, 0.75, 'down'], [60, 0.5, 'up']]) {
+    const g = drawAt(bpm, swing);
+    const at = (s) => g.positions.find((q) => q.s === s && q.y < 19);
+    const next = { bpm: ['key', 'C maj'], swing: ['bars', '4'] }; // the setting after each, on its right
+    for (const [which, label, number] of [['bpm', 'bpm', String(bpm)], ['swing', 'swing', swing === 0.5 ? 'off' : '75%']]) {
+      const [x] = SETTINGS[which], arrows = arrowsIn(SETTINGS[which]), right = arrows.up[0] + 5;
+      let own = 0;
+      for (const s of [label, number]) {
+        const p = at(s);
+        assert.ok(p && p.align === 'center', `${s}, centred`);
+        assert.ok(p.x - INK[s] / 2 >= x, `${s} starts in its box`);
+        assert.ok(p.x + INK[s] / 2 + 2 <= arrows.up[0], `${s} ends 2px or more short of the arrows`);
+        own = Math.max(own, p.x + INK[s] / 2);
+      }
+      for (const s of next[which]) {
+        assert.ok(at(s).x - INK[s] / 2 - right > arrows.up[0] - own, `the arrows nearer ${label} than ${s}, the next setting's`);
+      }
+      for (const dir of ['up', 'down']) {
+        const drawn = rectsIn(g, arrows[dir]);
+        assert.equal(drawn.reduce((n, [, , rw, rh]) => n + rw * rh, 0), 9, `${which} ${dir}: a triangle of 1, 3 and 5`);
+        assert.ok(drawn.every((r) => r[4] === (dir === lit ? C.grey : C.greyDark)), `${which} at ${bpm}/${swing}: ${dir} ${dir === lit ? 'lit' : 'dimmed'}`);
+      }
+      const [up] = rectsIn(g, arrows.up).sort((a, b) => a[1] - b[1]), [down] = rectsIn(g, arrows.down).sort((a, b) => b[1] - a[1]);
+      assert.deepEqual([up[2], down[2]], [1, 1], '▲ points up, ▼ down');
+    }
+  }
 });
 
 test("the studio's strip: every part's notes in its own lane and colour, the chords named, and the playhead", () => {

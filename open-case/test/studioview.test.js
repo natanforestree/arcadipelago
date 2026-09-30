@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  studioHit, padAt, faderValue, moodShort, NAME, TAB_BOXES, SETTINGS, WHEEL, BUTTONS, PAD, STRIP, LIST_BUTTONS, NAME_BUTTONS, NAME_FIELD,
+  studioHit, padAt, faderValue, moodShort, arrowsIn, NAME, TAB_BOXES, SETTINGS, WHEEL, BUTTONS, PAD, STRIP, LIST_BUTTONS, NAME_BUTTONS, NAME_FIELD,
 } from '../src/studioview.js';
 import { createStudio, newBeat, setTab, startNaming, DRUMS } from '../src/studio.js';
 import { STUDIO } from '../src/tuning.js';
@@ -25,7 +25,8 @@ test('a click lands on the name, a tab, a setting, the wheel (up or down) or a b
   const studio = createStudio(empty());
   assert.deepEqual(studioHit(studio, ...mid(NAME)), { hit: 'name' });
   for (const tab of ['drums', 'bass', 'chords', 'mix']) assert.deepEqual(studioHit(studio, ...mid(TAB_BOXES[tab])), { hit: 'tab', tab });
-  for (const which of ['bpm', 'mood', 'swing', 'bars']) assert.deepEqual(studioHit(studio, ...mid(SETTINGS[which])), { hit: 'setting', which });
+  for (const which of ['mood', 'bars']) assert.deepEqual(studioHit(studio, ...mid(SETTINGS[which])), { hit: 'setting', which });
+  for (const which of ['bpm', 'swing']) assert.equal(studioHit(studio, ...mid(SETTINGS[which])).which, which, 'the tempo and the swing say which half, too (below)');
   assert.deepEqual(studioHit(studio, WHEEL[0], WHEEL[1] - 10), { hit: 'wheel', dir: -1 });
   assert.deepEqual(studioHit(studio, WHEEL[0], WHEEL[1] + 10), { hit: 'wheel', dir: 1 });
   for (const which of ['sound', 'erase', 'clear', 'undo']) assert.deepEqual(studioHit(studio, ...mid(BUTTONS[which])), { hit: 'button', which });
@@ -33,6 +34,29 @@ test('a click lands on the name, a tab, a setting, the wheel (up or down) or a b
   setTab(studio, 'bass');
   assert.deepEqual(studioHit(studio, ...mid(BUTTONS.range)), { hit: 'button', which: 'range' });
   assert.equal(studioHit(studio, STRIP[0] + 10, STRIP[1] + 20), null, 'the strip is only to look at');
+});
+
+test('the tempo and the swing: their upper half is ▲ (dir 1) and their lower half ▼ (dir -1), all over', () => {
+  const studio = createStudio(empty());
+  for (const which of ['bpm', 'swing']) {
+    const [x, y, w, h] = SETTINGS[which];
+    for (let px = x; px < x + w; px += 0.5) for (let py = y; py < y + h; py += 0.5) {
+      assert.deepEqual(studioHit(studio, px, py), { hit: 'setting', which, dir: py < y + h / 2 ? 1 : -1 }, `${which} at ${px}, ${py}`);
+    }
+  }
+});
+
+test("the tempo's and the swing's arrows: the wheel's size, one over the other at the box's right, each in its half", () => {
+  for (const which of ['bpm', 'swing']) {
+    const box = SETTINGS[which], [x, y, w, h] = box, { up, down } = arrowsIn(box);
+    for (const a of [up, down]) assert.ok(a[0] >= x && a[1] >= y && a[0] + a[2] <= x + w && a[1] + a[3] <= y + h, `${which}: ${a} in ${box}`);
+    assert.deepEqual([up[2], up[3], down[2], down[3]], [5, 3, 5, 3], "5 wide and 3 high, as the wheel's are");
+    assert.equal(up[0], down[0], 'one over the other');
+    assert.ok(up[0] > x + w / 2, 'at the right, beside the label and the number');
+    assert.ok(up[1] + up[3] <= y + h / 2 && down[1] >= y + h / 2, '▲ in the upper half, ▼ in the lower');
+  }
+  const boxes = Object.values(SETTINGS);
+  for (const a of boxes) for (const b of boxes) assert.ok(a === b || !overlap(a, b), `${a} clear of ${b}`);
 });
 
 test("on the pad: a drum strip and how hard, or a column and its tone", () => {

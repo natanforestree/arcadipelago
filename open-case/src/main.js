@@ -34,7 +34,7 @@ import { createShop, choose, move, action, trying, hit } from './shop.js';
 import { createLoop, record, note, release, ring, step, undo, due, countBeats } from './looper.js';
 import { LOFI, clockOf, readyBeat } from './beats.js';
 import { createStudio, loadBeats, saveBeats, chosenBeat, advance, letGo, setErase } from './studio.js';
-import { keyDown, keyUp, mouseDown, mouseMove, mouseUp, scroll } from './studioinput.js';
+import { keyDown, keyUp, mouseDown, mouseMove, mouseUp, scroll, tick } from './studioinput.js';
 import { studioHit } from './studioview.js';
 import { DT, LAYERS, PARK } from './tuning.js';
 
@@ -106,7 +106,7 @@ function game(art) {
   const beats = loadBeats(storage);
   const keepBeats = () => !keepsNothing && saveBeats(storage, beats);
   let studio = null, studioSeen = -1, studioSaved = true;
-  const studioHeld = { key: null }, studioDrag = { what: null };
+  const studioHeld = { key: null }, studioDrag = { what: null }, studioWheel = {};
   // The beat your sets play: ?beat='s, or with the studio yours, the one you chose there; else the lo-fi.
   const setBeat = () => fixedBeat ?? (owns(gear, 'studio') ? chosenBeat(beats) : LOFI);
   let stomped = null; // the last pedal stomped: { id, on, time } (its name shows over the gear strip)
@@ -494,7 +494,7 @@ function game(art) {
   canvas.addEventListener('mousedown', (e) => {
     if (screen !== 'studio' || e.button !== 0) return;
     e.preventDefault();
-    if (mouseDown(studio, studioDrag, ...scenePoint(e), bandTime()) === 'busk') leaveStudio(); // it keeps your beats
+    if (mouseDown(studio, studioDrag, ...scenePoint(e), bandTime(), pageTime()) === 'busk') leaveStudio(); // it keeps your beats
   });
   addEventListener('mousemove', (e) => {
     if (screen !== 'studio') return;
@@ -508,7 +508,7 @@ function game(art) {
   canvas.addEventListener('wheel', (e) => {
     if (screen !== 'studio') return;
     e.preventDefault();
-    scroll(studio, ...scenePoint(e), e.deltaY);
+    scroll(studio, ...scenePoint(e), e.deltaY, pageTime(), studioWheel);
   }, { passive: false });
 
   // The shop: the arrow keys choose, Enter buys (or plays an instrument you own), Esc or the door
@@ -588,12 +588,14 @@ function game(art) {
         }
         stepScene(scene, set.t);
       }
-      // The studio: a held pad writes as the playhead reaches it, and on 16ths the band had already
-      // scheduled, what it had there is cut and what's written played; each change of the beat goes to
-      // the band, and is kept once you let go. A change goes to the band before the hold reads the
-      // band's time too, so after a new tempo it reads it on the band's new clock (and again after, for
-      // what the hold wrote).
+      // The studio: a tempo or swing arrow held down steps on (on the page's clock, as the mouse and
+      // the scroll wheel are timed); a held pad writes as the playhead reaches it, and on 16ths the
+      // band had already scheduled, what it had there is cut and what's written played; each change of
+      // the beat goes to the band, and is kept once you let go. A change goes to the band before the
+      // hold reads the band's time too, so after a new tempo it reads it on the band's new clock (and
+      // again after, for what the hold wrote).
       if (studio) {
+        tick(studio, studioDrag, pageTime());
         const toBand = () => {
           if (studio.version === studioSeen) return;
           audio.setBeat(studio.beat);

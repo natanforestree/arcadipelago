@@ -19,6 +19,14 @@ import { MOODS } from './beats.js';
 const PAD_KEYS = ['KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyG', 'KeyH', 'KeyJ', 'KeyK'];
 const KEY_VEL = 0.7, KEY_TONE = 0.5; // a drum played from its key, and a note or chord's tone
 const DRAG = { bpm: 2, swing: 2, mood: 10, bars: 12 }; // pixels of drag for each step of a setting
+const SWINGS = [50, 54, 58, 62, 66, 70, 75]; // the swing's steps, in percent (50 is off)
+// Holding the tempo's or the swing's arrow repeats its step: the first repeat after `wait` seconds,
+// then one every `every`, and once it's been held `fast` seconds, one every `faster`.
+const HOLD = { wait: 0.4, every: 0.1, fast: 1.5, faster: 0.04 };
+const SLOW = Math.round((HOLD.fast - HOLD.wait) / HOLD.every); // repeats after the first, to `fast`
+// When repeat n (from 0) of a hold is due, in seconds after the mouse went down.
+const repeatAt = (n) => (n <= SLOW ? HOLD.wait + n * HOLD.every : HOLD.fast + (n - SLOW) * HOLD.faster);
+const WHEEL_GAP = 0.06; // seconds: the scroll wheel steps a setting at most this often
 
 // A key goes down. Returns what main.js should do beyond the studio: 'leave' (Esc, with nothing
 // open to close), or null. `held` is the controls' own state: { key } for a pad key held.
@@ -78,9 +86,10 @@ export function keyUp(studio, held, e) {
   if (e.code === 'Backspace') setErase(studio, false);
 }
 
-// The mouse goes down at (x, y). Returns 'busk' after Busk to this, or null. `drag` is the controls'
-// state for what the mouse holds until it comes up.
-export function mouseDown(studio, drag, x, y, t) {
+// The mouse goes down at (x, y), at band time t and at `now` on the page's clock (seconds since the
+// page opened; tick and scroll are given the same clock). Returns 'busk' after Busk to this, or
+// null. `drag` is the controls' state for what the mouse holds until it comes up.
+export function mouseDown(studio, drag, x, y, t, now = 0) {
   const target = studioHit(studio, x, y);
   drag.what = null;
   if (!target) return null;
@@ -127,10 +136,18 @@ export function mouseDown(studio, drag, x, y, t) {
     case 'pad':
       if (press(studio, t, target.at)) drag.what = 'pad';
       break;
-    case 'setting':
-      drag.what = 'setting';
-      Object.assign(drag, { which: target.which, y, from: settingIndex(studio, target.which), begun: false, moved: false });
+    case 'setting': {
+      // The tempo and the swing step as the mouse goes down, up on their upper half and down on
+      // their lower; the key and the length step as it comes up (mouseUp). Either way, a drag
+      // takes over from where the setting was when the mouse went down.
+      const from = settingIndex(studio, target.which), before = studio.version;
+      if (target.dir) setSetting(studio, target.which, stepped(target.which, from, target.dir), false);
+      // dir, down and repeats: an arrow's hold (tick), none for the key or the length.
+      Object.assign(drag, {
+        what: 'setting', which: target.which, y, from, begun: studio.version !== before, moved: false, dir: target.dir ?? 0, down: now, repeats: 0,
+      });
       break;
+    }
     case 'fader': {
       // Grabbed where it is, nothing changes yet: the drag's first real change begins it (begun).
       const before = studio.version;
@@ -169,6 +186,13 @@ function settingIndex(studio, which) {
   return { bpm: b.bpm, swing: Math.round(b.swing * 100), mood: MOODS.findIndex((m) => m.id === b.mood), bars: LENGTHS.indexOf(b.bars) }[which];
 }
 
+// One step of the tempo or the swing from v (as settingIndex has it), dir 1 up or -1 down: the tempo
+// by a beat per minute; the swing to the first of SWINGS above v, or the last below it.
+function stepped(which, v, dir) {
+  if (which === 'bpm') return v + dir;
+  return (dir > 0 ? SWINGS.find((s) => s > v) : SWINGS.findLast((s) => s < v)) ?? v;
+}
+
 function setSetting(studio, which, v, again) {
   if (which === 'bpm') setTempo(studio, v, again);
   else if (which === 'swing') setSwing(studio, v / 100, again);
@@ -193,8 +217,20 @@ export function mouseMove(studio, drag, x, y) {
   }
 }
 
-// The mouse comes up: the finger lets go. A setting clicked without a drag steps on: the key to the
-// next mood, the length to the next.
+// Every frame while the studio is open, at page time `now`: a tempo or swing arrow still held (and
+// not dragged) steps again when its next repeat is due, as part of the same change.
+export function tick(studio, drag, now) {
+  if (drag.what !== 'setting' || !drag.dir || drag.moved || studio.asking) return;
+  while (now >= drag.down + repeatAt(drag.repeats)) {
+    const before = studio.version;
+    setSetting(studio, drag.which, stepped(drag.which, settingIndex(studio, drag.which), drag.dir), drag.begun);
+    if (studio.version !== before) drag.begun = true;
+    drag.repeats++;
+  }
+}
+
+// The mouse comes up: the finger lets go. The key or the length clicked without a drag steps on: the
+// key to the next mood, the length to the next. (The tempo and the swing stepped as it went down.)
 export function mouseUp(studio, drag) {
   if (drag.what === 'pad') letGo(studio);
   if (drag.what === 'setting' && !drag.moved && (drag.which === 'mood' || drag.which === 'bars')) {
@@ -203,8 +239,16 @@ export function mouseUp(studio, drag) {
   drag.what = null;
 }
 
-// The scroll wheel over the rhythm wheel turns it.
-export function scroll(studio, x, y, dy) {
+// The scroll wheel (dy, down the page) at page time `now`: over the rhythm wheel it turns it, and over
+// the tempo or the swing it steps it as its arrows do, wheel up for ▲. A trackpad sends a stream of
+// small events, so those step at most once every WHEEL_GAP seconds: `wheel` is the controls' state
+// for that, { at } the time of the last such step.
+export function scroll(studio, x, y, dy, now = 0, wheel = {}) {
   const target = studioHit(studio, x, y);
-  if (target?.hit === 'wheel' && dy) turnRhythm(studio, Math.sign(dy));
+  if (!dy || !target) return;
+  if (target.hit === 'wheel') turnRhythm(studio, Math.sign(dy));
+  else if (target.hit === 'setting' && target.dir && (wheel.at === undefined || now - wheel.at >= WHEEL_GAP)) {
+    wheel.at = now;
+    setSetting(studio, target.which, stepped(target.which, settingIndex(studio, target.which), dy < 0 ? 1 : -1), false);
+  }
 }

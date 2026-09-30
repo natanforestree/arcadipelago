@@ -11,7 +11,9 @@ import { STUDIO } from './tuning.js';
 // Where everything is, [x, y, w, h] in scene pixels.
 export const NAME = [2, 2, 62, 14];
 export const TAB_BOXES = { drums: [66, 3, 32, 14], bass: [100, 3, 26, 14], chords: [128, 3, 38, 14], mix: [168, 3, 22, 14] };
-export const SETTINGS = { bpm: [194, 1, 28, 17], mood: [222, 1, 36, 17], swing: [258, 1, 32, 17], bars: [290, 1, 28, 17] };
+// The tempo and the swing have ▲ and ▼ at their right (arrowsIn), so their boxes are a little wider.
+export const SETTINGS = { bpm: [192, 1, 29, 17], mood: [221, 1, 32, 17], swing: [253, 1, 39, 17], bars: [292, 1, 28, 17] };
+const ARROWED = ['bpm', 'swing']; // the settings with ▲ and ▼
 export const WHEEL = [40, 50, 22]; // its middle and radius
 export const BUTTONS = { sound: [4, 84, 74, 12], erase: [4, 98, 36, 12], clear: [42, 98, 36, 12], undo: [4, 112, 36, 12], range: [42, 112, 36, 12] };
 export const PAD = [82, 22, 234, 108];
@@ -24,6 +26,8 @@ const LIST_ROW = 11; // the list's rows
 const LANES = { drums: [144, 10], bass: [156, 9], chords: [167, 10] }; // each lane's top and height
 
 const inside = ([x, y, w, h], px, py) => px >= x && px < x + w && py >= y && py < y + h;
+// Which half of box [x, y, w, h] the height py is in: 1 the upper (its ▲), -1 the lower (its ▼).
+const half = ([, y, , h], py) => (py < y + h / 2 ? 1 : -1);
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 export const moodShort = (id) => ({ C: 'C maj', D: 'D dor', E: 'E phr', F: 'F lyd', G: 'G mix', A: 'A min' })[id];
 // A beat's name cut to fit a short space (the top bar, a row of the list): 9 letters at most, and
@@ -40,11 +44,20 @@ export const LIST_BUTTONS = {
 export const NAME_FIELD = [PAD[0] + 57, PAD[1] + 36, 120, 16];
 export const NAME_BUTTONS = { save: [PAD[0] + 60, PAD[1] + 92, 50, 12], cancel: [PAD[0] + 124, PAD[1] + 92, 50, 12] };
 
+// Where a box's ▲ and ▼ are, each [x, y, 5, 3]: the rhythm wheel's little triangles, one over the
+// other at the box's right, ▲ just above its middle and ▼ just below, since a click on the box's
+// upper half steps up and on its lower half down.
+export function arrowsIn([x, y, w, h]) {
+  const ax = x + w - 8, mid = Math.ceil(y + h / 2);
+  return { up: [ax, mid - 4, 5, 3], down: [ax, mid, 5, 3] };
+}
+
 // What a click (or a press) at scene point (x, y) lands on, as { hit, ... }, or null:
 //   'naming' { which: 'save' | 'cancel' }             while the name box is open (nothing else is)
 //   'replace' { slot }, 'keep'                        while asking which slot to replace
 //   'open' { which }, 'new', 'busk', 'save', 'close'  in the list of beats
 //   'name', 'tab' { tab }, 'setting' { which }, 'wheel' { dir }, 'button' { which }
+//   (on the tempo and the swing, 'setting' has dir too: 1 on the upper half, the ▲, -1 on the lower)
 //   'pad' { at }: { row, x } on the drums, { col, y } on the bass and chords
 //   'fader' { which, value } (a part's level, or 'pump'), 'mute' { part }, 'switch' { which }
 export function studioHit(studio, x, y) {
@@ -64,7 +77,9 @@ export function studioHit(studio, x, y) {
   }
   if (inside(NAME, x, y)) return { hit: 'name' };
   for (const [tab, box] of Object.entries(TAB_BOXES)) if (inside(box, x, y)) return { hit: 'tab', tab };
-  for (const [which, box] of Object.entries(SETTINGS)) if (inside(box, x, y)) return { hit: 'setting', which };
+  for (const [which, box] of Object.entries(SETTINGS)) {
+    if (inside(box, x, y)) return ARROWED.includes(which) ? { hit: 'setting', which, dir: half(box, y) } : { hit: 'setting', which };
+  }
   const [wx, wy, r] = WHEEL;
   if ((x - wx) ** 2 + (y - wy) ** 2 <= (r + 8) ** 2) return { hit: 'wheel', dir: y < wy ? -1 : 1 };
   for (const [which, box] of Object.entries(BUTTONS)) {
@@ -115,9 +130,15 @@ export function drawStudio(d, studio, t) {
   const values = {
     bpm: String(beat.bpm), mood: moodShort(beat.mood), swing: beat.swing === 0.5 ? 'off' : `${Math.round(beat.swing * 100)}%`, bars: String(beat.bars),
   };
-  for (const [id, [x, y, w]] of Object.entries(SETTINGS)) {
-    text(id === 'mood' ? 'key' : id, x + w / 2, y, C.greyDark, 'center');
-    text(values[id], x + w / 2, y + 8, C.light, 'center');
+  // The tempo and the swing: the label and the number to the left of their ▲ and ▼, and an arrow
+  // that can't step (at 140 bpm, say) dimmed.
+  const ends = { bpm: [beat.bpm < 140, beat.bpm > 60], swing: [beat.swing < 0.75, beat.swing > 0.5] };
+  for (const [id, box] of Object.entries(SETTINGS)) {
+    const [x, y, w] = box, arrows = ARROWED.includes(id) && arrowsIn(box);
+    const cx = arrows ? Math.floor((x + arrows.up[0] - 1) / 2) : x + w / 2;
+    text(id === 'mood' ? 'key' : id, cx, y, C.greyDark, 'center');
+    text(values[id], cx, y + 8, C.light, 'center');
+    if (arrows) upDown(px, arrows, ends[id].map((can) => (can ? C.grey : C.greyDark)));
   }
   if (PARTS.includes(part)) wheel(d, studio, tone[part]);
   buttons(d, studio);
@@ -144,6 +165,14 @@ function wheel({ px, big, C }, studio, [base, shadow]) {
   big(String(studio.rhythm[studio.tab] + 1), cx, cy - 7, C.light);
   for (const [dx, dy, dir] of [[0, -r - 7, -1], [0, r + 5, 1]]) {
     for (let i = 0; i < 3; i++) px(cx + dx - i, cy + dy + (dir < 0 ? i : 2 - i), 1 + 2 * i, 1, C.grey);
+  }
+}
+
+// A box's ▲ and ▼ (arrowsIn), in the colours [up, down], drawn as the wheel's arrows are.
+function upDown(px, { up, down }, [upColour, downColour]) {
+  for (let i = 0; i < 3; i++) {
+    px(up[0] + 2 - i, up[1] + i, 1 + 2 * i, 1, upColour);
+    px(down[0] + 2 - i, down[1] + 2 - i, 1 + 2 * i, 1, downColour);
   }
 }
 
