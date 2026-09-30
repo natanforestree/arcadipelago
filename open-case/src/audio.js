@@ -4,9 +4,9 @@
 //     sounds at once. The electric piano and the synth are made from oscillators as each note starts.
 //   - Your pedals, between your instrument and the speakers, chained in the usual order: overdrive,
 //     chorus, tremolo, delay, reverb. A stomp fades a pedal in or out over a few milliseconds.
-//   - The band: electric piano, drums, bass, hats and pad from groove.js's patterns, scheduled a
-//     little ahead of the audio clock, as Last Light's score is. Each layer plays into its own bus
-//     (its slot): switching a layer is a fade on that bus at a bar line.
+//   - The band: the beat it's given (beats.js), its chords, drums, bass, hats and Pad, scheduled a
+//     little ahead of the audio clock, as Last Light's score is, at the beat's tempo. Each layer plays
+//     into its own bus (its slot): switching a layer is a fade on that bus at a bar line.
 //   - Your loop (looper.js): its notes are scheduled a moment ahead with the band's, each a voice of
 //     its own through your instrument and pedals, and they fade and stop with the band.
 //   - Its count-in (countIn): a soft stick click on each beat after R, up to the bar line, so you can
@@ -15,7 +15,7 @@
 //   - A safety before the speakers, so a loop stacked on your playing can't clip.
 // Browsers only allow sound after a key press or click, so start() is called from inside one
 // (main.js). M mutes; the volume and mute are remembered.
-import { bandAt, timeOf16th, midiToHz, BAR, BEAT } from './groove.js';
+import { bandAt, midiToHz, clockOf, LOFI } from './beats.js';
 import { LAYERS, PLAY, GROOVE } from './tuning.js';
 import { PEDALS } from './gear.js';
 
@@ -96,7 +96,7 @@ const CHORUS_RATE = 0.8; // ...this many times a second
 const CHORUS_MIX = 0.6; // the copy's level; your own sound drops to CHORUS_DRY under it
 const CHORUS_DRY = 0.8;
 const TREMOLO_DEPTH = 0.35; // the volume swings this share either way, on the 8th notes
-const DELAY_TIME = BEAT * 0.75; // a dotted 8th
+const DELAY_BEATS = 0.75; // the echo's time, in beats of the band's beat: a dotted 8th
 const DELAY_FEEDBACK = 0.38; // each echo is this loud next to the one before...
 const DELAY_MIX = 0.45; // ...and the first this loud next to your note
 const DELAY_TONE = 2800; // Hz: each echo a little darker
@@ -182,7 +182,8 @@ export function createAudio(storage) {
   const inputs = {}; // a gain per instrument, into its tone filters and on into the pedals
   const loopIns = {}; // a gain per instrument for your loop's notes, into its input: the loop's fade
   const pedals = {}; // id -> { input, output, set(on, at) }
-  let tremoloDepth = null, tremoloWave = null;
+  let tremoloDepth = null, tremoloWave = null, delayLine = null;
+  let beat = LOFI, clock = clockOf(LOFI); // what the band plays, and its timing
   let instrument = 'acoustic';
   const pedalOn = Object.fromEntries(PEDALS.map((id) => [id, false]));
   const plucks = new Map(); // `${pitch}:${strength}` -> AudioBuffer, for the instrument you play
@@ -344,26 +345,27 @@ export function createAudio(storage) {
     return { input: amp, output: amp, set: (on, at) => fade(tremoloDepth.gain, on ? TREMOLO_DEPTH : 0, at) };
   }
 
-  // A new wave for the tremolo, a cosine at the 8th notes' rate starting at `at` (the band's first
-  // 16th, or any moment when there's no band), so its peaks land on the 8ths. The old wave plays
-  // until the new one takes over.
+  // A new wave for the tremolo, a cosine at the 8th notes' rate (of the band's beat) starting at `at`
+  // (the band's first 16th, or any moment when there's no band), so its peaks land on the 8ths. The
+  // old wave plays until the new one takes over.
   function newTremoloWave(at) {
     const wave = ctx.createOscillator();
     wave.setPeriodicWave(ctx.createPeriodicWave(new Float32Array([0, 1]), new Float32Array([0, 0])));
-    wave.frequency.value = 2 / BEAT;
+    wave.frequency.value = 2 / clock.beat;
     wave.connect(tremoloDepth);
     wave.start(at);
     tremoloWave?.stop(at);
     tremoloWave = wave;
   }
 
-  // Delay: echoes on the dotted 8th, each a little quieter and darker. Switched off, it stops taking
+  // Delay: echoes on the dotted 8th of the band's beat, each a little quieter and darker. Switched off, it stops taking
   // in new notes, and the echoes already going fade away on their own.
   function delay() {
     const input = ctx.createGain(), output = ctx.createGain(), send = ctx.createGain(), wet = ctx.createGain();
     const line = ctx.createDelay(2), dark = ctx.createBiquadFilter(), again = ctx.createGain();
     send.gain.value = 0;
-    line.delayTime.value = DELAY_TIME;
+    line.delayTime.value = clock.beat * DELAY_BEATS;
+    delayLine = line;
     dark.type = 'lowpass';
     dark.frequency.value = DELAY_TONE;
     again.gain.value = DELAY_FEEDBACK;
@@ -635,9 +637,13 @@ export function createAudio(storage) {
     }
   }
 
-  // The band starts with your first note: 16th 0 sounds at `at`. Your loop starts empty with it.
-  function startBand(at, level = BAND_LEVEL) {
+  // The band starts playing `b` (a beat) with your first note: 16th 0 sounds at `at`. Your loop starts
+  // empty with it. The tremolo and the delay take the beat's tempo.
+  function startBand(at, b = LOFI, level = BAND_LEVEL) {
     if (!ctx) return;
+    beat = b;
+    clock = clockOf(b);
+    delayLine.delayTime.setValueAtTime(clock.beat * DELAY_BEATS, at);
     loopAt = at;
     next16 = 0;
     stopAt = Infinity;
@@ -649,11 +655,11 @@ export function createAudio(storage) {
     }
   }
 
-  // The band in the shop, while you try the loop pedal: its electric piano alone (the keys layer, with
+  // The band in the shop, while you try the loop pedal: the chords of `b` alone (the keys layer, with
   // no stand-in percussion), softly, from `at`.
-  function tryBand(at) {
+  function tryBand(at, b = LOFI) {
     if (!ctx) return;
-    startBand(at, TRY_LEVEL);
+    startBand(at, b, TRY_LEVEL);
     for (const { id } of LAYERS) bus[id].gain.setTargetAtTime(id === 'keys' ? 1 : 0, at, 0.02);
     bus.perc.gain.setTargetAtTime(0, at, 0.02);
     wobble.gain.setTargetAtTime(0, at, 0.5);
@@ -664,9 +670,9 @@ export function createAudio(storage) {
     if (!ctx) return;
     for (const g of [band, ...Object.values(loopIns)]) {
       g.gain.setValueAtTime(g === band ? BAND_LEVEL : LOOP_LEVEL, at);
-      g.gain.linearRampToValueAtTime(0, at + BAR);
+      g.gain.linearRampToValueAtTime(0, at + clock.bar);
     }
-    stopAt = at + BAR;
+    stopAt = at + clock.bar;
   }
 
   // Stops the band and your loop at once: nothing more is scheduled, and what's still sounding fades
@@ -745,13 +751,13 @@ export function createAudio(storage) {
     if (!ctx || ctx.state !== 'running' || loopAt < 0) return [];
     const t = ctx.currentTime;
     // After a stall, skip what's already late rather than playing it all at once.
-    while (loopAt + timeOf16th(next16) < t - 0.1) next16++;
-    while (loopAt + timeOf16th(next16) < t + GROOVE.ahead && loopAt + timeOf16th(next16) < stopAt) {
-      const at = loopAt + timeOf16th(next16);
-      for (const { id } of LAYERS) {
-        for (const n of bandAt(id, next16)) playBand(id, n, at, loopAt + timeOf16th(next16 + n.len) - at);
+    const at16 = (s) => loopAt + clock.timeOf16th(s);
+    while (at16(next16) < t - 0.1) next16++;
+    while (at16(next16) < t + GROOVE.ahead && at16(next16) < stopAt) {
+      const at = at16(next16);
+      for (const { id } of [...LAYERS, { id: 'perc' }]) {
+        for (const n of bandAt(beat, id, next16)) playBand(id, n, at, at16(next16 + n.len) - at);
       }
-      for (const n of bandAt('perc', next16)) playBand('perc', n, at, loopAt + timeOf16th(next16 + n.len) - at);
       next16++;
     }
     if (t >= crackleAt && t < stopAt) {

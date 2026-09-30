@@ -9,6 +9,7 @@ export const GROOVE = {
   bpm: 80,
   swing: 0.58, // the second 16th of each pair lands at this share of the pair
   setBars: 60, // 15 times round the 4-bar loop: 3 minutes
+  setSeconds: 180, // a set lasts about this long, whatever its beat's tempo (beats.js setBars)
   ahead: 0.2, // seconds of band scheduled ahead of the audio clock
   layerLead: 0.25, // seconds before a bar line that its layers are decided (more than `ahead`)
   applause: 1, // seconds of applause after the band's fade, before the end card
