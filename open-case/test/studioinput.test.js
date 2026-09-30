@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { keyDown, keyUp, mouseDown, mouseMove, mouseUp, scroll } from '../src/studioinput.js';
-import { createStudio, newBeat, advance, setTab } from '../src/studio.js';
+import { createStudio, newBeat, advance, setTab, setTempo } from '../src/studio.js';
 import { NAME, TAB_BOXES, SETTINGS, WHEEL, BUTTONS, PAD } from '../src/studioview.js';
-import { clockOf } from '../src/beats.js';
+import { clockOf, blankBeat, LOFI } from '../src/beats.js';
 import { STUDIO } from '../src/tuning.js';
 
 const empty = () => ({ slots: Array(STUDIO.slots).fill(null), chosen: null });
@@ -161,4 +161,50 @@ test('the Mix: a fader follows the mouse as one change; a mute and the switches 
   assert.equal(studio.beat.mix.pad, true);
   mouseDown(studio, drag, 275, 61, 0);
   assert.equal(studio.beat.mix.vinyl, true);
+});
+
+// The drums fader's knob at full, and the fader halfway down.
+const KNOB = [111, 38], HALF = 38 + 31;
+function dragDrums(studio, drag) {
+  mouseDown(studio, drag, ...KNOB, 0);
+  for (let y = KNOB[1] + 1; y <= HALF; y++) mouseMove(studio, drag, KNOB[0], y);
+  mouseUp(studio, drag);
+}
+
+test('on a ready-made beat, a Mix fader grabbed at its knob and dragged moves, makes your copy, and one Undo takes the drag back', () => {
+  const studio = createStudio(empty()), drag = { what: null };
+  setTab(studio, 'mix');
+  mouseDown(studio, drag, ...KNOB, 0);
+  assert.equal(studio.beat, LOFI, 'grabbing it where it is changes nothing yet');
+  for (let y = KNOB[1] + 1; y <= HALF; y++) mouseMove(studio, drag, KNOB[0], y);
+  mouseUp(studio, drag);
+  assert.equal(studio.beat.mix.levels.drums, 0.5, 'it follows the mouse');
+  assert.deepEqual(studio.open, { slot: 0 });
+  assert.equal(studio.beat.name, 'Lo-fi 2', 'your copy');
+  assert.equal(LOFI.mix.levels.drums, 1, 'the ready-made lo-fi never changes');
+  mouseDown(studio, drag, ...mid(BUTTONS.undo), 0);
+  assert.equal(studio.beat.mix.levels.drums, 1, 'one Undo takes the whole drag back');
+  assert.equal(studio.undo.length, 0);
+});
+
+test('on your own beat, a fader drag from its knob is one change of its own: Undo takes back only the drag', () => {
+  const studio = blank(), drag = { what: null };
+  setTempo(studio, 100);
+  setTab(studio, 'mix');
+  dragDrums(studio, drag);
+  assert.equal(studio.beat.mix.levels.drums, 0.5);
+  mouseDown(studio, drag, ...mid(BUTTONS.undo), 0);
+  assert.deepEqual([studio.beat.mix.levels.drums, studio.beat.bpm], [1, 100], 'the drag undone, the tempo kept');
+});
+
+test('with every slot full, the same fader drag asks which slot to replace and changes nothing', () => {
+  const beats = empty();
+  for (let i = 0; i < STUDIO.slots; i++) beats.slots[i] = blankBeat(`Beat ${i + 1}`);
+  const studio = createStudio(beats), drag = { what: null };
+  setTab(studio, 'mix');
+  dragDrums(studio, drag);
+  assert.deepEqual(studio.asking, { make: 'copy' });
+  assert.equal(studio.beat, LOFI);
+  assert.equal(LOFI.mix.levels.drums, 1);
+  assert.deepEqual(beats.slots.map((b) => b.name), ['Beat 1', 'Beat 2', 'Beat 3', 'Beat 4', 'Beat 5', 'Beat 6']);
 });

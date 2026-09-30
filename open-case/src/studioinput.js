@@ -103,10 +103,13 @@ export function mouseDown(studio, drag, x, y, t) {
       drag.what = 'setting';
       Object.assign(drag, { which: target.which, y, from: settingIndex(studio, target.which), begun: false, moved: false });
       break;
-    case 'fader':
+    case 'fader': {
+      // Grabbed where it is, nothing changes yet: the drag's first real change begins it (begun).
+      const before = studio.version;
       fader(studio, target.which, target.value, false);
-      Object.assign(drag, { what: 'fader', which: target.which });
+      Object.assign(drag, { what: 'fader', which: target.which, begun: studio.version !== before });
       break;
+    }
     case 'mute':
       toggleMute(studio, target.part);
       break;
@@ -148,8 +151,11 @@ function setSetting(studio, which, v, again) {
 // The mouse moves to (x, y) while down: the finger moves on the pad, or a setting or fader follows.
 export function mouseMove(studio, drag, x, y) {
   if (drag.what === 'pad') moveTo(studio, padAt(studio.tab, x, y));
-  else if (drag.what === 'fader') fader(studio, drag.which, faderValue(y), true);
-  else if (drag.what === 'setting') {
+  else if (drag.what === 'fader') {
+    const before = studio.version;
+    fader(studio, drag.which, faderValue(y), drag.begun);
+    if (studio.version !== before) drag.begun = true;
+  } else if (drag.what === 'setting') {
     const steps = Math.trunc((drag.y - y) / DRAG[drag.which]);
     if (!steps && !drag.moved) return;
     drag.moved = true;
