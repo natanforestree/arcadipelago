@@ -32,7 +32,7 @@ test('a click lands on the name, a tab, a setting, the wheel (up or down) or a b
   for (const which of ['sound', 'erase', 'clear', 'undo']) assert.deepEqual(studioHit(studio, ...mid(BUTTONS[which])), { hit: 'button', which });
   assert.equal(studioHit(studio, ...mid(BUTTONS.range)), null, 'Range is only for the bass');
   setTab(studio, 'bass');
-  assert.deepEqual(studioHit(studio, ...mid(BUTTONS.range)), { hit: 'button', which: 'range' });
+  assert.deepEqual(studioHit(studio, ...mid(BUTTONS.range)), { hit: 'button', which: 'range', dir: -1 }, 'with which half (below)');
   assert.equal(studioHit(studio, STRIP[0] + 10, STRIP[1] + 20), null, 'the strip is only to look at');
 });
 
@@ -57,6 +57,33 @@ test("the tempo's and the swing's arrows: the wheel's size, one over the other a
   }
   const boxes = Object.values(SETTINGS);
   for (const a of boxes) for (const b of boxes) assert.ok(a === b || !overlap(a, b), `${a} clear of ${b}`);
+});
+
+test("the octave button, on the bass tab: its upper half is ▲ (dir 1) and its lower half ▼ (dir -1); off the bass, it's nothing", () => {
+  const studio = createStudio(empty());
+  const [x, y, w, h] = BUTTONS.range;
+  for (const tab of ['drums', 'chords', 'mix', 'bass']) {
+    setTab(studio, tab);
+    for (let px = x; px < x + w; px += 0.5) for (let py = y; py < y + h; py += 0.5) {
+      const want = tab === 'bass' ? { hit: 'button', which: 'range', dir: py < y + h / 2 ? 1 : -1 } : null;
+      assert.deepEqual(studioHit(studio, px, py), want, `${tab} at ${px}, ${py}`);
+    }
+  }
+});
+
+test("Undo and the octave share the bottom row of the left column, lined up with Erase and Clear, the octave's arrows at its right", () => {
+  const { sound, erase, clear, undo, range } = BUTTONS;
+  assert.deepEqual([undo[1], undo[3]], [range[1], range[3]], 'one row');
+  assert.ok(undo[0] + undo[2] < range[0], 'Undo, a gap, then the octave');
+  assert.equal(undo[0], erase[0], 'lined up on the left');
+  assert.equal(range[0] + range[2], clear[0] + clear[2], 'and on the right');
+  const all = [sound, erase, clear, undo, range];
+  for (const a of all) for (const b of all) assert.ok(a === b || !overlap(a, b), `${a} clear of ${b}`);
+  const [x, y, w, h] = range, { up, down } = arrowsIn(range);
+  for (const a of [up, down]) assert.ok(a[0] >= x && a[1] >= y && a[0] + a[2] <= x + w && a[1] + a[3] <= y + h, `${a} in ${range}`);
+  assert.deepEqual([up[2], up[3], down[2], down[3]], [5, 3, 5, 3]);
+  assert.ok(up[0] === down[0] && up[0] > x + w / 2, 'one over the other, at the right');
+  assert.ok(up[1] + up[3] <= y + h / 2 && down[1] >= y + h / 2, '▲ in the upper half, ▼ in the lower');
 });
 
 test("on the pad: a drum strip and how hard, or a column and its tone", () => {

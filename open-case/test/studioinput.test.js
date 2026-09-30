@@ -300,6 +300,55 @@ test("the rhythm wheel's scrolling is as it was: every event turns it, however c
   assert.equal(studio.beat.bpm, 91, "and the wheel's turning holds up no setting");
 });
 
+test("a click on the octave button's upper half raises the bass pad an octave, on its lower half lowers it, from -1 to +1 (no wrapping)", () => {
+  const studio = blank(), drag = { what: null };
+  setTab(studio, 'bass');
+  const seen = [];
+  for (const at of [upper, upper, lower, lower, lower, upper]) {
+    click(studio, drag, at(BUTTONS.range));
+    seen.push(studio.range);
+  }
+  assert.deepEqual(seen, [1, 1, 0, -1, -1, 0], 'at either end it stays');
+  click(studio, drag, lower(BUTTONS.range));
+  mouseDown(studio, drag, ...upper(BUTTONS.range), 0, 10);
+  tick(studio, drag, 13);
+  mouseUp(studio, drag);
+  assert.equal(studio.range, 0, 'from -1, a press steps it once, however long it is held');
+  assert.equal(studio.undo.length, 0, 'the octave is where the pad plays, not a change to the beat');
+});
+
+test('the scroll wheel over the octave button steps it, wheel up raising it, at most once in 60 ms', () => {
+  const studio = blank(), wheel = {};
+  setTab(studio, 'bass');
+  const [x, y] = mid(BUTTONS.range);
+  scroll(studio, x, y, -100, 1, wheel);
+  assert.equal(studio.range, 1);
+  scroll(studio, x, y, 100, 1.03, wheel);
+  assert.equal(studio.range, 1, 'within 60 ms: nothing');
+  scroll(studio, x, y, 100, 1.1, wheel);
+  scroll(studio, x, y, 100, 1.2, wheel);
+  scroll(studio, x, y, 100, 1.3, wheel);
+  assert.equal(studio.range, -1, 'down to -1, where it stays');
+});
+
+test('off the bass tab the octave button is inert, to a click or the wheel, and Z and X too; on it, Z and X work as before', () => {
+  const studio = blank(), drag = { what: null }, held = { key: null }, wheel = {};
+  for (const tab of ['drums', 'chords', 'mix']) {
+    setTab(studio, tab);
+    click(studio, drag, upper(BUTTONS.range));
+    click(studio, drag, lower(BUTTONS.range));
+    scroll(studio, ...mid(BUTTONS.range), -100, tab.length, wheel);
+    keyDown(studio, held, key('KeyX'), 0);
+    assert.equal(studio.range, 0, tab);
+  }
+  setTab(studio, 'bass');
+  keyDown(studio, held, key('KeyX'), 0);
+  keyDown(studio, held, key('KeyX'), 0);
+  assert.equal(studio.range, 1, 'X: up an octave, and no further');
+  keyDown(studio, held, key('KeyZ'), 0);
+  assert.equal(studio.range, 0, 'Z: down an octave');
+});
+
 test('tabs, the name, the wheel, the buttons and the scroll wheel', () => {
   const studio = blank(), drag = { what: null };
   mouseDown(studio, drag, ...mid(TAB_BOXES.chords), 0);

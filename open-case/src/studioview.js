@@ -15,7 +15,8 @@ export const TAB_BOXES = { drums: [66, 3, 32, 14], bass: [100, 3, 26, 14], chord
 export const SETTINGS = { bpm: [192, 1, 29, 17], mood: [221, 1, 32, 17], swing: [253, 1, 39, 17], bars: [292, 1, 28, 17] };
 const ARROWED = ['bpm', 'swing']; // the settings with ▲ and ▼
 export const WHEEL = [40, 50, 22]; // its middle and radius
-export const BUTTONS = { sound: [4, 84, 74, 12], erase: [4, 98, 36, 12], clear: [42, 98, 36, 12], undo: [4, 112, 36, 12], range: [42, 112, 36, 12] };
+// The octave (range, the bass only) is wider than Undo beside it, for its ▲ and ▼ (arrowsIn).
+export const BUTTONS = { sound: [4, 84, 74, 12], erase: [4, 98, 36, 12], clear: [42, 98, 36, 12], undo: [4, 112, 28, 12], range: [34, 112, 44, 12] };
 export const PAD = [82, 22, 234, 108];
 export const STRIP = [16, 134, 300, 44]; // the picture of the loop: its numbers row, then the lanes
 const MIX_FADERS = { drums: 104, bass: 144, chords: 184, pump: 244 }; // each fader's x, 14 wide
@@ -57,7 +58,7 @@ export function arrowsIn([x, y, w, h]) {
 //   'replace' { slot }, 'keep'                        while asking which slot to replace
 //   'open' { which }, 'new', 'busk', 'save', 'close'  in the list of beats
 //   'name', 'tab' { tab }, 'setting' { which }, 'wheel' { dir }, 'button' { which }
-//   (on the tempo and the swing, 'setting' has dir too: 1 on the upper half, the ▲, -1 on the lower)
+//   (on the tempo, the swing and the octave button, dir too: 1 on the upper half, the ▲, -1 below)
 //   'pad' { at }: { row, x } on the drums, { col, y } on the bass and chords
 //   'fader' { which, value } (a part's level, or 'pump'), 'mute' { part }, 'switch' { which }
 export function studioHit(studio, x, y) {
@@ -83,7 +84,9 @@ export function studioHit(studio, x, y) {
   const [wx, wy, r] = WHEEL;
   if ((x - wx) ** 2 + (y - wy) ** 2 <= (r + 8) ** 2) return { hit: 'wheel', dir: y < wy ? -1 : 1 };
   for (const [which, box] of Object.entries(BUTTONS)) {
-    if (inside(box, x, y) && (which !== 'range' || studio.tab === 'bass')) return { hit: 'button', which };
+    if (!inside(box, x, y)) continue;
+    if (which !== 'range') return { hit: 'button', which };
+    if (studio.tab === 'bass') return { hit: 'button', which, dir: half(box, y) };
   }
   if (!inside(PAD, x, y)) return null;
   if (studio.tab === 'mix') return mixHit(x, y);
@@ -135,7 +138,7 @@ export function drawStudio(d, studio, t) {
   const ends = { bpm: [beat.bpm < 140, beat.bpm > 60], swing: [beat.swing < 0.75, beat.swing > 0.5] };
   for (const [id, box] of Object.entries(SETTINGS)) {
     const [x, y, w] = box, arrows = ARROWED.includes(id) && arrowsIn(box);
-    const cx = arrows ? Math.floor((x + arrows.up[0] - 1) / 2) : x + w / 2;
+    const cx = arrows ? textLeftOf(x, arrows) : x + w / 2;
     text(id === 'mood' ? 'key' : id, cx, y, C.greyDark, 'center');
     text(values[id], cx, y + 8, C.light, 'center');
     if (arrows) upDown(px, arrows, ends[id].map((can) => (can ? C.grey : C.greyDark)));
@@ -168,6 +171,9 @@ function wheel({ px, big, C }, studio, [base, shadow]) {
   }
 }
 
+// Where to centre a text in a box from x to its arrows (arrowsIn), a pixel short of them.
+const textLeftOf = (x, arrows) => Math.round((x + arrows.up[0] - 1) / 2);
+
 // A box's ▲ and ▼ (arrowsIn), in the colours [up, down], drawn as the wheel's arrows are.
 function upDown(px, { up, down }, [upColour, downColour]) {
   for (let i = 0; i < 3; i++) {
@@ -178,13 +184,16 @@ function upDown(px, { up, down }, [upColour, downColour]) {
 
 function buttons({ px, text, C }, studio) {
   const lit = { erase: studio.erase };
-  for (const [id, [x, y, w, h]] of Object.entries(BUTTONS)) {
+  for (const [id, box] of Object.entries(BUTTONS)) {
+    const [x, y, w, h] = box;
     const off = (id === 'range' && studio.tab !== 'bass') || (id !== 'undo' && studio.tab === 'mix' && id !== 'sound');
     const faded = off || (id === 'sound' && studio.tab === 'mix') || (id === 'undo' && !studio.undo.length);
     px(x, y, w, h, lit[id] ? C.red : C.charcoal);
     const sound = PARTS.includes(studio.tab) ? SOUNDS[studio.tab][studio.beat.sounds[studio.tab]].name : 'sound';
     const word = id === 'range' ? `oct ${studio.range > 0 ? '+1' : studio.range < 0 ? '-1' : '0'}` : id === 'sound' ? sound : id;
-    text(word, x + w / 2, y + 2, faded ? C.greyDark : C.light, 'center');
+    const arrows = id === 'range' && arrowsIn(box); // the octave's ▲ and ▼, dimmed at its ends
+    text(word, arrows ? textLeftOf(x, arrows) : x + w / 2, y + 2, faded ? C.greyDark : C.light, 'center');
+    if (arrows) upDown(px, arrows, [studio.range < 1, studio.range > -1].map((can) => (can && !off ? C.grey : C.greyDark)));
   }
 }
 

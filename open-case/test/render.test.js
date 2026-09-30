@@ -14,7 +14,7 @@ import { createShop, choose, CARD, BUTTON } from '../src/shop.js';
 import { createLoop, record, step, loopLength } from '../src/looper.js';
 import { stoodAt } from './helpers.js';
 import { createStudio, setTab, newBeat, startNaming, typeName, saveName } from '../src/studio.js';
-import { STRIP, PAD, NAME_FIELD, SETTINGS, arrowsIn } from '../src/studioview.js';
+import { STRIP, PAD, NAME_FIELD, SETTINGS, BUTTONS, arrowsIn } from '../src/studioview.js';
 const { bar: BAR, beat: BEAT } = LOFI_CLOCK;
 const LOOP_LENGTH = loopLength(createLoop());
 
@@ -748,6 +748,36 @@ test("the tempo's and the swing's ▲▼ are drawn beside their label and number
       assert.deepEqual([up[2], down[2]], [1, 1], '▲ points up, ▼ down');
     }
   }
+});
+
+test("the octave button: its label clear of its ▲▼, the one that can't step dimmed, all of it dim off the bass; Undo still fits", () => {
+  const studio = createStudio({ slots: Array(6).fill(null), chosen: null });
+  const C = data.colors, [x, , w] = BUTTONS.range, arrows = arrowsIn(BUTTONS.range);
+  const INK = { 'oct +1': 31, 'oct 0': 25, 'oct -1': 29, undo: 23 }; // as Chrome draws them (see above)
+  const drawOn = (tab, range) => {
+    setTab(studio, tab);
+    studio.range = range;
+    const g = fakeContext();
+    createRenderer(g, art)(view({ screen: 'studio', studio, t: 0 }));
+    return g;
+  };
+  for (const [range, label, up, down] of [[1, 'oct +1', C.greyDark, C.grey], [0, 'oct 0', C.grey, C.grey], [-1, 'oct -1', C.grey, C.greyDark]]) {
+    const g = drawOn('bass', range), p = g.positions.find((q) => q.s === label);
+    assert.ok(p && p.align === 'center' && p.color === C.light, label);
+    assert.ok(p.x - INK[label] / 2 >= x + 2, `${label}: 2px or more inside the button`);
+    assert.ok(p.x + INK[label] / 2 + 2 <= arrows.up[0], `${label}: 2px or more short of the arrows`);
+    assert.ok(arrows.up[0] + 5 + 2 <= x + w, 'the arrows 2px or more inside the button');
+    for (const [dir, colour] of [['up', up], ['down', down]]) {
+      const drawn = rectsIn(g, arrows[dir]);
+      assert.equal(drawn.reduce((n, [, , rw, rh]) => n + rw * rh, 0), 9, `${dir}: a triangle of 1, 3 and 5`);
+      assert.ok(drawn.every((r) => r[4] === colour), `at ${label}, ${dir} ${colour === C.grey ? 'lit' : 'dimmed'}`);
+    }
+    const undo = g.positions.find((q) => q.s === 'undo'), [ux, , uw] = BUTTONS.undo;
+    assert.ok(undo.x - INK.undo / 2 >= ux + 2 && undo.x + INK.undo / 2 + 2 <= ux + uw, 'Undo, 2px or more inside its button');
+  }
+  const off = drawOn('drums', 0);
+  assert.equal(off.positions.find((q) => q.s === 'oct 0').color, C.greyDark);
+  for (const dir of ['up', 'down']) assert.ok(rectsIn(off, arrows[dir]).every((r) => r[4] === C.greyDark), `off the bass, ${dir} dim`);
 });
 
 test("the studio's strip: every part's notes in its own lane and colour, the chords named, and the playhead", () => {

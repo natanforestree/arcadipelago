@@ -131,7 +131,7 @@ export function mouseDown(studio, drag, x, y, t, now = 0) {
       turnRhythm(studio, target.dir);
       break;
     case 'button':
-      button(studio, target.which);
+      button(studio, target.which, target.dir);
       break;
     case 'pad':
       if (press(studio, t, target.at)) drag.what = 'pad';
@@ -166,9 +166,10 @@ export function mouseDown(studio, drag, x, y, t, now = 0) {
   return null;
 }
 
-function button(studio, which) {
+// A button clicked; on the octave, dir 1 on its upper half (up an octave) or -1 on its lower.
+function button(studio, which, dir) {
   if (which === 'sound') nextSound(studio);
-  else if (which === 'range') moveRange(studio, studio.range === 1 ? -2 : 1);
+  else if (which === 'range') moveRange(studio, dir);
   else if (which === 'erase') setErase(studio, !studio.erase); // a mouse can't hold two things: here it's a switch
   else if (which === 'clear') clearPart(studio);
   else if (which === 'undo') undoChange(studio);
@@ -240,15 +241,17 @@ export function mouseUp(studio, drag) {
 }
 
 // The scroll wheel (dy, down the page) at page time `now`: over the rhythm wheel it turns it, and over
-// the tempo or the swing it steps it as its arrows do, wheel up for ▲. A trackpad sends a stream of
-// small events, so those step at most once every WHEEL_GAP seconds: `wheel` is the controls' state
-// for that, { at } the time of the last such step.
+// the tempo, the swing or the octave button it steps it as its arrows do, wheel up for ▲. A trackpad
+// sends a stream of small events, so those step at most once every WHEEL_GAP seconds: `wheel` is the
+// controls' state for that, { at } the time of the last such step.
 export function scroll(studio, x, y, dy, now = 0, wheel = {}) {
   const target = studioHit(studio, x, y);
   if (!dy || !target) return;
   if (target.hit === 'wheel') turnRhythm(studio, Math.sign(dy));
-  else if (target.hit === 'setting' && target.dir && (wheel.at === undefined || now - wheel.at >= WHEEL_GAP)) {
+  else if (target.dir && (wheel.at === undefined || now - wheel.at >= WHEEL_GAP)) {
     wheel.at = now;
-    setSetting(studio, target.which, stepped(target.which, settingIndex(studio, target.which), dy < 0 ? 1 : -1), false);
+    const dir = dy < 0 ? 1 : -1;
+    if (target.hit === 'setting') setSetting(studio, target.which, stepped(target.which, settingIndex(studio, target.which), dir), false);
+    else moveRange(studio, dir); // the octave button, the only other with arrows
   }
 }
