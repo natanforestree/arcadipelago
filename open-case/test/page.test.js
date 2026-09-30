@@ -21,3 +21,7 @@ test('the page loads the game as a module, with its icon and the Silkscreen font
   assert.match(html, /<link rel="icon" href="icon\.png">/);
   assert.match(html, /family=Silkscreen/);
 });
+
+test('the sound check has a choice of beats', () => {
+  assert.match(html, /<label>Beat <select id="sound-beat"><\/select><\/label>/);
+});

@@ -1,5 +1,6 @@
-// The sound check (/open-case/?sound): the band with a switch per layer, and your instrument on the
-// keys, so the sounds and the beat can be judged by ear before anything else. Every instrument and
+// The sound check (/open-case/?sound): the band with a switch per layer and a choice of the ready-made
+// beats, and your instrument on the keys, so the sounds and the beats can be judged by ear before
+// anything else. Every instrument and
 // pedal in the shop can be tried here, without buying it (keys 2 to 6 stomp the pedals too), and the
 // loop pedal (R records, Backspace undoes). No crowd, no set: the band plays until you leave.
 import { createInput } from './input.js';
@@ -7,6 +8,7 @@ import { layoutPitches } from './keys.js';
 import { STOCK } from './gear.js';
 import { createLoop, record, note, release, ring, step, undo, due, loopState, countBeats } from './looper.js';
 import { LOOP } from './tuning.js';
+import { READY, clockOf, readyBeat } from './beats.js';
 
 // Browsers don't treat these as user activation (Chrome doesn't for a lone modifier, no browser does
 // for Esc), so starting an AudioContext from one leaves it suspended.
@@ -19,20 +21,33 @@ export function soundCheck(audio, { debug }) {
   document.getElementById('game').hidden = true;
   const boxes = [...panel.querySelectorAll('input[data-layer]')];
   let started = false, measured = null;
-  const loop = createLoop();
+  const beats = document.getElementById('sound-beat');
+  for (const b of READY) beats.add(new Option(b.name, b.id));
+  let beat = READY[0], loop = createLoop(clockOf(beat));
   let bandAt = 0; // the band's first 16th, on the audio clock: the loop's times count from it
   const bandTime = () => audio.now() - bandAt;
 
+  // The band starts (or starts again, with another beat) a moment from now, with an empty loop.
+  const playBand = () => {
+    audio.stopLoop();
+    loop = createLoop(clockOf(beat));
+    bandAt = audio.now() + 0.1;
+    audio.startBand(bandAt, beat);
+    for (const box of boxes) audio.setLayer(box.dataset.layer, box.checked);
+  };
   const begin = () => {
     if (started) return;
     started = true;
     audio.start();
     warm();
-    bandAt = audio.now() + 0.1;
-    audio.startBand(bandAt);
-    for (const box of boxes) audio.setLayer(box.dataset.layer, box.checked);
+    playBand();
     document.getElementById('sound-start').hidden = true;
   };
+  beats.addEventListener('change', () => {
+    beat = readyBeat(beats.value);
+    if (started) playBand();
+    beats.blur(); // so the arrow keys and letters play, not change the choice
+  });
   for (const box of boxes) box.addEventListener('change', () => started && audio.setLayer(box.dataset.layer, box.checked));
   // The shop's instruments and pedals, from its stock.
   const choice = document.getElementById('sound-instrument'), pedals = document.getElementById('sound-pedals');
@@ -95,7 +110,7 @@ export function soundCheck(audio, { debug }) {
       audio.setPedal(id, box.checked);
     },
   });
-  if (debug) window.__openCase = { audio, input, loop, get measured() { return measured; } };
+  if (debug) window.__openCase = { audio, input, get loop() { return loop; }, get measured() { return measured; } };
 
   const frame = () => {
     if (started) step(loop, bandTime());

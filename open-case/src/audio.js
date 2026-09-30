@@ -5,13 +5,17 @@
 //   - Your pedals, between your instrument and the speakers, chained in the usual order: overdrive,
 //     chorus, tremolo, delay, reverb. A stomp fades a pedal in or out over a few milliseconds.
 //   - The band: the beat it's given (beats.js), its chords, drums, bass, hats and Pad, scheduled a
-//     little ahead of the audio clock, as Last Light's score is, at the beat's tempo. Each layer plays
-//     into its own bus (its slot): switching a layer is a fade on that bus at a bar line.
+//     little ahead of the audio clock, as Last Light's score is, at the beat's tempo, in the sounds
+//     the beat chose. Each layer plays into its own bus (its slot): switching a layer is a fade on that
+//     bus at a bar line. With the beat's Pump up, the chords, bass and Pad duck on every kick.
+//   - A note the studio has just written is heard at once (playWritten), even if the band had already
+//     scheduled its 16th.
 //   - Your loop (looper.js): its notes are scheduled a moment ahead with the band's, each a voice of
 //     its own through your instrument and pedals, and they fade and stop with the band.
 //   - Its count-in (countIn): a soft stick click on each beat after R, up to the bar line, so you can
 //     hear when the recording is about to start; never through your pedals, never recorded.
-//   - Vinyl crackle, a dusty filter over the band, the tape wobble, coins landing and applause.
+//   - A dusty filter over the band; the Vinyl (crackle, hiss and tape wobble) when the beat has it on;
+//     coins landing and applause.
 //   - A safety before the speakers, so a loop stacked on your playing can't clip.
 // Browsers only allow sound after a key press or click, so start() is called from inside one
 // (main.js). M mutes; the volume and mute are remembered.
@@ -97,6 +101,14 @@ const CHORUS_MIX = 0.6; // the copy's level; your own sound drops to CHORUS_DRY 
 const CHORUS_DRY = 0.8;
 const TREMOLO_DEPTH = 0.35; // the volume swings this share either way, on the 8th notes
 const DELAY_BEATS = 0.75; // the echo's time, in beats of the band's beat: a dotted 8th
+const PUMP_DEPTH = 0.7; // at full Pump, the chords, bass and Pad drop to 30% on a kick...
+const PUMP_BACK = 0.25; // ...and come back with this time constant, in beats
+const HISS_LEVEL = 0.02; // the Vinyl's quiet hiss under its crackle
+// A band note's tone: below 0.5, a lowpass closing from TONE_DARK_HZ x 32 (0.5) to TONE_DARK_HZ (0);
+// above it, a shelf lifting the highs from TONE_SHELF_HZ by up to TONE_LIFT_DB (1).
+const TONE_DARK_HZ = 200;
+const TONE_SHELF_HZ = 2000;
+const TONE_LIFT_DB = 12;
 const DELAY_FEEDBACK = 0.38; // each echo is this loud next to the one before...
 const DELAY_MIX = 0.45; // ...and the first this loud next to your note
 const DELAY_TONE = 2800; // Hz: each echo a little darker
@@ -179,6 +191,7 @@ export function softClip(k = OD_CURVE, n = 1025) {
 export function createAudio(storage) {
   let ctx = null, master = null, band = null, noise = null, wobble = null;
   const bus = {}; // a gain per layer: the layer slots
+  const pump = {}; // the ducking gains the chords, bass and Pad play through, into their slots
   const inputs = {}; // a gain per instrument, into its tone filters and on into the pedals
   const loopIns = {}; // a gain per instrument for your loop's notes, into its input: the loop's fade
   const pedals = {}; // id -> { input, output, set(on, at) }
@@ -197,7 +210,9 @@ export function createAudio(storage) {
   let muted = storage.get(MUTE_KEY) === '1';
   let volume = Number(storage.get(VOLUME_KEY) ?? 0.8);
   if (!(volume >= 0 && volume <= 1)) volume = 0.8;
-  let loopAt = -1, next16 = 0, stopAt = Infinity, crackleAt = 0;
+  let loopAt = -1, next16 = 0, stopAt = Infinity, crackleAt = 0, hiss = null;
+  const layerOn = {}; // whether each layer slot is on (the Pump follows the kick only while you can hear it)
+  const bandPlucks = new Map(); // `${voice}:${note}` -> AudioBuffer: the band's plucked strings
   let loopDone = 0; // your loop's notes are scheduled up to this band time
   const level = () => (muted ? 0 : volume);
 
@@ -223,6 +238,7 @@ export function createAudio(storage) {
     for (const { id, min } of LAYERS) {
       bus[id] = ctx.createGain();
       bus[id].gain.value = min === 0 ? 1 : 0;
+      layerOn[id] = min === 0;
       bus[id].connect(band);
     }
     // The stand-in percussion's own bus: not a crowd layer (never in LAYERS), gated the opposite of
@@ -230,6 +246,11 @@ export function createAudio(storage) {
     bus.perc = ctx.createGain();
     bus.perc.gain.value = 1;
     bus.perc.connect(band);
+    // The Pump's gains: the chords and the bass into their slots, the Pad into the top's.
+    for (const [id, into] of [['keys', 'keys'], ['bass', 'bass'], ['pad', 'top']]) {
+      pump[id] = ctx.createGain();
+      pump[id].connect(bus[into]);
+    }
     noise = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
     const d = noise.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
@@ -275,15 +296,16 @@ export function createAudio(storage) {
     lfo.connect(wobble);
     lfo.start();
     // A quiet hiss under the crackle, part of the keys layer.
-    const hiss = ctx.createBufferSource(), hf = ctx.createBiquadFilter(), hg = ctx.createGain();
-    hiss.buffer = noise;
-    hiss.loop = true;
+    const hs = ctx.createBufferSource(), hf = ctx.createBiquadFilter();
+    hiss = ctx.createGain();
+    hs.buffer = noise;
+    hs.loop = true;
     hf.type = 'bandpass';
     hf.frequency.value = 4000;
     hf.Q.value = 0.5;
-    hg.gain.value = 0.02;
-    hiss.connect(hf).connect(hg).connect(bus.keys);
-    hiss.start();
+    hiss.gain.value = beat.mix.vinyl ? HISS_LEVEL : 0;
+    hs.connect(hf).connect(hiss).connect(bus.keys);
+    hs.start();
   }
 
   const now = () => (ctx ? ctx.currentTime : 0);
@@ -590,9 +612,47 @@ export function createAudio(storage) {
     src.start(t, Math.random() * 1.5, len + 0.05);
   }
 
-  // One band note into its layer's bus. len is in seconds.
+  // A band note's way into its slot, through its tone: below 0.5 a lowpass closing towards its pitch
+  // (darker), above it a shelf lifting its highs (brighter); at 0.5 (or with none) the sound itself.
+  function toned(out, tone) {
+    if (tone === undefined || tone === 0.5) return out;
+    const fl = ctx.createBiquadFilter();
+    if (tone < 0.5) {
+      fl.type = 'lowpass';
+      fl.frequency.value = TONE_DARK_HZ * Math.pow(2, tone * 10);
+    } else {
+      fl.type = 'highshelf';
+      fl.frequency.value = TONE_SHELF_HZ;
+      fl.gain.value = (tone - 0.5) * 2 * TONE_LIFT_DB;
+    }
+    fl.connect(out);
+    return fl;
+  }
+
+  // A plucked string of the band's (the nylon guitar, the plucked bass): its samples worked out the
+  // first time its note is played and kept, then damped len seconds after it starts.
+  function bandString(out, t, len, n, { ring, bright, pick }, level) {
+    const key = `${n.voice}:${n.note}`;
+    let buf = bandPlucks.get(key);
+    if (!buf) {
+      const data = pluckSamples(ctx.sampleRate, midiToHz(n.note), 1, { ring, bright: [bright], pick });
+      buf = ctx.createBuffer(1, data.length, ctx.sampleRate);
+      buf.getChannelData(0).set(data);
+      bandPlucks.set(key, buf);
+    }
+    const src = ctx.createBufferSource(), g = ctx.createGain();
+    src.buffer = buf;
+    g.gain.setValueAtTime(n.vel * level, t);
+    g.gain.setTargetAtTime(0, t + len, 0.03);
+    src.connect(g).connect(out);
+    src.start(t);
+    src.stop(t + len + 0.2);
+  }
+
+  // One band note into its layer's bus (the chords, the bass and the Pad through their Pump). len is in
+  // seconds.
   function playBand(layer, n, t, len) {
-    const out = bus[layer], f = midiToHz(n.note);
+    const out = toned(n.voice === 'pad' ? pump.pad : pump[layer] ?? bus[layer], n.tone), f = midiToHz(n.note);
     switch (n.voice) {
       case 'ep': {
         // A soft electric piano: a sine with a sine modulating it, the tine's bite dying away.
@@ -634,6 +694,82 @@ export function createAudio(storage) {
       case 'tap': // a soft low thud on the downbeat, its pitch dropping quickly, quiet
         tone(out, t, { len: 0.1, freq: PERC_TAP_HZ, to: PERC_TAP_DROP_HZ, vol: n.vel * PERC_TAP_LEVEL });
         break;
+      // The brushes kit.
+      case 'softKick': // a round, quiet thump
+        tone(out, t, { len: 0.3, freq: 90, to: 45, vol: n.vel });
+        break;
+      case 'brush': // a swish of wire brushes: noise that swells a little, then fades
+        burst(out, t, { len: 0.28, freq: 3200, q: 0.5, vol: n.vel * 0.7, attack: 0.03 });
+        break;
+      case 'rim': // a rim click: a short wooden knock
+        tone(out, t, { len: 0.05, type: 'triangle', freq: 1650, vol: n.vel * 0.45, attack: 0.001 });
+        burst(out, t, { len: 0.02, freq: 3000, q: 3, vol: n.vel * 0.3 });
+        break;
+      // The funk kit.
+      case 'tightKick': // short and punchy, with a click on top
+        tone(out, t, { len: 0.2, freq: 150, to: 48, vol: n.vel });
+        burst(out, t, { len: 0.012, type: 'highpass', freq: 3500, vol: n.vel * 0.15 });
+        break;
+      case 'crack': // a bright, tight snare
+        burst(out, t, { len: 0.13, freq: 2600, q: 0.9, vol: n.vel * 0.7 });
+        tone(out, t, { len: 0.06, type: 'triangle', freq: 240, vol: n.vel * 0.3 });
+        break;
+      case 'openHat': // an open hat, ringing a little
+        burst(out, t, { len: 0.32, type: 'highpass', freq: 7500, vol: n.vel * 0.28 });
+        break;
+      // The reggae kit.
+      case 'deepKick': // deep and long
+        tone(out, t, { len: 0.55, freq: 85, to: 38, vol: n.vel });
+        break;
+      case 'rimshot': // a cross-stick: a hollow knock
+        tone(out, t, { len: 0.06, type: 'triangle', freq: 820, vol: n.vel * 0.4, attack: 0.001 });
+        burst(out, t, { len: 0.035, freq: 2000, q: 2, vol: n.vel * 0.3 });
+        break;
+      // The basses (the round bass is 'bass', above).
+      case 'pluck': // a plucked bass string
+        bandString(out, t, len, n, { ring: 1.2, bright: 0.45, pick: 0.25 }, 1);
+        break;
+      case 'deep': // a deep, round sine
+        tone(out, t, { len, freq: f, vol: n.vel * 0.4, attack: 0.02 });
+        break;
+      // The chord sounds (the electric piano is 'ep', above).
+      case 'nylon': // a nylon-strung guitar, plucked softly
+        bandString(out, t, len, n, { ring: 1.4, bright: 0.3, pick: 0.18 }, 0.4);
+        break;
+      case 'clav': { // a clavinet-like stab: a bright pulse whose filter snaps shut
+        const o = ctx.createOscillator(), fl = ctx.createBiquadFilter(), g = ctx.createGain();
+        const end = t + Math.max(0.08, Math.min(len, 0.3));
+        o.type = 'square';
+        o.frequency.value = f;
+        fl.type = 'lowpass';
+        fl.Q.value = 4;
+        fl.frequency.setValueAtTime(f * 10, t);
+        fl.frequency.exponentialRampToValueAtTime(f * 2, t + 0.12);
+        g.gain.setValueAtTime(n.vel * 0.09, t);
+        g.gain.exponentialRampToValueAtTime(0.001, end);
+        o.connect(fl).connect(g).connect(out);
+        o.start(t);
+        o.stop(end + 0.05);
+        break;
+      }
+      case 'organ': // a drawbar organ: the note, its octave and its twelfth, as sines
+        for (const [k, v] of [[1, 0.1], [2, 0.065], [3, 0.04]]) tone(out, t, { len: Math.max(len, 0.12), freq: f * k, vol: n.vel * v, attack: 0.008 });
+        break;
+      case 'piano': // a soft piano: a sine and a quieter octave over it, dying away
+        tone(out, t, { len: Math.min(len + 0.8, 3), freq: f, vol: n.vel * 0.1, attack: 0.002 });
+        tone(out, t, { len: Math.min(len, 1.5), type: 'triangle', freq: f * 2, vol: n.vel * 0.025, attack: 0.002 });
+        break;
+    }
+  }
+
+  // The Pump: on a kick at `at`, the chords, the bass and the Pad drop by the beat's Pump and come
+  // back over about an 8th note.
+  function duck(at) {
+    const depth = beat.mix.pump * PUMP_DEPTH;
+    if (!depth) return;
+    for (const g of Object.values(pump)) {
+      g.gain.setValueAtTime(1 - depth, at);
+      g.gain.setTargetAtTime(1, at + 0.01, clock.beat * PUMP_BACK);
     }
   }
 
@@ -644,6 +780,7 @@ export function createAudio(storage) {
     beat = b;
     clock = clockOf(b);
     delayLine.delayTime.setValueAtTime(clock.beat * DELAY_BEATS, at);
+    hiss.gain.setValueAtTime(b.mix.vinyl ? HISS_LEVEL : 0, at);
     loopAt = at;
     next16 = 0;
     stopAt = Infinity;
@@ -653,6 +790,32 @@ export function createAudio(storage) {
       g.gain.cancelScheduledValues(at);
       g.gain.setValueAtTime(g === band ? level : LOOP_LEVEL, at);
     }
+  }
+
+  // The band carries on with `b` in place of the beat it was playing (the studio's changes), from the
+  // same 16th: at a new tempo, the 16ths still to come are timed by it, so nothing jumps or repeats.
+  function setBeat(b) {
+    if (!ctx) return;
+    const next = clockOf(b);
+    const retimed = b.bpm !== beat.bpm || b.swing !== beat.swing;
+    if (loopAt >= 0 && retimed) loopAt += clock.timeOf16th(next16) - next.timeOf16th(next16);
+    beat = b;
+    clock = next;
+    if (retimed) {
+      delayLine.delayTime.setValueAtTime(clock.beat * DELAY_BEATS, ctx.currentTime);
+      newTremoloWave(ctx.currentTime);
+    }
+    hiss.gain.setTargetAtTime(b.mix.vinyl ? HISS_LEVEL : 0, ctx.currentTime, 0.05);
+    wobble.gain.setTargetAtTime(layerOn.top && b.mix.vinyl ? 9 : 0, ctx.currentTime, 0.5);
+  }
+
+  // Notes the studio has just written at 16th s (band time: 16ths since the band's first), heard even
+  // when the band has already scheduled that 16th: at its time, or at once if that's already past. A
+  // 16th not yet scheduled is left to the band, which will play what's written there.
+  function playWritten(layer, notes, s) {
+    if (!ctx || loopAt < 0 || s >= next16) return;
+    const at = Math.max(ctx.currentTime, loopAt + clock.timeOf16th(s));
+    for (const n of notes) playBand(layer, n, at, loopAt + clock.timeOf16th(s + n.len) - at);
   }
 
   // The band in the shop, while you try the loop pedal: the chords of `b` alone (the keys layer, with
@@ -737,8 +900,9 @@ export function createAudio(storage) {
   // A layer slot switched on or off, at a bar line (or at once, from the sound check).
   function setLayer(id, on, at = now()) {
     if (!ctx) return;
+    layerOn[id] = on;
     bus[id].gain.setTargetAtTime(on ? 1 : 0, Math.max(at, ctx.currentTime), 0.02);
-    if (id === 'top') wobble.gain.setTargetAtTime(on ? 9 : 0, Math.max(at, ctx.currentTime), 0.5);
+    if (id === 'top') wobble.gain.setTargetAtTime(on && beat.mix.vinyl ? 9 : 0, Math.max(at, ctx.currentTime), 0.5);
     // The stand-in percussion fills in for the drums, so it fades the opposite way, at the same moment.
     if (id === 'drums') bus.perc.gain.setTargetAtTime(on ? 0 : 1, Math.max(at, ctx.currentTime), 0.02);
   }
@@ -756,11 +920,14 @@ export function createAudio(storage) {
     while (at16(next16) < t + GROOVE.ahead && at16(next16) < stopAt) {
       const at = at16(next16);
       for (const { id } of [...LAYERS, { id: 'perc' }]) {
-        for (const n of bandAt(beat, id, next16)) playBand(id, n, at, at16(next16 + n.len) - at);
+        for (const n of bandAt(beat, id, next16)) {
+          playBand(id, n, at, at16(next16 + n.len) - at);
+          if (n.drum === 'kick' && layerOn.drums) duck(at);
+        }
       }
       next16++;
     }
-    if (t >= crackleAt && t < stopAt) {
+    if (beat.mix.vinyl && t >= crackleAt && t < stopAt) {
       crackleAt = t + 0.03 + Math.random() * 0.25;
       burst(bus.keys, t, { len: 0.004 + Math.random() * 0.01, type: 'highpass', freq: 2000 + Math.random() * 4000, vol: 0.05 + Math.random() * 0.12 });
     }
@@ -807,8 +974,12 @@ export function createAudio(storage) {
   }
 
   return {
-    start, now, warm, noteOn, noteOff, setRing, setInstrument, setPedal, startBand, tryBand, endBand, stopBand, stopLoop,
-    countIn, setLayer, update, coin, clap, reportedLatency, heardAt,
+    start, now, warm, noteOn, noteOff, setRing, setInstrument, setPedal, startBand, setBeat, playWritten, tryBand, endBand, stopBand,
+    stopLoop, countIn, setLayer, update, coin, clap, reportedLatency, heardAt,
+    // the band's first 16th on the audio clock (-1 with no band): band time counts from it
+    get bandStart() {
+      return loopAt;
+    },
     get started() {
       return !!ctx;
     },

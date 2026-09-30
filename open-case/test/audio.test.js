@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createAudio, pluckSamples, softClip, safetyCurve, VOICING } from '../src/audio.js';
 import { fakeAudioContext } from './fake-audio.js';
-import { LOFI_CLOCK } from '../src/beats.js';
+import { LOFI, LOFI_CLOCK, READY, readyBeat, clockOf, bandAt } from '../src/beats.js';
 import { PLAY, GROOVE, LAYERS } from '../src/tuning.js';
 import { PEDALS, INSTRUMENTS } from '../src/gear.js';
 import { createLoop, record, note, release, step, due, loopLength } from '../src/looper.js';
@@ -746,4 +746,164 @@ test('update() forgets a count-in once its clicks are done, so stopLoop no longe
     audio.update(() => []);
     audio.stopLoop(0);
     assert.ok(clicks.every((s) => !cueGain(s).cut), 'already forgotten by update(), so stopLoop had nothing left to cut');
+  }));
+
+// Runs the audio clock on in frames from its time now to `until`, updating the band.
+function runBand(ctx, audio, until) {
+  while (ctx().currentTime < until) {
+    ctx().currentTime += 1 / 60;
+    audio.update();
+  }
+}
+const FUNK = readyBeat('funk'), BOSSA = readyBeat('bossa');
+
+test("the band plays a beat at its own tempo: its notes start on that beat's 16ths", () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    audio.startBand(0.5, FUNK);
+    for (const { id } of LAYERS) audio.setLayer(id, true, 0.5);
+    runBand(ctx, audio, 0.5 + 2 * clockOf(FUNK).bar);
+    const clock = clockOf(FUNK), times = new Set();
+    for (let s = 0; s < 40; s++) times.add((0.5 + clock.timeOf16th(s)).toFixed(6)); // scheduled a moment ahead
+    const band = ctx().started.filter((x) => x.t >= 0.5);
+    assert.ok(band.length > 60, `${band.length} sounds`);
+    for (const x of band) assert.ok(times.has(x.t.toFixed(6)), `a sound at ${x.t}, off the funk's 16ths`);
+  }));
+
+test('every ready-made beat plays in its own sounds, into its slots', () => {
+  for (const beat of READY) {
+    withAudio((ctx) => {
+      const audio = createAudio(memoryStorage());
+      audio.start();
+      audio.startBand(0, beat);
+      for (const { id } of LAYERS) audio.setLayer(id, true, 0);
+      const before = ctx().started.length;
+      runBand(ctx, audio, clockOf(beat).bar * 4);
+      assert.ok(ctx().started.length - before > 60, `${beat.id}: ${ctx().started.length - before} sounds`);
+    });
+  }
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    audio.startBand(0, FUNK);
+    runBand(ctx, audio, 1);
+    assert.ok(ctx().started.some((x) => x.kind === 'osc' && x.node.type === 'square'), "the funk's clav");
+  });
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    audio.startBand(0, BOSSA);
+    runBand(ctx, audio, 1);
+    assert.ok(ctx().buffers.length > 4, "the bossa's nylon strings, plucked");
+  });
+});
+
+test("the delay's echo and the tremolo's pulse take the beat's tempo", () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    audio.startBand(1, BOSSA);
+    const beat = clockOf(BOSSA).beat;
+    const nodes = downstream(playOn(ctx, audio, 'acoustic')[0].node);
+    const line = nodes.find((n) => n.kind === 'delay' && n.delayTime.events.length);
+    assert.deepEqual(line.delayTime.events.at(-1), ['set', beat * 0.75, 1]);
+    const waves = ctx().started.filter((x) => x.kind === 'osc' && x.node.type === 'custom');
+    assert.ok(Math.abs(waves.at(-1).node.frequency.value - 2 / beat) < 1e-9);
+  }));
+
+test('with the Pump up, the chords, bass and Pad duck on each kick, but only once the drums are heard', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    const pumped = { ...LOFI, mix: { ...LOFI.mix, pump: 1 } };
+    audio.startBand(0, pumped);
+    const bass = ctx().busGain('bass').from[0]; // the Pump's gain feeding the bass slot
+    runBand(ctx, audio, 1);
+    assert.equal(bass.gain.events.length, 0, 'no drums yet, so no pumping');
+    audio.setLayer('drums', true, 1);
+    runBand(ctx, audio, 5);
+    const kicks = [0, 7, 10].map((s) => 3 + LOFI_CLOCK.timeOf16th(s)); // bar 1's kicks
+    for (const at of kicks) assert.ok(bass.gain.events.some(([how, v, t]) => how === 'set' && Math.abs(v - 0.3) < 1e-9 && Math.abs(t - at) < 1e-9), `ducked at ${at}`);
+  }));
+
+test('with the Vinyl off there is no crackle, no hiss and no tape wobble', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    audio.startBand(0, FUNK);
+    audio.setLayer('top', true, 0);
+    const keys = ctx().busGain('keys');
+    const before = ctx().started.length;
+    runBand(ctx, audio, 2);
+    const noise = ctx().started.slice(before).filter((x) => x.kind === 'buffer' && downstream(x.node)[0]?.type === 'highpass' && downstream(x.node).includes(keys));
+    assert.equal(noise.length, 0, 'no crackle into the keys slot');
+    const hiss = keys.from.find((n) => n.gain && n.gain.events.some(([how, , t]) => how === 'set' && t === 0));
+    assert.equal(hiss.gain.events.at(-1)[1], 0, 'the hiss is silent');
+    const wobble = ctx().started.find((x) => x.kind === 'osc' && x.node.frequency.value === 0.55).node.outs[0];
+    assert.equal(wobble.gain.events.at(-1)[1], 0, 'no wobble, even with the top in');
+  }));
+
+test("a note's tone darkens it below 0.5 and brightens it above; at 0.5 it's the sound itself", () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    const beat = (tone) => ({ ...LOFI, bass: [{ s: 0, degree: 0, len: 4, vel: 0.9, tone }], chords: [], drums: [] });
+    const filterOf = (tone) => {
+      audio.startBand(ctx().currentTime + 0.05, beat(tone));
+      audio.setLayer('bass', true, 0);
+      const before = ctx().started.length;
+      runBand(ctx, audio, ctx().currentTime + 0.3);
+      const note = ctx().started.slice(before).find((x) => x.kind === 'osc' && x.node.type === 'triangle');
+      return downstream(note.node).find((n) => n.kind === 'filter') ?? null;
+    };
+    assert.equal(filterOf(0.5).type, 'highpass', 'straight into the slot: the first filter is the band\'s dusty one');
+    const dark = filterOf(0.2);
+    assert.equal(dark.type, 'lowpass');
+    assert.ok(dark.frequency.value < 1000, `${dark.frequency.value}`);
+    const bright = filterOf(0.9);
+    assert.equal(bright.type, 'highshelf');
+    assert.ok(bright.gain.value > 8);
+  }));
+
+test("a note the studio writes on a 16th already scheduled is heard at its time, or at once if that's past", () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    const empty = { ...LOFI, drums: [], bass: [], chords: [] };
+    audio.startBand(0, empty);
+    audio.setLayer('bass', true, 0);
+    ctx().currentTime = 1;
+    audio.update(); // scheduled to about 1.2 s
+    const next = [...Array(64).keys()].find((s) => LOFI_CLOCK.timeOf16th(s) >= 1.1);
+    const notes = bandAt({ ...empty, bass: [{ s: next, degree: 0, len: 2, vel: 0.9, tone: 0.5 }] }, 'bass', next);
+    let before = ctx().started.length;
+    audio.playWritten('bass', notes, next);
+    assert.equal(ctx().started.slice(before)[0].t, LOFI_CLOCK.timeOf16th(next), 'on its 16th');
+    before = ctx().started.length;
+    audio.playWritten('bass', notes, next - 2); // a 16th already gone by
+    assert.equal(ctx().started.slice(before)[0].t, 1, 'at once');
+    before = ctx().started.length;
+    audio.playWritten('bass', notes, next + 8); // not scheduled yet: the band will play it
+    assert.equal(ctx().started.length, before);
+  }));
+
+test('changing the beat mid-loop carries on from the same 16th, timing the rest by the new tempo', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    const hatsOnly = { ...LOFI, mix: { ...LOFI.mix, vinyl: false, pad: false }, chords: [], bass: [], drums: LOFI.drums.filter((h) => h.drum === 'hats') };
+    audio.startBand(0, hatsOnly);
+    audio.setLayer('top', true, 0);
+    audio.setLayer('drums', true, 0); // so the stand-in percussion is out
+    runBand(ctx, audio, 1);
+    const start = audio.bandStart;
+    audio.setBeat({ ...hatsOnly, bpm: 100, swing: 0.5 });
+    const before = ctx().started.length;
+    runBand(ctx, audio, 3);
+    const hats = [...new Set(ctx().started.slice(before).filter((x) => x.kind === 'buffer').map((x) => x.t.toFixed(6)))].map(Number).sort((a, b) => a - b);
+    const gaps = hats.slice(1).map((t, i) => t - hats[i]);
+    const eighth = 60 / 100 / 2;
+    assert.ok(gaps.slice(1).every((g) => Math.abs(g - eighth / 2) < 1e-6 || Math.abs(g - eighth) < 1e-6), `${gaps}`);
+    assert.ok(hats[0] > 1 && audio.bandStart !== start, 'nothing already scheduled moves; the band just carries on');
   }));

@@ -13,8 +13,9 @@
 // URL options: ?sound (the sound check); ?debug (interest bars, the corner panel, and Run the bots on
 // the end card); ?seed=N (fixes the passers-by, and the park's windows, train and birds); ?bot=random or
 // ?bot=lick (the bot plays the set, audibly); ?sky=N (the park as it is N bars into a set, until a set
-// starts); ?coins=N (your savings are N on this page, and nothing bought on it is kept). With any of
-// them, window.__openCase exposes the game for browser checks.
+// starts); ?coins=N (your savings are N on this page, and nothing bought on it is kept); ?beat=lofi,
+// bossa, funk, reggae or ballad (every set plays that ready-made beat). With any of them,
+// window.__openCase exposes the game for browser checks.
 import { createAudio } from './audio.js';
 import { createInput } from './input.js';
 import { layoutPitches, shopKey } from './keys.js';
@@ -30,7 +31,7 @@ import { loadArt } from './assets.js';
 import { PEDALS, loadGear, saveGear, earn, buy, play, stomp, stockItem, owns } from './gear.js';
 import { createShop, choose, move, action, trying, hit } from './shop.js';
 import { createLoop, record, note, release, ring, step, undo, due, countBeats } from './looper.js';
-import { LOFI, clockOf } from './beats.js';
+import { LOFI, clockOf, readyBeat } from './beats.js';
 import { DT, LAYERS, PARK } from './tuning.js';
 
 // The module is running, so the page's "couldn't start" message will never be needed.
@@ -46,7 +47,8 @@ const bot = { random: randomBot, lick: lickBot }[params.get('bot')] ?? null;
 const fixedSeed = params.has('seed') ? Number.parseInt(params.get('seed'), 10) || 1 : null;
 const skyBar = params.has('sky') ? Math.max(0, Number.parseFloat(params.get('sky')) || 0) : 0;
 const debugSavings = params.has('coins') ? Math.max(0, Number.parseInt(params.get('coins'), 10) || 0) : null;
-const anyDebug = debug || !!bot || fixedSeed !== null || params.has('sound') || params.has('sky') || debugSavings !== null;
+const fixedBeat = readyBeat(params.get('beat'));
+const anyDebug = debug || !!bot || fixedSeed !== null || params.has('sound') || params.has('sky') || debugSavings !== null || !!fixedBeat;
 
 const storage = safeStorage();
 const audio = createAudio(storage);
@@ -79,7 +81,7 @@ function game(art) {
 
   let screen = 'title'; // 'ready' (waiting for your first note), 'playing', 'paused', 'over', 'shop', 'thanks'
   let set = null, scene = createScene(pageSeed), start = 0, seed = 0;
-  let beat = LOFI; // the beat your sets play (beats.js)
+  let beat = fixedBeat ?? LOFI; // the beat your sets play (beats.js)
   let botMoments = null, botNext = 0, botFed = 0;
   const latency = { reported: null, measured: null };
   // Your savings and gear. With ?coins=N your savings are N, and nothing is kept.
