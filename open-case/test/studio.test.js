@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {
   createStudio, loadBeats, saveBeats, chosenBeat, openBeat, newBeat, replaceSlot, cancelAsk, buskTo, isChosen, setTab, nextTab,
   turnRhythm, rhythmOf, moveRange, nextSound, setTempo, setSwing, setMood, setLength, setLevel, toggleMute, setPump, togglePad,
-  toggleVinyl, clearPart, undoChange, press, moveTo, letGo, setErase, advance, DRUMS,
+  toggleVinyl, clearPart, undoChange, press, moveTo, letGo, setErase, advance, DRUMS, startNaming, typeName, backspaceName, saveName,
+  cancelNaming,
 } from '../src/studio.js';
 import { LOFI, readyBeat, clockOf, blankBeat, keyNote, BASS_C } from '../src/beats.js';
 import { RHYTHMS } from '../src/rhythms.js';
@@ -374,4 +375,128 @@ test('every change moves the version on, so the sound and the screen can follow'
   const w = studio.version;
   turnRhythm(studio, 1);
   assert.equal(studio.version, w, 'choosing a rhythm changes nothing in the beat');
+});
+
+// Types `s` into the name box, a character at a time.
+const type = (studio, s) => [...s].forEach((ch) => typeName(studio, ch));
+
+test('Save on your own beat opens the name box on its name; Enter sets the new name, trimmed, and goes back to the list', () => {
+  const studio = blank();
+  studio.list = true;
+  startNaming(studio);
+  assert.deepEqual(studio.naming, { text: 'Beat 1' }, 'the name as it is, to change');
+  assert.equal(studio.list, false, 'the name box takes the list\'s place');
+  for (let i = 0; i < 6; i++) backspaceName(studio);
+  type(studio, ' Rainy Day ');
+  const v = studio.version;
+  saveName(studio, 7.5);
+  assert.equal(studio.beat.name, 'Rainy Day', 'the spaces at either end trimmed');
+  assert.equal(studio.beats.slots[0].name, 'Rainy Day', 'your slot has it');
+  assert.ok(studio.version > v, 'a new name is a change, so main.js keeps it');
+  assert.equal(studio.naming, null);
+  assert.equal(studio.list, true, 'back to the list');
+  assert.equal(studio.saved, 7.5, 'and when it was saved, in band time, for "saved"');
+  startNaming(studio);
+  assert.deepEqual(studio.naming, { text: 'Rainy Day' }, 'Save again renames');
+  cancelNaming(studio);
+  undoChange(studio);
+  assert.equal(studio.beat.name, 'Beat 1', 'Undo takes a new name back, as any change');
+});
+
+test('the name box takes up to 12 letters, digits and spaces; Backspace deletes the last', () => {
+  const studio = blank();
+  startNaming(studio);
+  for (let i = 0; i < 6; i++) backspaceName(studio);
+  assert.equal(studio.naming.text, '');
+  backspaceName(studio);
+  assert.equal(studio.naming.text, '', 'nothing left to delete');
+  for (const ch of ['!', '-', '.', '_', 'é', 'ab', '', 'Tab', '\n']) typeName(studio, ch);
+  assert.equal(studio.naming.text, '', 'only one letter, digit or space at a time');
+  type(studio, 'Night Bus 9 and more');
+  assert.equal(studio.naming.text, 'Night Bus 9 ', '12 at most');
+  backspaceName(studio);
+  assert.equal(studio.naming.text, 'Night Bus 9');
+});
+
+test('an empty or all-space name keeps the old one, and cancel keeps it too', () => {
+  const studio = blank();
+  for (const typed of ['', '   ']) {
+    startNaming(studio);
+    for (let i = 0; i < 12; i++) backspaceName(studio);
+    type(studio, typed);
+    saveName(studio, 1);
+    assert.equal(studio.beat.name, 'Beat 1', JSON.stringify(typed));
+  }
+  assert.equal(studio.undo.length, 0, 'no change made');
+  startNaming(studio);
+  type(studio, 'xyz');
+  const v = studio.version;
+  cancelNaming(studio);
+  assert.equal(studio.beat.name, 'Beat 1');
+  assert.equal(studio.version, v);
+  assert.equal(studio.naming, null);
+  assert.equal(studio.list, true, 'back to the list, nothing changed');
+});
+
+test('while the name box is open, the pad can\'t be pressed', () => {
+  const studio = blank();
+  startNaming(studio);
+  assert.equal(press(studio, 0, { row: 0, x: 1 }), false);
+  assert.equal(studio.held, null);
+});
+
+test('Save on a ready-made beat makes your copy in the first empty slot, then names the copy', () => {
+  const beats = empty();
+  beats.slots[0] = blankBeat('Mine');
+  const studio = createStudio(beats);
+  openBeat(studio, { ready: 'funk' });
+  studio.list = true;
+  const v = studio.version;
+  startNaming(studio);
+  assert.deepEqual(studio.open, { slot: 1 });
+  assert.equal(studio.beat.name, 'Funk 2', 'your copy, named as a first change names it');
+  assert.ok(studio.version > v, 'the copy is kept');
+  assert.deepEqual(studio.naming, { text: 'Funk 2' });
+  type(studio, 'x');
+  saveName(studio, 0);
+  assert.equal(beats.slots[1].name, 'Funk 2x');
+  assert.equal(readyBeat('funk').name, 'Funk', 'the ready-made funk keeps its name');
+});
+
+test('Save on a ready-made beat with every slot full asks which to replace, then names the copy; Esc leaves all as it was', () => {
+  const beats = empty();
+  for (let i = 0; i < STUDIO.slots; i++) beats.slots[i] = blankBeat(`Beat ${i + 1}`);
+  const studio = createStudio(beats);
+  openBeat(studio, { ready: 'reggae' });
+  studio.list = true;
+  startNaming(studio);
+  assert.ok(studio.asking, 'it asks which to replace');
+  assert.equal(studio.naming, null, 'no name box yet');
+  cancelAsk(studio);
+  assert.equal(studio.asking, null);
+  assert.equal(studio.beat, readyBeat('reggae'));
+  assert.equal(studio.list, true, 'the list, as it was');
+  assert.deepEqual(beats.slots.map((b) => b.name), ['Beat 1', 'Beat 2', 'Beat 3', 'Beat 4', 'Beat 5', 'Beat 6']);
+  startNaming(studio);
+  replaceSlot(studio, 3);
+  assert.equal(beats.slots[3].name, 'Reggae 2');
+  assert.deepEqual(studio.open, { slot: 3 });
+  assert.deepEqual(studio.naming, { text: 'Reggae 2' }, 'the replace carries on into the name box');
+});
+
+test('a name you give comes back after a reload', () => {
+  const storage = memoryStorage();
+  const studio = blank();
+  startNaming(studio);
+  for (let i = 0; i < 6; i++) backspaceName(studio);
+  type(studio, 'Sunday 4 AM');
+  saveName(studio, 0);
+  saveBeats(storage, studio.beats);
+  assert.equal(loadBeats(storage).slots[0].name, 'Sunday 4 AM');
+  startNaming(studio);
+  for (let i = 0; i < 12; i++) backspaceName(studio);
+  type(studio, 'A B C D E F G');
+  saveName(studio, 0);
+  saveBeats(storage, studio.beats);
+  assert.equal(loadBeats(storage).slots[0].name, 'A B C D E F', 'the longest a name can be');
 });

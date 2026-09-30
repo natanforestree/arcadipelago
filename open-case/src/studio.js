@@ -1,9 +1,9 @@
 // The studio (a shop item): where you make beats to busk to, the way Figure makes them. The open beat
 // plays round and round; you pick a part (a tab) and a rhythm on the wheel, and hold the pad: the
 // rhythm plays, and is written into the part as the playhead passes, replacing what was there. Also
-// here: erasing and clearing, undo, the song's settings, the sounds and the mix, your six slots, and
-// the beat your sets play. Pure, so it's tested in Node; main.js runs it, audio.js plays the open beat
-// and studioview.js draws it.
+// here: erasing and clearing, undo, the song's settings, the sounds and the mix, your six slots, naming
+// a beat (Save), and the beat your sets play. Pure, so it's tested in Node; main.js runs it, audio.js
+// plays the open beat and studioview.js draws it.
 //
 // Times are band time: seconds since the band's first 16th, on the open beat's clock. 16ths count
 // from the band's first too, round and round the beat.
@@ -54,8 +54,10 @@ export function createStudio(beats) {
     held: null, // the pad held: { part, row, x } on the drums or { part, col, y }, and next, the first 16th still to write
     erase: false, // Erase (or Backspace) is down
     undo: [], // the open beat as it was before each change, the latest last
-    asking: null, // every slot is full: { make: 'copy' | 'new' } until you pick one to replace
+    asking: null, // every slot is full: { make: 'copy' | 'new', name } until you pick one to replace
     list: false, // the list of beats is open over the pad
+    naming: null, // the name box is open over the pad: { text }, the name as typed so far
+    saved: null, // the band time a name was last saved, for "saved" on the list, or null
   };
   openBeat(studio, beats.chosen ?? { ready: READY[0].id });
   return studio;
@@ -70,6 +72,8 @@ export function openBeat(studio, which) {
   studio.undo = [];
   studio.held = null;
   studio.list = false;
+  studio.naming = null;
+  studio.saved = null;
   studio.version++;
 }
 
@@ -125,18 +129,66 @@ export function newBeat(studio) {
   else keep(studio, i, blankBeat(freeName(studio.beats.slots, 'Beat', 1)));
 }
 
-// With every slot full: slot i is replaced by the copy or the new beat you were making.
+// With every slot full: slot i is replaced by the copy or the new beat you were making. A copy made
+// to be saved (name) goes on into the name box.
 export function replaceSlot(studio, i) {
-  const make = studio.asking?.make;
-  if (!make || i < 0 || i >= STUDIO.slots) return;
+  const ask = studio.asking;
+  if (!ask || i < 0 || i >= STUDIO.slots) return;
   studio.asking = null;
   const others = studio.beats.slots.map((b, k) => (k === i ? null : b));
-  keep(studio, i, make === 'copy' ? copyOf(studio, others) : blankBeat(freeName(others, 'Beat', 1)));
+  keep(studio, i, ask.make === 'copy' ? copyOf(studio, others) : blankBeat(freeName(others, 'Beat', 1)));
+  if (ask.name) studio.naming = { text: studio.beat.name };
 }
 
 // Esc while asking: nothing is made or replaced, and everything stays as it was.
 export function cancelAsk(studio) {
   studio.asking = null;
+}
+
+// Save: the name box opens on the open beat's name, for you to change. A ready-made beat is first
+// copied into your first empty slot, as your first change to it would be, and the box opens on the
+// copy; with every slot full, the studio asks which to replace first, and then opens it.
+export function startNaming(studio) {
+  if (studio.beat.ready) {
+    const i = studio.beats.slots.indexOf(null);
+    if (i < 0) {
+      studio.asking = { make: 'copy', name: true };
+      return;
+    }
+    keep(studio, i, copyOf(studio));
+  }
+  studio.held = null;
+  studio.list = false;
+  studio.naming = { text: studio.beat.name };
+}
+
+// A key typed into the name box: a letter, a digit or a space, up to STUDIO.name of them.
+export function typeName(studio, ch) {
+  const n = studio.naming;
+  if (n && /^[A-Za-z0-9 ]$/.test(ch) && n.text.length < STUDIO.name) n.text += ch;
+}
+
+// Backspace in the name box: the last one typed goes.
+export function backspaceName(studio) {
+  if (studio.naming) studio.naming.text = studio.naming.text.slice(0, -1);
+}
+
+// Enter (or the box's save) at band time t: the name, trimmed, is the beat's, a change like any other
+// (so it's kept, and Undo takes it back), and it's back to the list, where "saved" shows. An empty
+// name keeps the old one.
+export function saveName(studio, t) {
+  if (!studio.naming) return;
+  const name = studio.naming.text.trim();
+  studio.naming = null;
+  if (name && name !== studio.beat.name) edit(studio, (b) => (b.name = name));
+  studio.list = true;
+  studio.saved = t;
+}
+
+// Esc (or the box's cancel): back to the list, the name as it was.
+export function cancelNaming(studio) {
+  studio.naming = null;
+  studio.list = true;
 }
 
 // Busk to this: your sets play the open beat from now on.
@@ -261,7 +313,7 @@ function sixteenthBefore(clock, t) {
 // ago. False when there's no pad to hold (the Mix tab, or a slot must be picked first).
 export function press(studio, t, at) {
   const part = studio.tab;
-  if (!PARTS.includes(part) || studio.asking || studio.list || !begin(studio)) return false;
+  if (!PARTS.includes(part) || studio.asking || studio.list || studio.naming || !begin(studio)) return false;
   const clock = clockOf(studio.beat), s = sixteenthBefore(clock, t);
   studio.held = { part, ...at, next: t - clock.timeOf16th(s) <= STUDIO.grace ? s : s + 1 };
   studio.version++;

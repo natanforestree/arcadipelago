@@ -166,6 +166,8 @@ export const STUDIO = {
   ahead: 0.05, // seconds
   vel: { bass: 0.8, chords: 0.5 },
   softest: 0.3, // a drum held at the pad's left; the right is 1
+  name: 12, // the most letters a name you give a beat can have
+  saved: 1.5, // seconds "saved" shows on the list after you name a beat
 };
 
 // The loop pedal (looper.js): a loop is one pass of the chords, up to `layers` deep, and a note up to
