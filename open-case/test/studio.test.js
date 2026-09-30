@@ -249,6 +249,20 @@ test('with every slot full, a copy or a new beat asks which to replace; Esc leav
   assert.equal(beats.slots[4].name, 'Beat 3', 'the first number no other slot has');
 });
 
+test('with every slot full, the rest of a refused drag leaves a ready-made beat alone', () => {
+  const beats = empty();
+  for (let i = 0; i < STUDIO.slots; i++) beats.slots[i] = blankBeat(`Beat ${i + 1}`);
+  const studio = createStudio(beats);
+  openBeat(studio, { ready: 'reggae' });
+  const reggae = readyBeat('reggae');
+  const before = reggae.bpm;
+  setTempo(studio, 100);
+  assert.deepEqual(studio.asking, { make: 'copy' });
+  assert.equal(reggae.bpm, before, 'first step refused, beat unchanged');
+  setTempo(studio, 110, true);
+  assert.equal(reggae.bpm, before, 'rest of drag also refused, the ready-made beat stays unchanged');
+});
+
 test('New makes a blank beat, named Beat 1, Beat 2...', () => {
   const studio = createStudio(empty());
   newBeat(studio);

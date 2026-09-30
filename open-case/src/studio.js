@@ -109,9 +109,10 @@ function begin(studio) {
 }
 
 // Changes the open beat with fn(beat), once begin() allows it. `again` continues a change already
-// begun (the rest of a drag), so it undoes as one. Returns whether it changed.
+// begun (the rest of a drag), so it undoes as one. If the first step of a drag is refused (all slots
+// full, ready-made beat), every step after is also refused. Returns whether it changed.
 function edit(studio, fn, again = false) {
-  if (!again && !begin(studio)) return false;
+  if (again ? studio.beat.ready : !begin(studio)) return false;
   fn(studio.beat);
   studio.version++;
   return true;
