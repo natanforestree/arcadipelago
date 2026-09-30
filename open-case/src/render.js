@@ -512,8 +512,7 @@ export function createRenderer(g, art) {
     else if (screen === 'ready') {
       if (view.busking) text(`busking to ${view.busking}`, W / 2, 50, C.gold, 'center');
       text('play a note to start the set', W / 2, 60, C.light, 'center');
-    }
-    else if (screen === 'paused') { // dimmed, under the pause card (index.html)
+    } else if (screen === 'paused') { // dimmed, under the pause card (index.html)
       g.globalAlpha = 0.5;
       px(0, 0, W, H, C.ink);
       g.globalAlpha = 1;

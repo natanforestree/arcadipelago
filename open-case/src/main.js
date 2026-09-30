@@ -14,7 +14,8 @@
 // the end card); ?seed=N (fixes the passers-by, and the park's windows, train and birds); ?bot=random or
 // ?bot=lick (the bot plays the set, audibly); ?sky=N (the park as it is N bars into a set, until a set
 // starts); ?coins=N (your savings are N on this page, and nothing bought on it is kept); ?beat=lofi,
-// bossa, funk, reggae or ballad (every set plays that ready-made beat). With any of them,
+// bossa, funk, reggae or ballad (every set plays that ready-made beat); ?studio (the studio is yours on
+// this page, the first key opens it, and nothing made on it is kept). With any of them,
 // window.__openCase exposes the game for browser checks.
 import { createAudio } from './audio.js';
 import { createInput } from './input.js';
@@ -51,7 +52,10 @@ const fixedSeed = params.has('seed') ? Number.parseInt(params.get('seed'), 10) |
 const skyBar = params.has('sky') ? Math.max(0, Number.parseFloat(params.get('sky')) || 0) : 0;
 const debugSavings = params.has('coins') ? Math.max(0, Number.parseInt(params.get('coins'), 10) || 0) : null;
 const fixedBeat = readyBeat(params.get('beat'));
-const anyDebug = debug || !!bot || fixedSeed !== null || params.has('sound') || params.has('sky') || debugSavings !== null || !!fixedBeat;
+const tryStudio = params.has('studio');
+const anyDebug = debug || !!bot || fixedSeed !== null || params.has('sound') || params.has('sky') || debugSavings !== null || !!fixedBeat || tryStudio;
+// This page keeps nothing (?coins=N or ?studio): no gear, beats or log is written to storage.
+const keepsNothing = debugSavings !== null || tryStudio;
 
 const storage = safeStorage();
 const audio = createAudio(storage);
@@ -86,18 +90,21 @@ function game(art) {
   let set = null, scene = createScene(pageSeed), start = 0, seed = 0;
   let botMoments = null, botNext = 0, botFed = 0;
   const latency = { reported: null, measured: null };
-  // Your savings and gear. With ?coins=N your savings are N, and nothing is kept.
+  // Your savings and gear. With ?coins=N your savings are N, with ?studio the studio is yours, and on
+  // either page nothing is kept.
   const gear = loadGear(storage);
   if (debugSavings !== null) gear.savings = debugSavings;
-  const keep = () => debugSavings === null && saveGear(storage, gear);
-  // The log is Nathan's own: a bot set or a ?coins page never writes to it. Savings still count up
-  // on a ?coins page (earn, below); they're just never kept, same as keep() above.
-  const logging = !bot && debugSavings === null;
+  if (tryStudio && !owns(gear, 'studio')) gear.owned = [...gear.owned, 'studio'];
+  const keep = () => !keepsNothing && saveGear(storage, gear);
+  // The log is Nathan's own: a bot set, a ?coins page or a ?studio page never writes to it. Savings
+  // still count up on such a page (earn, below); they're just never kept, same as keep() above.
+  const logging = !bot && !keepsNothing;
   let shop = null; // the shop's state (shop.js) while you're in it
   // Your beats (studio.js): six slots and the one your sets play, kept like your gear (not on a ?coins
-  // page). The studio's state while you're in it, and the last change of its beat handed to the band.
+  // or ?studio page). The studio's state while you're in it, and the last change of its beat handed to
+  // the band.
   const beats = loadBeats(storage);
-  const keepBeats = () => debugSavings === null && saveBeats(storage, beats);
+  const keepBeats = () => !keepsNothing && saveBeats(storage, beats);
   let studio = null, studioSeen = -1, studioSaved = true;
   const studioHeld = { key: null }, studioDrag = { what: null };
   // The beat your sets play: ?beat='s, or with the studio yours, the one you chose there; else the lo-fi.
@@ -248,7 +255,8 @@ function game(art) {
   // Any key at all dismisses the title card and starts the sound (browsers only allow sound after a
   // key press or a click). It's heard before the keys are read, and it plays no note. Esc and a lone
   // modifier don't count as user activation in every browser, so an AudioContext started from one
-  // would stay suspended: leave them alone, doing nothing, on the title card.
+  // would stay suspended: leave them alone, doing nothing, on the title card. With ?studio, it opens
+  // the studio instead of the park.
   addEventListener('keydown', (e) => {
     if (screen !== 'title' || e.metaKey || e.ctrlKey || e.altKey) return;
     if (NON_ACTIVATING_KEYS.has(e.key)) return;
@@ -257,6 +265,7 @@ function game(art) {
     audio.start();
     warmLayout();
     if (bot) startBot();
+    else if (tryStudio) openStudio();
     else screen = 'ready';
   });
 
@@ -427,6 +436,10 @@ function game(art) {
   // the park, ready for the next set, and so does Busk to this, once it has kept your choice.
   document.getElementById('studio').addEventListener('click', () => {
     if (logging) logChoice(storage, 'studio');
+    openStudio();
+  });
+  // Into the studio: from the end card's Studio button, or with ?studio, from the title card.
+  function openStudio() {
     letGoStudio();
     end.hidden = true;
     audio.stopBand();
@@ -439,7 +452,7 @@ function game(art) {
     audio.editBand(); // so what you paint over can be cut off (until the band next starts)
     for (const { id } of LAYERS) audio.setLayer(id, true, at);
     screen = 'studio';
-  });
+  }
   // A keyup or mouseup the page never gets (the window lost the keys, or we left the studio) would
   // leave a hold writing, or Erase wiping, as the playhead passes.
   function letGoStudio() {
@@ -511,7 +524,7 @@ function game(art) {
     else if (what === 'enter') {
       const act = action(shop, gear);
       if (act?.act === 'buy' && buy(gear, act.id)) {
-        if (debugSavings === null) logBuy(storage, { date: new Date().toISOString(), id: act.id, price: stockItem(act.id).price });
+        if (!keepsNothing) logBuy(storage, { date: new Date().toISOString(), id: act.id, price: stockItem(act.id).price });
         shop.soldAt = pageTime();
         audio.coin();
       } else if (act?.act === 'play') play(gear, act.id);

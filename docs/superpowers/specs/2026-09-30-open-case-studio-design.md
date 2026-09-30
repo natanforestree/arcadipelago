@@ -224,11 +224,16 @@ The plan's prototype settled what this spec left open, and changed two small thi
 - **The colours** come from the palette already there: the drums the sky's orange, the bass the speaker's blue, the chords the loop pedal's green. The art stays at 49 colours, and the groovebox adds two frames to the sheet.
 - **Two more files** than "How it's built" lists: `studioview.js` (the screen, and what a click lands on) and `studioinput.js` (the mouse and the keys). Your beats are stored under `open-case-beats`.
 
+After Nathan's first go ("it doesnt do anything", of Busk to this), three more things, which he agreed:
+- **Save, in the list of beats,** between Busk to this and Close ("i almost feel the save should go in this dropdown"), and Cmd+S (Ctrl+S) from anywhere in the studio. It opens a name box in the list's place: type up to 12 letters, digits and spaces, Backspace deletes, and Enter (or its save) sets the name and goes back to the list, where "saved" shows for a moment on the busking line. Esc (or cancel) keeps the old name, and so does an empty one; spaces at either end are trimmed. While the box is open the keys only type, and the band plays on. Saving a ready-made beat makes your copy first, as a first change does, asking which slot to replace when all six are full. Your changes still keep themselves as you go; a new name is a change like any other, so it's kept, and Undo takes it back. Save again renames.
+- **Busk to this goes to the park:** it still chooses the open beat and keeps it, then leaves the studio as Esc does. Waiting for the first note, the park says "busking to" and the beat's name over "play a note to start the set", whenever the studio is yours or `?beat=` fixes the beat. Without either, the prompt is as it was.
+- **`?studio`** counts the studio as yours on that page, and the title card's first key opens it. Like `?coins=N`, the page keeps nothing: no gear, beats or log.
+
 ## Not in this change
 
 - The picture strip in the busking screen (the next spec).
 - A lead part, loops longer than 4 bars, or more than six slots.
 - Keys outside the white keys.
-- Recording audio, sharing or exporting beats, or naming them yourself.
+- Recording audio, or sharing or exporting beats.
 - Changing the beat during a set, or the crowd liking some styles more than others.
 - The Regulars.
