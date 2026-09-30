@@ -1,7 +1,7 @@
 # Open Case: the studio (design spec)
 
 **Date:** 2026-09-30
-**Status:** Nathan agreed the design in chat and on the mockups in the browser ("thats what i am talking about!"), and asked for this spec ("write the spec then pause"). It waits for his review; the implementation plan comes after.
+**Status:** Nathan agreed the design in chat and on the mockups in the browser ("thats what i am talking about!"), asked for this spec ("write the spec then pause"), then for the plan ("go ahead and write the plan then pause"). Built from `docs/superpowers/plans/2026-09-30-open-case-studio.md`.
 
 It started with Nathan: "before we move to the regulars i would like to add another few tracks to add some variety, its getting boring hearing the same song over and over". Every set plays the same 4-bar lo-fi loop, 15 times round.
 
@@ -208,6 +208,21 @@ The layout from the mockups, drawn in the game's flat style at 320×180. Each pa
 ## How we'll know it works
 
 Nathan opens the studio and has a beat he likes in a minute or two, without thinking about notes, the way Figure felt. Then he busks over it, and sets stop sounding the same. **If making a beat feels fiddly,** the rhythms and the pad are where to look. **If a style doesn't sound like itself,** its sounds and patterns get tuned by ear.
+
+## What the build settled
+
+The plan's prototype settled what this spec left open, and changed two small things:
+- **Esc leaves the studio for the park,** ready for the next set, as the shop does, rather than going back to the end card. Every screen between sets returns to the park, and the end card only tells you about a set that's over.
+- **With the mouse, Erase is a switch:** click it and it lights red, paint over what to wipe, click it again. A mouse can't hold two things at once. Backspace still erases while it's held.
+- **Z and X** move the bass pad an octave down or up, as they move your octave when you play. The Range button steps through the three.
+- **The settings:** drag the tempo (2 pixels a beat per minute) or the swing up or down. Click the key or the length to step on to the next, or drag them.
+- **The timing:** a press up to 60 ms after a 16th catches it, and a hold writes 50 ms ahead of the playhead, so the band plays what it writes on time. Letting go within 50 ms of a 16th still writes it. These are in `tuning.js` (`STUDIO`).
+- **From the keys:** a drum plays at 0.7 of full, and a note or chord at the middle tone. A held bass note plays at 0.8, a chord at 0.5.
+- **The chords' names:** the pad names the key's triads (Am, Bdim, C). The strip names each chord as its sound stacks it: Am7 on the nylon guitar, Am9 on the electric piano, and the lo-fi's and the funk's by their own voicings.
+- **A set's bars:** 60 for the lo-fi, 100 for the bossa nova, 76 for the funk, 56 for the reggae and 52 for the ballad.
+- **The ready-made beats' loudness,** rendered offline in Chrome with every part playing: the lo-fi −24.8 dB, the reggae −25.7, the funk −26.6, the bossa nova −27.3 and the ballad −29.0, the gentler ones a little softer. None peaks above −4 dB. The Pump ducks by up to 70% and comes back over a quarter of a beat.
+- **The colours** come from the palette already there: the drums the sky's orange, the bass the speaker's blue, the chords the loop pedal's green. The art stays at 49 colours, and the groovebox adds two frames to the sheet.
+- **Two more files** than "How it's built" lists: `studioview.js` (the screen, and what a click lands on) and `studioinput.js` (the mouse and the keys). Your beats are stored under `open-case-beats`.
 
 ## Not in this change
 
