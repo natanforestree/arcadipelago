@@ -184,7 +184,7 @@ function game(art) {
 
   function startBot() {
     begin(audio.now() + 0.15);
-    botMoments = momentsOf(bot(seed));
+    botMoments = momentsOf(bot(seed, set.beat)); // in time with the beat the set plays
     botNext = 0;
     botFed = 0;
   }
@@ -537,7 +537,8 @@ function game(art) {
   });
 
   document.getElementById('bots').addEventListener('click', () => {
-    const r = runSet(seed, randomBot(seed)).coins, l = runSet(seed, lickBot(seed)).coins;
+    // On the beat your set played, so the bots and you are compared on the same beat.
+    const r = runSet(seed, randomBot(seed, set.beat), set.beat).coins, l = runSet(seed, lickBot(seed, set.beat), set.beat).coins;
     document.getElementById('bots-result').textContent = `Random bot: ${r}. Lick bot: ${l}. You: ${set.coins}.`;
   });
 
