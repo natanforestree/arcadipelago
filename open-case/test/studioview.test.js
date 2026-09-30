@@ -1,12 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { studioHit, padAt, faderValue, moodShort, NAME, TAB_BOXES, SETTINGS, WHEEL, BUTTONS, PAD, STRIP } from '../src/studioview.js';
-import { createStudio, newBeat, setTab, DRUMS } from '../src/studio.js';
+import {
+  studioHit, padAt, faderValue, moodShort, NAME, TAB_BOXES, SETTINGS, WHEEL, BUTTONS, PAD, STRIP, LIST_BUTTONS, NAME_BUTTONS, NAME_FIELD,
+} from '../src/studioview.js';
+import { createStudio, newBeat, setTab, startNaming, DRUMS } from '../src/studio.js';
 import { STUDIO } from '../src/tuning.js';
 
 const empty = () => ({ slots: Array(STUDIO.slots).fill(null), chosen: null });
 const mid = ([x, y, w, h]) => [x + w / 2, y + h / 2];
 const inScreen = ([x, y, w, h]) => x >= 0 && y >= 0 && x + w <= 320 && y + h <= 180;
+const inPad = ([x, y, w, h]) => x >= PAD[0] && y >= PAD[1] && x + w <= PAD[0] + PAD[2] && y + h <= PAD[1] + PAD[3];
+const overlap = ([ax, ay, aw, ah], [bx, by, bw, bh]) => ax < bx + bw && bx < ax + aw && ay < by + bh && by < ay + ah;
 
 test('everything on the studio screen is inside it, and the pad, the wheel, the strip and the top bar keep apart', () => {
   for (const box of [NAME, PAD, STRIP, ...Object.values(TAB_BOXES), ...Object.values(SETTINGS), ...Object.values(BUTTONS)]) assert.ok(inScreen(box), `${box}`);
@@ -85,4 +89,29 @@ test('asking which slot to replace: a click on a slot replaces it, anywhere off 
 
 test('the keys are named short, to fit the top bar', () => {
   assert.deepEqual(['C', 'D', 'E', 'F', 'G', 'A'].map(moodShort), ['C maj', 'D dor', 'E phr', 'F lyd', 'G mix', 'A min']);
+});
+
+test("the list's Save sits on its bottom row between Busk to this and Close, and a click on it saves", () => {
+  const { save, new: fresh, busk, close } = LIST_BUTTONS;
+  assert.ok(save && inScreen(save) && inPad(save), `${save}`);
+  assert.equal(save[1], busk[1], 'on the row of buttons');
+  assert.equal(save[3], busk[3]);
+  for (const other of [fresh, busk, close]) assert.ok(!overlap(save, other), `${save} clear of ${other}`);
+  assert.ok(save[0] >= busk[0] + busk[2] && save[0] + save[2] <= close[0], 'between Busk to this and Close');
+  const studio = createStudio(empty());
+  studio.list = true;
+  assert.deepEqual(studioHit(studio, ...mid(save)), { hit: 'save' });
+});
+
+test('the name box: its save and cancel buttons are all there is to click', () => {
+  const studio = createStudio(empty());
+  newBeat(studio);
+  startNaming(studio);
+  for (const box of [NAME_FIELD, NAME_BUTTONS.save, NAME_BUTTONS.cancel]) assert.ok(inScreen(box) && inPad(box), `${box}`);
+  assert.ok(!overlap(NAME_BUTTONS.save, NAME_BUTTONS.cancel) && !overlap(NAME_FIELD, NAME_BUTTONS.save) && !overlap(NAME_FIELD, NAME_BUTTONS.cancel));
+  assert.deepEqual(studioHit(studio, ...mid(NAME_BUTTONS.save)), { hit: 'naming', which: 'save' });
+  assert.deepEqual(studioHit(studio, ...mid(NAME_BUTTONS.cancel)), { hit: 'naming', which: 'cancel' });
+  const hits = new Set();
+  for (let x = 0; x < 320; x += 2) for (let y = 0; y < 180; y += 2) hits.add(JSON.stringify(studioHit(studio, x, y)));
+  assert.deepEqual([...hits].sort(), ['null', '{"hit":"naming","which":"cancel"}', '{"hit":"naming","which":"save"}'], 'the name, the tabs and the pad wait');
 });

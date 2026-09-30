@@ -54,7 +54,9 @@ export function createStudio(beats) {
     held: null, // the pad held: { part, row, x } on the drums or { part, col, y }, and next, the first 16th still to write
     erase: false, // Erase (or Backspace) is down
     undo: [], // the open beat as it was before each change, the latest last
-    asking: null, // every slot is full: { make: 'copy' | 'new', name } until you pick one to replace
+    // every slot is full: { make: 'copy' | 'new' } until you pick one to replace, with name: true for a
+    // copy that goes on into the name box (Save)
+    asking: null,
     list: false, // the list of beats is open over the pad
     naming: null, // the name box is open over the pad: { text }, the name as typed so far
     saved: null, // the band time a name was last saved, for "saved" on the list, or null

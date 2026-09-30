@@ -5,11 +5,13 @@
 // Keys: A S D F the drum strips, A to K the bass notes or chords; up and down turn the rhythm wheel;
 // Tab the next part; Backspace (held) erases, Shift+Backspace clears the part; Z and X move the bass
 // pad down or up an octave; Cmd+Z (Ctrl+Z) undoes (with Shift it's redo elsewhere, and there's no
-// redo, so it does nothing); Esc closes the list, or leaves.
+// redo, so it does nothing); Cmd+S (Ctrl+S) opens the name box, as the list's Save does; Esc closes
+// the list, or leaves. While the name box is open, the keys type the name instead: letters, digits
+// and spaces, Backspace deletes, Enter saves and Esc cancels.
 import {
   PARTS, DRUMS, LENGTHS, press, moveTo, letGo, setErase, turnRhythm, nextTab, setTab, clearPart, undoChange, moveRange, nextSound,
   setTempo, setSwing, setMood, setLength, setLevel, setPump, toggleMute, togglePad, toggleVinyl, openBeat, newBeat, buskTo, replaceSlot,
-  cancelAsk,
+  cancelAsk, startNaming, typeName, backspaceName, saveName, cancelNaming,
 } from './studio.js';
 import { studioHit, padAt, faderValue } from './studioview.js';
 import { MOODS } from './beats.js';
@@ -21,9 +23,14 @@ const DRAG = { bpm: 2, swing: 2, mood: 10, bars: 12 }; // pixels of drag for eac
 // A key goes down. Returns what main.js should do beyond the studio: 'leave' (Esc, with nothing
 // open to close), or null. `held` is the controls' own state: { key } for a pad key held.
 export function keyDown(studio, held, e, t) {
+  if (studio.naming) return nameKey(studio, e, t);
   if (e.repeat) return null;
   if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.code === 'KeyZ') {
     undoChange(studio);
+    return null;
+  }
+  if ((e.metaKey || e.ctrlKey) && e.code === 'KeyS') {
+    if (!studio.asking) startNaming(studio); // a question on screen is answered first
     return null;
   }
   if (e.metaKey || e.ctrlKey || e.altKey) return null;
@@ -47,6 +54,17 @@ export function keyDown(studio, held, e, t) {
     if (e.shiftKey) clearPart(studio);
     else setErase(studio, true);
   } else if ((e.code === 'KeyZ' || e.code === 'KeyX') && studio.tab === 'bass') moveRange(studio, e.code === 'KeyX' ? 1 : -1);
+  return null;
+}
+
+// A key goes down in the name box at band time t: it types (by e.key, one character; a held key
+// repeats, as in any text box), and nothing else in the studio hears it.
+function nameKey(studio, e, t) {
+  if (e.metaKey || e.ctrlKey || e.altKey) return null;
+  if (e.code === 'Escape') cancelNaming(studio);
+  else if (e.code === 'Enter' || e.code === 'NumpadEnter') saveName(studio, t);
+  else if (e.code === 'Backspace') backspaceName(studio);
+  else if (typeof e.key === 'string' && e.key.length === 1) typeName(studio, e.key);
   return null;
 }
 
@@ -84,6 +102,13 @@ export function mouseDown(studio, drag, x, y, t) {
       buskTo(studio);
       studio.list = false;
       return 'busk';
+    case 'save':
+      startNaming(studio);
+      break;
+    case 'naming':
+      if (target.which === 'save') saveName(studio, t);
+      else cancelNaming(studio);
+      break;
     case 'close':
       studio.list = false;
       break;

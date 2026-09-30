@@ -1,9 +1,9 @@
 // The studio's screen at 320x180, laid out as Figure's is but wide: the beat's name, the tabs and the
 // song's settings across the top; the rhythm wheel and the buttons on the left; the big pad on the
 // right (the Mix tab's faders in its place); and along the bottom, a picture of the loop, only to look
-// at: bar numbers, a lane for each part showing its notes, and the playhead. The list of beats, and the
-// question of which slot to replace, open over the pad. studioHit says what a click lands on;
-// drawStudio draws it all with render.js's tools.
+// at: bar numbers, a lane for each part showing its notes, and the playhead. The list of beats, the
+// question of which slot to replace, and the name box (the list's Save) open over the pad. studioHit
+// says what a click lands on; drawStudio draws it all with render.js's tools.
 import { READY, clockOf, chordOf, bassNote, keyNote, noteLetter, padChordName, SOUNDS, BASS_C } from './beats.js';
 import { PARTS, DRUMS, COLUMNS, rhythmOf, isChosen, chosenBeat } from './studio.js';
 import { STUDIO } from './tuning.js';
@@ -32,15 +32,25 @@ const shortName = (name) => (name.length > 9 ? `${name.slice(0, 8)}.` : name);
 // The list's rows over the pad: the ready-made beats on the left, your slots on the right, and its
 // buttons along the bottom.
 const listBox = (i, side) => [PAD[0] + 4 + side * 116, PAD[1] + 14 + i * LIST_ROW, 110, LIST_ROW];
-const LIST_BUTTONS = { new: [PAD[0] + 4, PAD[1] + 92, 40, 12], busk: [PAD[0] + 48, PAD[1] + 92, 78, 12], close: [PAD[0] + 178, PAD[1] + 92, 50, 12] };
+export const LIST_BUTTONS = {
+  new: [PAD[0] + 4, PAD[1] + 92, 40, 12], busk: [PAD[0] + 48, PAD[1] + 92, 78, 12], save: [PAD[0] + 130, PAD[1] + 92, 44, 12], close: [PAD[0] + 178, PAD[1] + 92, 50, 12],
+};
+// The name box, in the list's place: the name as you type it, and its buttons along the bottom.
+export const NAME_FIELD = [PAD[0] + 57, PAD[1] + 36, 120, 16];
+export const NAME_BUTTONS = { save: [PAD[0] + 60, PAD[1] + 92, 50, 12], cancel: [PAD[0] + 124, PAD[1] + 92, 50, 12] };
 
 // What a click (or a press) at scene point (x, y) lands on, as { hit, ... }, or null:
-//   'replace' { slot }, 'keep'                  while asking which slot to replace
-//   'open' { which }, 'new', 'busk', 'close'    in the list of beats
+//   'naming' { which: 'save' | 'cancel' }             while the name box is open (nothing else is)
+//   'replace' { slot }, 'keep'                        while asking which slot to replace
+//   'open' { which }, 'new', 'busk', 'save', 'close'  in the list of beats
 //   'name', 'tab' { tab }, 'setting' { which }, 'wheel' { dir }, 'button' { which }
 //   'pad' { at }: { row, x } on the drums, { col, y } on the bass and chords
 //   'fader' { which, value } (a part's level, or 'pump'), 'mute' { part }, 'switch' { which }
 export function studioHit(studio, x, y) {
+  if (studio.naming) {
+    for (const [which, box] of Object.entries(NAME_BUTTONS)) if (inside(box, x, y)) return { hit: 'naming', which };
+    return null;
+  }
   if (studio.asking) {
     for (let i = 0; i < STUDIO.slots; i++) if (inside(listBox(i, 1), x, y)) return { hit: 'replace', slot: i };
     return inside(PAD, x, y) ? null : { hit: 'keep' };
@@ -85,15 +95,15 @@ function mixHit(x, y) {
 // A fader's value at scene height y, for a drag that has wandered off the fader.
 export const faderValue = (y) => Math.round(clamp01((FADER[0] + FADER[1] - y) / FADER[1]) * 100) / 100;
 
-// Draws the studio: d is render.js's { px, text, big, C } (big: text in the 16px font); t is band time
-// (for the playhead).
+// Draws the studio: d is render.js's { px, text, big, measure, C } (big: text in the 16px font;
+// measure: a text's width); t is band time (for the playhead, the name box's cursor and "saved").
 export function drawStudio(d, studio, t) {
   const { px, text, C } = d, beat = studio.beat, part = studio.tab;
   const tone = { drums: [C.drums, C.drumsDark], bass: [C.bass, C.bassDark], chords: [C.chords, C.chordsDark] };
   px(0, 0, 320, 180, C.night);
   // The top bar: the beat's name (click for the list), the tabs, the settings.
   px(0, 0, 320, 19, C.dusk);
-  px(NAME[0], NAME[1], NAME[2], NAME[3], studio.list ? C.charcoal : C.night);
+  px(NAME[0], NAME[1], NAME[2], NAME[3], studio.list || studio.naming ? C.charcoal : C.night);
   text(shortName(beat.name), NAME[0] + 3, NAME[1] + 3, C.light);
   text('v', NAME[0] + NAME[2] - 7, NAME[1] + 3, C.grey);
   for (const [id, [x, y, w, h]] of Object.entries(TAB_BOXES)) {
@@ -113,7 +123,8 @@ export function drawStudio(d, studio, t) {
   if (part === 'mix') mix(d, studio, tone);
   else pad(d, studio, tone[part]);
   strip(d, studio, t, tone);
-  if (studio.list || studio.asking) list(d, studio);
+  if (studio.naming) nameBox(d, studio, t);
+  else if (studio.list || studio.asking) list(d, studio, t);
 }
 
 // The rhythm wheel: the part's rhythm as marks round a ring (long for a long note), its number in the
@@ -245,8 +256,9 @@ function strip({ px, text, C }, studio, t, tone) {
 
 // The list of beats (or, with every slot full, which of yours to replace), over the pad. Each row is a
 // beat's name and, at its end, its tempo and key; the beat your sets play is named in green, and said
-// under the rows (a row is too short for the word as well).
-function list({ px, text, C }, studio) {
+// under the rows (a row is too short for the word as well), where "saved" shows for a moment after
+// you name a beat.
+function list({ px, text, C }, studio, t) {
   const [x0, y0, w, h] = PAD, asking = studio.asking;
   px(x0, y0, w, h, C.ink);
   text(asking ? 'your slots are full: replace which?' : 'ready-made', x0 + 6, y0 + 3, C.gold);
@@ -261,14 +273,33 @@ function list({ px, text, C }, studio) {
     READY.forEach((b, i) => row(listBox(i, 0), b, studio.open.ready === b.id, isChosen(studio, { ready: b.id })));
   }
   studio.beats.slots.forEach((b, i) => row(listBox(i, 1), b, studio.open.slot === i, b && isChosen(studio, { slot: i })));
-  text(`busking: ${chosenBeat(studio.beats).name}`, x0 + 6, y0 + 14 + STUDIO.slots * LIST_ROW + 1, C.go);
+  const under = y0 + 14 + STUDIO.slots * LIST_ROW + 1;
+  text(`busking: ${chosenBeat(studio.beats).name}`, x0 + 6, under, C.go);
+  if (studio.saved !== null && t >= studio.saved && t - studio.saved < STUDIO.saved) text('saved', x0 + w - 6, under, C.go, 'right');
   if (asking) {
     text('esc: leave them all', x0 + 6, y0 + h - 12, C.grey);
     return;
   }
   for (const [id, [x, y, bw, bh]] of Object.entries(LIST_BUTTONS)) {
-    const word = { new: 'new', busk: 'busk to this', close: 'close' }[id];
+    const word = { new: 'new', busk: 'busk to this', save: 'save', close: 'close' }[id];
     px(x, y, bw, bh, id === 'busk' ? C.gold : C.charcoal);
     text(word, x + bw / 2, y + 2, id === 'busk' ? C.ink : C.light, 'center');
+  }
+}
+
+// The name box (the list's Save), in the list's place: the name as you type it, with a cursor that
+// blinks on band time, and its save and cancel buttons.
+function nameBox({ px, text, measure, C }, studio, t) {
+  const [x0, y0, w, h] = PAD, [fx, fy, fw, fh] = NAME_FIELD, name = studio.naming.text;
+  px(x0, y0, w, h, C.ink);
+  text('name your track', x0 + 6, y0 + 3, C.gold);
+  px(fx, fy, fw, fh, C.charcoal);
+  text(name, fx + 4, fy + 4, C.light);
+  if (Math.floor(t * 2) % 2 === 0) px(fx + 4 + measure(name) + 1, fy + 3, 1, 10, C.light);
+  text(`letters, numbers, spaces: up to ${STUDIO.name}`, x0 + w / 2, fy + fh + 6, C.grey, 'center');
+  text('enter: save   esc: cancel', x0 + w / 2, y0 + h - 30, C.greyDark, 'center');
+  for (const [id, [x, y, bw, bh]] of Object.entries(NAME_BUTTONS)) {
+    px(x, y, bw, bh, id === 'save' ? C.gold : C.charcoal);
+    text(id, x + bw / 2, y + 2, id === 'save' ? C.ink : C.light, 'center');
   }
 }

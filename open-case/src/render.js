@@ -140,6 +140,11 @@ export function createRenderer(g, art) {
     g.fillStyle = c;
     g.fillText(s, Math.round(x), Math.round(y));
   };
+  // The width of a text in the 8px font.
+  const measure = (s) => {
+    g.font = FONT;
+    return g.measureText(s).width;
+  };
   // Text in the 16px font, centred on x: the count-in's digit, the studio's rhythm number.
   const big = (s, x, y, c) => {
     g.font = '16px Silkscreen, monospace';
@@ -479,7 +484,7 @@ export function createRenderer(g, art) {
     const { screen, set, scene, keys, t, time } = view;
     g.imageSmoothingEnabled = false;
     if (screen === 'shop') return shopView(view);
-    if (screen === 'studio') return drawStudio({ px, text, big, C }, view.studio, t);
+    if (screen === 'studio') return drawStudio({ px, text, big, measure, C }, view.studio, t);
     park(view);
     const flying = figures(view);
     if (set) {

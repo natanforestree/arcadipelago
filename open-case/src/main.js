@@ -459,9 +459,14 @@ function game(art) {
     canvas.style.cursor = '';
   }
   const bandTime = () => audio.now() - audio.bandStart;
+  // The browser's own uses of the studio's keys are kept off: Cmd+S would save the page, and while
+  // you name a beat, Space would scroll, Enter press a button, and ' or / open Firefox's quick find.
   addEventListener('keydown', (e) => {
     if (screen !== 'studio') return;
-    if (e.code === 'Tab' || e.code === 'Backspace' || e.code.startsWith('Arrow') || ((e.metaKey || e.ctrlKey) && e.code === 'KeyZ')) e.preventDefault();
+    const cmd = e.metaKey || e.ctrlKey;
+    if (e.code === 'Tab' || e.code === 'Backspace' || e.code.startsWith('Arrow') || (cmd && (e.code === 'KeyZ' || e.code === 'KeyS')) || (studio.naming && !cmd)) {
+      e.preventDefault();
+    }
     const what = keyDown(studio, studioHeld, e, bandTime());
     if (what === 'leave') leaveStudio();
   });

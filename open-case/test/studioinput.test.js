@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { keyDown, keyUp, mouseDown, mouseMove, mouseUp, scroll } from '../src/studioinput.js';
-import { createStudio, newBeat, advance, setTab, setTempo } from '../src/studio.js';
-import { NAME, TAB_BOXES, SETTINGS, WHEEL, BUTTONS, PAD } from '../src/studioview.js';
-import { clockOf, blankBeat, LOFI } from '../src/beats.js';
+import { createStudio, newBeat, advance, setTab, setTempo, openBeat, startNaming } from '../src/studio.js';
+import { NAME, TAB_BOXES, SETTINGS, WHEEL, BUTTONS, PAD, LIST_BUTTONS, NAME_BUTTONS } from '../src/studioview.js';
+import { clockOf, blankBeat, LOFI, readyBeat } from '../src/beats.js';
 import { STUDIO } from '../src/tuning.js';
 
 const empty = () => ({ slots: Array(STUDIO.slots).fill(null), chosen: null });
@@ -226,4 +226,81 @@ test("Cmd coming up lets go of a held pad key, whose own keyup macOS never sends
   keyUp(studio, held, key('MetaLeft', { key: 'Meta' }));
   assert.equal(studio.held, null);
   assert.equal(held.key, null);
+});
+
+// A key typed in the name box: its code, and the character it types (e.key).
+const typed = (ch) => key(/[a-z]/i.test(ch) ? `Key${ch.toUpperCase()}` : /[0-9]/.test(ch) ? `Digit${ch}` : 'Space', { key: ch, shiftKey: ch !== ch.toLowerCase() });
+
+test('Cmd+S and Ctrl+S open the name box, from the pad or the list', () => {
+  const studio = blank(), held = { key: null };
+  assert.equal(keyDown(studio, held, key('KeyS', { metaKey: true, key: 's' }), 0), null);
+  assert.deepEqual(studio.naming, { text: 'Beat 1' });
+  assert.equal(studio.held, null, 'S is no pad key here');
+  keyDown(studio, held, key('Escape'), 0);
+  assert.equal(studio.naming, null);
+  keyDown(studio, held, key('KeyS', { ctrlKey: true, key: 's' }), 0);
+  assert.deepEqual(studio.naming, { text: 'Beat 1' }, 'Ctrl+S, with the list open');
+  const ready = createStudio(empty());
+  keyDown(ready, { key: null }, key('KeyS', { metaKey: true, key: 's' }), 0);
+  assert.equal(ready.beat.name, 'Lo-fi 2', 'a ready-made beat is copied first');
+  assert.deepEqual(ready.naming, { text: 'Lo-fi 2' });
+});
+
+test('while naming, the keys type: a pad key types and never presses the pad, and arrows, Tab, Z and X do nothing', () => {
+  const studio = blank(), held = { key: null };
+  startNaming(studio);
+  const before = JSON.stringify({ ...studio, naming: null });
+  for (const ch of 'asdf') assert.equal(keyDown(studio, held, typed(ch), 0), null);
+  assert.equal(studio.held, null, 'the pad is never pressed');
+  assert.equal(held.key, null);
+  for (const code of ['ArrowUp', 'ArrowDown', 'Tab']) keyDown(studio, held, key(code), 0);
+  keyDown(studio, held, key('KeyZ', { metaKey: true }), 0);
+  assert.equal(studio.naming.text, 'Beat 1asdf');
+  for (const ch of 'zx') keyDown(studio, held, typed(ch), 0);
+  assert.equal(studio.naming.text, 'Beat 1asdfzx', 'Z and X type too');
+  assert.equal(JSON.stringify({ ...studio, naming: null }), before, 'nothing else changed: the wheel, the tab, the octave, the beat');
+  keyDown(studio, held, key('Backspace', { key: 'Backspace' }), 0);
+  keyDown(studio, held, key('Backspace', { key: 'Backspace', repeat: true }), 0);
+  assert.equal(studio.naming.text, 'Beat 1asdf', 'Backspace deletes the last, and deletes on as it repeats');
+  assert.equal(studio.erase, false, 'and never erases');
+  keyUp(studio, held, key('Backspace'));
+  keyDown(studio, held, key('Escape', { key: 'Escape' }), 0);
+  assert.equal(studio.naming, null, 'Esc: back to the list, nothing changed');
+  assert.equal(studio.list, true);
+  assert.equal(studio.beat.name, 'Beat 1');
+});
+
+test('in the name box, Enter saves the name and goes back to the list', () => {
+  const studio = blank(), held = { key: null };
+  startNaming(studio);
+  for (let i = 0; i < 6; i++) keyDown(studio, held, key('Backspace', { key: 'Backspace' }), 0);
+  for (const ch of 'Late Tram 7') keyDown(studio, held, typed(ch), 0);
+  assert.equal(keyDown(studio, held, key('Enter', { key: 'Enter' }), 3.25), null);
+  assert.equal(studio.beat.name, 'Late Tram 7');
+  assert.equal(studio.list, true);
+  assert.equal(studio.saved, 3.25, 'saved at the band time of the key');
+});
+
+test("a click on the list's Save opens the name box, and its save and cancel buttons work; Busk to this still says 'busk'", () => {
+  const studio = blank(), drag = { what: null };
+  const mid = ([x, y, w, h]) => [x + w / 2, y + h / 2];
+  studio.list = true;
+  mouseDown(studio, drag, ...mid(LIST_BUTTONS.save), 0);
+  assert.deepEqual(studio.naming, { text: 'Beat 1' });
+  studio.naming.text = 'Mine';
+  mouseDown(studio, drag, ...mid(NAME_BUTTONS.cancel), 0);
+  assert.equal(studio.naming, null);
+  assert.equal(studio.beat.name, 'Beat 1', 'cancel keeps the name');
+  assert.equal(studio.list, true);
+  mouseDown(studio, drag, ...mid(LIST_BUTTONS.save), 0);
+  studio.naming.text = 'Mine';
+  mouseDown(studio, drag, ...mid(NAME_BUTTONS.save), 2);
+  assert.equal(studio.beat.name, 'Mine');
+  assert.equal(studio.saved, 2);
+  assert.equal(studio.list, true, 'back to the list');
+  openBeat(studio, { ready: 'bossa' });
+  studio.list = true;
+  assert.equal(mouseDown(studio, drag, ...mid(LIST_BUTTONS.busk), 0), 'busk');
+  assert.deepEqual(studio.beats.chosen, { ready: 'bossa' });
+  assert.equal(readyBeat('bossa').name, 'Bossa nova');
 });

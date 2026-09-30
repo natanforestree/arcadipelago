@@ -13,8 +13,8 @@ import { STOCK, PEDALS, INSTRUMENTS, freshGear, buy, stomp } from '../src/gear.j
 import { createShop, choose, CARD, BUTTON } from '../src/shop.js';
 import { createLoop, record, step, loopLength } from '../src/looper.js';
 import { stoodAt } from './helpers.js';
-import { createStudio, setTab, newBeat } from '../src/studio.js';
-import { STRIP, PAD } from '../src/studioview.js';
+import { createStudio, setTab, newBeat, startNaming, typeName, saveName } from '../src/studio.js';
+import { STRIP, PAD, NAME_FIELD } from '../src/studioview.js';
 const { bar: BAR, beat: BEAT } = LOFI_CLOCK;
 const LOOP_LENGTH = loopLength(createLoop());
 
@@ -721,4 +721,36 @@ test('the list of beats, and the question when your slots are full, over the pad
   const q = fakeContext();
   createRenderer(q, art)(view({ screen: 'studio', studio, t: 0 }));
   assert.ok(q.texts.includes('your slots are full: replace which?') && q.texts.includes('esc: leave them all'));
+});
+
+test('the list has Save; the name box shows its title, the name with a blinking cursor, save and cancel; then "saved" for a moment', () => {
+  const studio = createStudio({ slots: Array(6).fill(null), chosen: null });
+  newBeat(studio);
+  studio.list = true;
+  const drawAt = (t) => {
+    const g = fakeContext();
+    createRenderer(g, art)(view({ screen: 'studio', studio, t }));
+    return g;
+  };
+  const C = data.colors;
+  assert.ok(drawAt(0).texts.includes('save'), "the list's Save");
+  startNaming(studio);
+  typeName(studio, 'x');
+  const g = drawAt(0.1);
+  for (const s of ['name your track', 'Beat 1x', 'save', 'cancel']) assert.ok(g.texts.includes(s), s);
+  assert.ok(!g.texts.includes('ready-made'), 'in the list\'s place');
+  const [fx, fy, fw, fh] = NAME_FIELD, name = g.positions.find((p) => p.s === 'Beat 1x');
+  assert.ok(name.x >= fx && name.y >= fy && name.y < fy + fh, 'the name, in its field');
+  // The cursor: a thin light bar just after the name (the stand-in's 6px a letter), blinking.
+  const cursor = (gg) => gg.rects.find(([x, y, w, h, c]) => w === 1 && h > 4 && c === C.light && x > name.x + 7 * 6 - 1 && x <= name.x + 7 * 6 + 2 && y >= fy && y + h <= fy + fh);
+  assert.ok(cursor(g), 'the cursor, after the name');
+  assert.ok(!cursor(drawAt(0.6)), 'and blinking');
+  saveName(studio, 2);
+  const busking = (gg) => gg.positions.find((p) => p.s.startsWith('busking: '));
+  const saved = drawAt(2.5).positions.find((p) => p.s === 'saved');
+  assert.ok(saved, '"saved", just after');
+  assert.equal(saved.y, busking(drawAt(2.5)).y, "on the list's busking line");
+  assert.equal(saved.color, C.go);
+  assert.ok(drawAt(2.5).texts.includes('Beat 1x'), 'and the new name on its row');
+  assert.ok(!drawAt(2 + 1.6).texts.includes('saved'), 'gone after a moment');
 });
