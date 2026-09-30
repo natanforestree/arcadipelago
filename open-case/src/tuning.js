@@ -153,6 +153,18 @@ export const SHOP = {
   synth: { price: 250 },
 };
 
+// The studio (studio.js): your slots, how far back Undo goes, how late a press can be and still catch
+// the 16th it just missed, how far ahead of the playhead a hold writes (so the band plays what it
+// writes on time), and how hard a held bass note and chord are played (a drum's is where you hold it).
+export const STUDIO = {
+  slots: 6,
+  undo: 20,
+  grace: 0.06, // seconds
+  ahead: 0.05, // seconds
+  vel: { bass: 0.8, chords: 0.5 },
+  softest: 0.3, // a drum held at the pad's left; the right is 1
+};
+
 // The loop pedal (looper.js): a loop is one pass of the chords, up to `layers` deep, and a note up to
 // `early` 16ths before a recording's first bar line still counts, played just as early.
 export const LOOP = { bars: 4, layers: 3, early: 1 };

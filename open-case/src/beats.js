@@ -335,3 +335,43 @@ export const BALLAD = {
 export const READY = [LOFI, BOSSA, FUNK, REGGAE, BALLAD];
 export const readyBeat = (id) => READY.find((b) => b.id === id) ?? null;
 export const LOFI_CLOCK = clockOf(LOFI);
+
+// A beat of your own to change freely: a deep copy, never the ready-made one it came from (so it has
+// no ready-made id).
+export const cloneBeat = (beat) => ({ ...JSON.parse(JSON.stringify(beat)), id: null, ready: false });
+
+// A blank beat, named `name`: 90 bpm, straight, A minor, 4 bars, the lo-fi's sounds, nothing in it.
+export function blankBeat(name) {
+  return {
+    id: null, name, ready: false, bpm: 90, swing: 0.5, mood: 'A', bars: 4,
+    sounds: { drums: 'lofi', bass: 'round', chords: 'epiano' }, mix: mix(), drums: [], bass: [], chords: [],
+  };
+}
+
+// A beat read back from storage, checked from top to bottom: the beat as a beat of your own, or null
+// if anything about it is off (it's ignored, and the game carries on).
+export function cleanBeat(raw) {
+  const num = (x, lo, hi) => typeof x === 'number' && Number.isFinite(x) && x >= lo && x <= hi;
+  const int = (x, lo, hi) => Number.isInteger(x) && x >= lo && x <= hi;
+  const flag = (x) => typeof x === 'boolean';
+  try {
+    if (!raw || typeof raw !== 'object' || typeof raw.name !== 'string' || !raw.name || raw.name.length > 24) return null;
+    if (!num(raw.bpm, 60, 140) || !num(raw.swing, 0.5, 0.75) || !MOODS.some((m) => m.id === raw.mood) || ![1, 2, 4].includes(raw.bars)) return null;
+    const { sounds: so, mix: m } = raw;
+    if (!KITS[so?.drums] || !BASSES[so?.bass] || !CHORD_SOUNDS[so?.chords]) return null;
+    const parts = ['drums', 'bass', 'chords'];
+    if (!m || !parts.every((p) => num(m.levels?.[p], 0, 1) && flag(m.muted?.[p])) || !num(m.pump, 0, 1) || !flag(m.pad) || !flag(m.vinyl)) return null;
+    const end = raw.bars * 16;
+    const ok = {
+      drums: (h) => int(h.s, 0, end - 1) && ['kick', 'snare', 'hats', 'perc'].includes(h.drum) && num(h.vel, 0, 1),
+      bass: (h) => int(h.s, 0, end - 1) && int(h.degree, -14, 21) && int(h.len, 1, 64) && num(h.vel, 0, 1) && num(h.tone, 0, 1),
+      chords: (h) => int(h.s, 0, end - 1) && int(h.degree, -14, 21) && int(h.len, 1, 64) && num(h.vel, 0, 1) && num(h.tone, 0, 1)
+        && (h.notes === undefined || (Array.isArray(h.notes) && h.notes.length > 0 && h.notes.every((n) => int(n, 0, 127))))
+        && (h.name === undefined || typeof h.name === 'string'),
+    };
+    if (!parts.every((p) => Array.isArray(raw[p]) && raw[p].length <= 512 && raw[p].every((h) => h && ok[p](h)))) return null;
+    return cloneBeat(raw);
+  } catch {
+    return null;
+  }
+}
