@@ -744,6 +744,17 @@ test('the list of beats, and the question when your slots are full, over the pad
   assert.ok(q.texts.includes('your slots are full: replace which?') && q.texts.includes('esc: leave them all'));
 });
 
+test('a name you give that is cut short to fit ends at its last letter, not a space, before the dot', () => {
+  const studio = createStudio({ slots: Array(6).fill(null), chosen: null });
+  newBeat(studio);
+  studio.beat.name = 'Sad Dog 42x';
+  studio.list = true;
+  const g = fakeContext();
+  createRenderer(g, art)(view({ screen: 'studio', studio, t: 0 }));
+  assert.equal(g.texts.filter((s) => s === 'Sad Dog.').length, 2, 'in the top bar and on its row');
+  assert.ok(!g.texts.includes('Sad Dog .'));
+});
+
 test('the list has Save; the name box shows its title, the name with a blinking cursor, save and cancel; then "saved" for a moment', () => {
   const studio = createStudio({ slots: Array(6).fill(null), chosen: null });
   newBeat(studio);

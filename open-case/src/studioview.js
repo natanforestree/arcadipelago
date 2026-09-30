@@ -26,8 +26,9 @@ const LANES = { drums: [144, 10], bass: [156, 9], chords: [167, 10] }; // each l
 const inside = ([x, y, w, h], px, py) => px >= x && px < x + w && py >= y && py < y + h;
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 export const moodShort = (id) => ({ C: 'C maj', D: 'D dor', E: 'E phr', F: 'F lyd', G: 'G mix', A: 'A min' })[id];
-// A beat's name cut to fit a short space (the top bar, a row of the list): 9 letters at most.
-const shortName = (name) => (name.length > 9 ? `${name.slice(0, 8)}.` : name);
+// A beat's name cut to fit a short space (the top bar, a row of the list): 9 letters at most, and
+// never a space before the dot.
+const shortName = (name) => (name.length > 9 ? `${name.slice(0, 8).trimEnd()}.` : name);
 
 // The list's rows over the pad: the ready-made beats on the left, your slots on the right, and its
 // buttons along the bottom.
