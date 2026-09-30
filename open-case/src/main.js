@@ -32,7 +32,7 @@ import { PEDALS, loadGear, saveGear, earn, buy, play, stomp, stockItem, owns } f
 import { createShop, choose, move, action, trying, hit } from './shop.js';
 import { createLoop, record, note, release, ring, step, undo, due, countBeats } from './looper.js';
 import { LOFI, clockOf, readyBeat } from './beats.js';
-import { createStudio, loadBeats, saveBeats, chosenBeat, advance } from './studio.js';
+import { createStudio, loadBeats, saveBeats, chosenBeat, advance, letGo, setErase } from './studio.js';
 import { keyDown, keyUp, mouseDown, mouseMove, mouseUp, scroll } from './studioinput.js';
 import { studioHit } from './studioview.js';
 import { DT, LAYERS, PARK } from './tuning.js';
@@ -313,7 +313,13 @@ function game(art) {
   });
   sound();
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) pause(true);
+    if (document.hidden) {
+      pause(true);
+      if (screen === 'studio') letGoStudio();
+    }
+  });
+  addEventListener('blur', () => {
+    if (screen === 'studio') letGoStudio();
   });
 
   function handle(events) {
@@ -418,6 +424,7 @@ function game(art) {
   // the park, ready for the next set.
   document.getElementById('studio').addEventListener('click', () => {
     if (logging) logChoice(storage, 'studio');
+    letGoStudio();
     end.hidden = true;
     audio.stopBand();
     set = null;
@@ -429,8 +436,19 @@ function game(art) {
     for (const { id } of LAYERS) audio.setLayer(id, true, at);
     screen = 'studio';
   });
+  // A keyup or mouseup the page never gets (the window lost the keys, or we left the studio) would
+  // leave a hold writing, or Erase wiping, as the playhead passes.
+  function letGoStudio() {
+    if (studio) {
+      letGo(studio);
+      setErase(studio, false);
+    }
+    studioHeld.key = null;
+    studioDrag.what = null;
+  }
   function leaveStudio() {
     keepBeats();
+    letGoStudio();
     studio = null;
     audio.stopBand();
     screen = 'ready';
