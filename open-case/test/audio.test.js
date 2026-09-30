@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createAudio, pluckSamples, softClip, safetyCurve, VOICING } from '../src/audio.js';
 import { fakeAudioContext } from './fake-audio.js';
-import { LOFI, LOFI_CLOCK, READY, readyBeat, clockOf, bandAt, cloneBeat } from '../src/beats.js';
+import { LOFI, LOFI_CLOCK, READY, readyBeat, clockOf, bandAt, cloneBeat, midiToHz } from '../src/beats.js';
 import { PLAY, GROOVE, LAYERS } from '../src/tuning.js';
 import { PEDALS, INSTRUMENTS } from '../src/gear.js';
 import { createLoop, record, note, release, step, due, loopLength } from '../src/looper.js';
@@ -877,14 +877,15 @@ test("a note the studio writes on a 16th already scheduled is heard at its time,
     audio.update(); // scheduled to about 1.2 s
     const next = [...Array(64).keys()].find((s) => LOFI_CLOCK.timeOf16th(s) >= 1.1);
     const notes = bandAt({ ...empty, bass: [{ s: next, degree: 0, len: 2, vel: 0.9, tone: 0.5 }] }, 'bass', next);
+    const written = (s) => ({ part: 'bass', drum: null, layer: 'bass', notes, s });
     let before = ctx().started.length;
-    audio.playWritten('bass', notes, next);
+    audio.playWritten(written(next));
     assert.equal(ctx().started.slice(before)[0].t, LOFI_CLOCK.timeOf16th(next), 'on its 16th');
     before = ctx().started.length;
-    audio.playWritten('bass', notes, next - 2); // a 16th already gone by
+    audio.playWritten(written(next - 2)); // a 16th already gone by
     assert.equal(ctx().started.slice(before)[0].t, 1, 'at once');
     before = ctx().started.length;
-    audio.playWritten('bass', notes, next + 8); // not scheduled yet: the band will play it
+    audio.playWritten(written(next + 8)); // not scheduled yet: the band will play it
     assert.equal(ctx().started.length, before);
   }));
 
@@ -958,4 +959,112 @@ test("changing the swing of the band's own beat in place: the next 16th keeps it
     const gaps = after.slice(1).map((t, i) => t - after[i]);
     const want = after.slice(1).map((_, i) => clock.timeOf16th(10 + i) - clock.timeOf16th(9 + i));
     assert.ok(gaps.every((g, i) => Math.abs(g - want[i]) < 1e-6), `${gaps} wanted ${want}`);
+  }));
+
+// The studio's band: `beat` (one of your own, the Pad and Vinyl off unless it says) from 0.5 s,
+// every layer in, as main.js starts it when you open the studio.
+function studioBand(ctx, audio, over) {
+  const beat = { ...cloneBeat(LOFI), mix: { ...LOFI.mix, pad: false, vinyl: false }, chords: [], bass: [], drums: [], ...over };
+  audio.startBand(0.5, beat);
+  audio.editBand();
+  for (const { id } of LAYERS) audio.setLayer(id, true, 0.5);
+  return beat;
+}
+// When a sound's way to the speakers is cut to silence (a gain ramped to 0), or null if it never is.
+const cutAt = (node) => downstream(node).flatMap((n) => (n.kind === 'gain' ? n.gain.events.filter(([how, v]) => how === 'linear' && v === 0).map(([, , t]) => t) : []))[0] ?? null;
+// The sounds started at time t since the `before`-th, and those of them that are oscillators at hz.
+const startedAt = (ctx, t, before = 0) => ctx().started.slice(before).filter((x) => Math.abs(x.t - t) < 1e-9);
+const oscAt = (ctx, t, hz, before = 0) => startedAt(ctx, t, before).filter((x) => x.kind === 'osc' && Math.abs(x.node.frequency.events[0]?.[1] - hz) < 0.01);
+const at16 = (s) => 0.5 + LOFI_CLOCK.timeOf16th(s);
+
+test('in the studio, painting a drum strip over a 16th the band already scheduled cuts its old hit there and plays the new; another strip plays on', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    studioBand(ctx, audio, { drums: [{ s: 8, drum: 'kick', vel: 1 }, { s: 8, drum: 'snare', vel: 0.8 }] });
+    const T = at16(8);
+    runBand(ctx, audio, T - 0.15); // the band has scheduled 16th 8
+    const oldKick = oscAt(ctx, T, 110)[0].node;
+    const snare = startedAt(ctx, T).filter((x) => x.node !== oldKick && downstream(x.node).includes(ctx().busGain('drums')));
+    assert.ok(oldKick && snare.length === 2, "the band's kick and snare (a burst and a tone) at 16th 8");
+    ctx().currentTime = T - 0.04; // a hold writes a moment ahead of the playhead
+    const kick = { voice: 'kick', note: 0, vel: 0.7, len: 1, drum: 'kick' };
+    let before = ctx().started.length;
+    audio.playWritten({ part: 'drums', drum: 'kick', layer: 'drums', notes: [kick], s: 8 });
+    const cut = cutAt(oldKick);
+    assert.ok(cut !== null && cut >= T - 0.04 && cut <= T + 0.01, `the old kick is silent by its own time: ${cut}`);
+    const fresh = oscAt(ctx, T, 110, before);
+    assert.equal(fresh.length, 1, 'the new kick, on its 16th');
+    assert.equal(cutAt(fresh[0].node), null);
+    for (const x of snare) assert.equal(cutAt(x.node), null, 'the snare at the same 16th keeps sounding');
+    // Let go and press again within the grace: the same 16th painted again replaces the new kick too.
+    ctx().currentTime = T + 0.03;
+    before = ctx().started.length;
+    audio.playWritten({ part: 'drums', drum: 'kick', layer: 'drums', notes: [kick], s: 8 });
+    const again = cutAt(fresh[0].node);
+    assert.ok(again !== null && again >= T + 0.03 && again <= T + 0.03 + 0.01, `cut at once, over a few ms: ${again}`);
+    assert.equal(oscAt(ctx, T + 0.03, 110, before).length, 1, 'one kick sounding, not two');
+    for (const x of snare) assert.equal(cutAt(x.node), null);
+  }));
+
+test('in the studio, a bass note still sounding where a new one is painted is cut where the new one starts; the new one rings on over the empty 16ths after it', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    studioBand(ctx, audio, { bass: [{ s: 0, degree: 0, len: 8, vel: 0.9, tone: 0.5 }] });
+    const T = at16(4);
+    runBand(ctx, audio, T - 0.1);
+    const old = oscAt(ctx, 0.5, midiToHz(36))[0].node; // C2, from 16th 0 for 8 16ths
+    ctx().currentTime = T - 0.04;
+    audio.playWritten({ part: 'bass', drum: null, layer: 'bass', notes: [], s: 3 }); // an empty 16th (Erase)
+    assert.equal(cutAt(old), null, 'emptying a 16th trims nothing');
+    const before = ctx().started.length;
+    audio.playWritten({ part: 'bass', drum: null, layer: 'bass', notes: [{ voice: 'bass', note: 41, vel: 0.8, len: 4, tone: 0.5 }], s: 4 });
+    const cut = cutAt(old);
+    assert.ok(cut !== null && cut >= T - 0.04 && cut <= T + 0.01, `the old note stops where the new starts: ${cut}`);
+    const fresh = oscAt(ctx, T, midiToHz(41), before)[0].node;
+    ctx().currentTime = at16(5) - 0.04;
+    audio.update();
+    audio.playWritten({ part: 'bass', drum: null, layer: 'bass', notes: [], s: 5 }); // the rhythm has no hit here
+    assert.equal(cutAt(fresh), null, 'the note just painted rings on');
+  }));
+
+test("in the studio, a chord painted over one still sounding cuts it and the bar's Pad where it starts; the hats in the Pad's layer play on", () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    const hats = [0, 2, 4, 6].map((s) => ({ s, drum: 'hats', vel: 0.5 }));
+    studioBand(ctx, audio, { mix: { ...LOFI.mix, pad: true, vinyl: false }, chords: [{ s: 0, degree: 0, len: 16, vel: 0.5, tone: 0.5 }], drums: hats });
+    const T = at16(4);
+    runBand(ctx, audio, T - 0.1);
+    const band = startedAt(ctx, 0.5).filter((x) => x.kind === 'osc');
+    const into = (x, id) => downstream(x.node).includes(ctx().busGain(id));
+    const chord = band.filter((x) => into(x, 'keys')), pad = band.filter((x) => x.node.type === 'sawtooth' && into(x, 'top'));
+    assert.ok(chord.length >= 3 && pad.length >= 4, 'the chord and the Pad from 16th 0');
+    const hat = startedAt(ctx, T).filter((x) => downstream(x.node).includes(ctx().busGain('top')));
+    assert.equal(hat.length, 1, 'the hat on 16th 4');
+    ctx().currentTime = T - 0.04;
+    audio.playWritten({ part: 'chords', drum: null, layer: 'keys', notes: [60, 64, 67].map((note) => ({ voice: 'ep', note, vel: 0.5, len: 4, tone: 0.5 })), s: 4 });
+    for (const x of [...chord, ...pad]) {
+      const cut = cutAt(x.node);
+      assert.ok(cut !== null && cut >= T - 0.04 && cut <= T + 0.01, `cut where the new chord starts: ${cut}`);
+    }
+    assert.equal(cutAt(hat[0].node), null, 'the hat plays on');
+  }));
+
+test('outside the studio the band makes no gates: each note goes straight into its slot, as it always has', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    const kickInto = () => oscAt(ctx, ctx().started.filter((x) => x.kind === 'osc' && x.node.frequency.events[0]?.[1] === 110).at(-1).t, 110)[0].node.outs[0].outs[0];
+    audio.editBand(); // the studio, then a set: starting the band turns the gates off
+    audio.startBand(0.5);
+    runBand(ctx, audio, 1.5);
+    assert.equal(kickInto(), ctx().busGain('drums'), 'in a set');
+    audio.startBand(2);
+    audio.editBand();
+    runBand(ctx, audio, 3);
+    const gate = kickInto();
+    assert.notEqual(gate, ctx().busGain('drums'));
+    assert.deepEqual(gate.outs, [ctx().busGain('drums')], 'in the studio, through a gate into the same slot');
   }));

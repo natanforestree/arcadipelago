@@ -9,7 +9,9 @@
 //     the beat chose. Each layer plays into its own bus (its slot): switching a layer is a fade on that
 //     bus at a bar line. With the beat's Pump up, the chords, bass and Pad duck on every kick.
 //   - A note the studio has just written is heard at once (playWritten), even if the band had already
-//     scheduled its 16th.
+//     scheduled its 16th: while the studio is open (editBand), each part's band notes play through a
+//     gate of their own for each 16th, and painting over a 16th the band has already scheduled cuts
+//     what it had there, so the old notes and the new never sound together.
 //   - Your loop (looper.js): its notes are scheduled a moment ahead with the band's, each a voice of
 //     its own through your instrument and pedals, and they fade and stop with the band.
 //   - Its count-in (countIn): a soft stick click on each beat after R, up to the bar line, so you can
@@ -104,6 +106,8 @@ const DELAY_BEATS = 0.75; // the echo's time, in beats of the band's beat: a dot
 const PUMP_DEPTH = 0.7; // at full Pump, the chords, bass and Pad drop to 30% on a kick...
 const PUMP_BACK = 0.25; // ...and come back with this time constant, in beats
 const HISS_LEVEL = 0.02; // the Vinyl's quiet hiss under its crackle
+const CUT_FADE = 0.005; // seconds: how quickly a note painted over in the studio fades to silence
+const GATE_TAIL = 1; // seconds a studio gate is kept after its notes' length: the longest ring-out
 // A band note's tone: below 0.5, a lowpass closing from TONE_DARK_HZ x 32 (0.5) to TONE_DARK_HZ (0);
 // above it, a shelf lifting the highs from TONE_SHELF_HZ by up to TONE_LIFT_DB (1).
 const TONE_DARK_HZ = 200;
@@ -216,6 +220,11 @@ export function createAudio(storage) {
   const layerOn = {}; // whether each layer slot is on (the Pump follows the kick only while you can hear it)
   const bandPlucks = new Map(); // `${voice}:${note}` -> AudioBuffer: the band's plucked strings
   let loopDone = 0; // your loop's notes are scheduled up to this band time
+  // In the studio (editBand): the band's notes go through a gate per part and 16th, so painting over
+  // them can cut them off. { key: a drum strip, 'bass' or 'chords'; s: the band's 16th; into: the slot
+  // it feeds; g: the gate; until: the 16th its longest note lasts to; end: when it's done }
+  let editing = false;
+  const gates = new Set();
   const level = () => (muted ? 0 : volume);
 
   function start() {
@@ -651,10 +660,12 @@ export function createAudio(storage) {
     src.stop(t + len + 0.2);
   }
 
-  // One band note into its layer's bus (the chords, the bass and the Pad through their Pump). len is in
-  // seconds.
-  function playBand(layer, n, t, len) {
-    const out = toned(n.voice === 'pad' ? pump.pad : pump[layer] ?? bus[layer], n.tone), f = midiToHz(n.note);
+  // Where a band note goes: its layer's bus (the chords, the bass and the Pad through their Pump).
+  const slotOf = (layer, n) => (n.voice === 'pad' ? pump.pad : pump[layer] ?? bus[layer]);
+
+  // One band note into `into` (its slot, or in the studio a gate before it). len is in seconds.
+  function playBand(layer, n, t, len, into = slotOf(layer, n)) {
+    const out = toned(into, n.tone), f = midiToHz(n.note);
     switch (n.voice) {
       case 'ep': {
         // A soft electric piano: a sine with a sine modulating it, the tine's bite dying away.
@@ -779,6 +790,8 @@ export function createAudio(storage) {
   // empty with it. The tremolo and the delay take the beat's tempo.
   function startBand(at, b = LOFI, level = BAND_LEVEL) {
     if (!ctx) return;
+    editing = false; // the studio's gates are only for the studio: editBand turns them on
+    gates.clear();
     beat = b;
     clock = clockOf(b);
     delayLine.delayTime.setValueAtTime(clock.beat * DELAY_BEATS, at);
@@ -814,13 +827,64 @@ export function createAudio(storage) {
     wobble.gain.setTargetAtTime(layerOn.top && b.mix.vinyl ? 9 : 0, ctx.currentTime, 0.5);
   }
 
-  // Notes the studio has just written at 16th s (band time: 16ths since the band's first), heard even
-  // when the band has already scheduled that 16th: at its time, or at once if that's already past. A
+  // The studio is open: from now until the band next starts, its notes play through gates, so what
+  // you paint over can be cut off (playWritten).
+  function editBand() {
+    editing = true;
+  }
+
+  // The part a band note is in, for the studio: its drum strip, the bass, or the chords (the keys layer
+  // and the Pad, which is the chords' upper notes); null for the stand-in percussion.
+  const partOf = (layer, n) => n.drum ?? (layer === 'bass' ? 'bass' : layer === 'keys' || n.voice === 'pad' ? 'chords' : null);
+
+  // The gate a studio note starting at 16th s (at time t, for len seconds) plays through: the one its
+  // part already has there into the same slot, or a new one at full, kept until its notes are done.
+  function gated(layer, n, s, t, len) {
+    const key = partOf(layer, n), into = slotOf(layer, n);
+    if (!key) return into;
+    let r = null;
+    for (const x of gates) if (x.key === key && x.s === s && x.into === into) r = x;
+    if (!r) {
+      r = { key, s, into, g: ctx.createGain(), until: s, end: t };
+      r.g.connect(into);
+      gates.add(r);
+    }
+    r.until = Math.max(r.until, s + n.len);
+    r.end = Math.max(r.end, t + len + GATE_TAIL);
+    return r.g;
+  }
+
+  // What a gate carries fades to silence over a few ms, done by `at` if there's time (a note painted
+  // over before it starts is never heard), else from now.
+  function cut(g, at) {
+    const from = Math.max(ctx.currentTime, at - CUT_FADE);
+    g.gain.setValueAtTime(1, from);
+    g.gain.linearRampToValueAtTime(0, from + CUT_FADE);
+  }
+
+  // A 16th the studio has just painted, { part, drum, layer, notes, s } (studio.js advance; s: the
+  // band's 16th, counted from its first), heard at once even when the band has already scheduled it:
+  // at its time, or now if that's past. The band's notes of that part (or drum strip) starting there
+  // are cut, and for the bass and chords, a note of theirs still sounding there that the new one
+  // stops (the bar's Pad too: the next time round plays the new one). Then what's written plays, each
+  // note through a gate of its own so it can be painted over in turn; one already over is skipped. A
   // 16th not yet scheduled is left to the band, which will play what's written there.
-  function playWritten(layer, notes, s) {
+  function playWritten({ part, drum, layer, notes, s }) {
     if (!ctx || loopAt === null || s >= next16) return;
     const at = Math.max(ctx.currentTime, loopAt + clock.timeOf16th(s));
-    for (const n of notes) playBand(layer, n, at, loopAt + clock.timeOf16th(s + n.len) - at);
+    if (editing) {
+      const key = drum ?? part, trims = notes.length > 0 && part !== 'drums';
+      for (const r of gates) {
+        if (r.key !== key || !(r.s === s || (trims && r.s < s && r.until > s))) continue;
+        gates.delete(r);
+        cut(r.g, at);
+      }
+    }
+    for (const n of notes) {
+      const len = loopAt + clock.timeOf16th(s + n.len) - at;
+      if (len <= 0) continue;
+      playBand(layer, n, at, len, editing ? gated(layer, n, s, at, len) : undefined);
+    }
   }
 
   // The band in the shop, while you try the loop pedal: the chords of `b` alone (the keys layer, with
@@ -926,7 +990,8 @@ export function createAudio(storage) {
       const at = at16(next16);
       for (const { id } of [...LAYERS, { id: 'perc' }]) {
         for (const n of bandAt(beat, id, next16)) {
-          playBand(id, n, at, at16(next16 + n.len) - at);
+          const len = at16(next16 + n.len) - at;
+          playBand(id, n, at, len, editing ? gated(id, n, next16, at, len) : undefined);
           if (n.drum === 'kick' && layerOn.drums) duck(at);
         }
       }
@@ -938,6 +1003,7 @@ export function createAudio(storage) {
     }
     for (const v of looped) if (v.end < t) looped.delete(v);
     for (const v of countIns) if (v.end < t) countIns.delete(v);
+    for (const r of gates) if (r.end < t) gates.delete(r);
     // Your loop's notes, never in the past: after a stall, what's already late is skipped.
     const from = Math.max(loopDone, t - loopAt), to = Math.min(t + GROOVE.ahead, stopAt) - loopAt;
     if (!loopDue || to <= from) return [];
@@ -979,7 +1045,7 @@ export function createAudio(storage) {
   }
 
   return {
-    start, now, warm, noteOn, noteOff, setRing, setInstrument, setPedal, startBand, setBeat, playWritten, tryBand, endBand, stopBand,
+    start, now, warm, noteOn, noteOff, setRing, setInstrument, setPedal, startBand, editBand, setBeat, playWritten, tryBand, endBand, stopBand,
     stopLoop, countIn, setLayer, update, coin, clap, reportedLatency, heardAt,
     // the band's first 16th on the audio clock (null with no band): band time counts from it
     get bandStart() {

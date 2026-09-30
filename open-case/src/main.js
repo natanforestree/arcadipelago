@@ -433,6 +433,7 @@ function game(art) {
     studioSeen = studio.version;
     const at = audio.now() + 0.1;
     audio.startBand(at, studio.beat);
+    audio.editBand(); // so what you paint over can be cut off (until the band next starts)
     for (const { id } of LAYERS) audio.setLayer(id, true, at);
     screen = 'studio';
   });
@@ -565,10 +566,11 @@ function game(art) {
         }
         stepScene(scene, set.t);
       }
-      // The studio: a held pad writes as the playhead reaches it, and the notes on 16ths the band had
-      // already scheduled are played for it; each change of the beat goes to the band, and is kept once
-      // you let go. A change goes to the band before the hold reads the band's time too, so after a new
-      // tempo it reads it on the band's new clock (and again after, for what the hold wrote).
+      // The studio: a held pad writes as the playhead reaches it, and on 16ths the band had already
+      // scheduled, what it had there is cut and what's written played; each change of the beat goes to
+      // the band, and is kept once you let go. A change goes to the band before the hold reads the
+      // band's time too, so after a new tempo it reads it on the band's new clock (and again after, for
+      // what the hold wrote).
       if (studio) {
         const toBand = () => {
           if (studio.version === studioSeen) return;
@@ -577,7 +579,7 @@ function game(art) {
           studioSaved = false;
         };
         toBand();
-        for (const w of advance(studio, bandTime())) audio.playWritten(w.layer, w.notes, w.s);
+        for (const w of advance(studio, bandTime())) audio.playWritten(w);
         toBand();
         if (!studioSaved && !studio.held) {
           keepBeats();

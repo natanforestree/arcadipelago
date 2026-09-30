@@ -155,8 +155,10 @@ export const SHOP = {
 };
 
 // The studio (studio.js): your slots, how far back Undo goes, how late a press can be and still catch
-// the 16th it just missed, how far ahead of the playhead a hold writes (so the band plays what it
-// writes on time), and how hard a held bass note and chord are played (a drum's is where you hold it).
+// the 16th it just missed, how far ahead of the playhead a hold writes (just ahead of the sound; the
+// band has scheduled further ahead still, so audio.js cuts what the band had on each 16th written and
+// plays what's written, on its 16th), and how hard a held bass note and chord are played (a drum's is
+// where you hold it).
 export const STUDIO = {
   slots: 6,
   undo: 20,

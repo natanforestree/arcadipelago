@@ -285,29 +285,35 @@ export function setErase(studio, on) {
 
 // Time runs on to band time t while you hold: every 16th from the next one still to write up to
 // STUDIO.ahead past t is written (the part's notes there replaced by the rhythm's hit, if it has one
-// there), or with Erase down, emptied. Returns what was written for the sound, [{ layer, notes, s }]
-// (s: the band's 16th), so the notes on 16ths the band has already scheduled are still heard.
+// there), or with Erase down, emptied. Returns every 16th it painted, for the sound: [{ part, drum,
+// layer, notes, s }] (drum: the strip, or null off the drums; layer: the band's layer the part plays
+// in; notes: what was written, or none where it was left empty; s: the band's 16th). The band has
+// already scheduled the old notes of those 16ths, so audio.js cuts them and plays what's written.
 export function advance(studio, t) {
   const h = studio.held;
   if (!h) return [];
   const clock = clockOf(studio.beat), out = [], from = h.next;
   while (clock.timeOf16th(h.next) <= t + STUDIO.ahead) {
-    const played = paint(studio, h, h.next);
-    if (played?.notes.length) out.push({ ...played, s: h.next });
+    out.push({ ...paint(studio, h, h.next), s: h.next });
     h.next++;
   }
   if (h.next !== from) studio.version++; // written or erased: either way, the beat has changed
   return out;
 }
 
-// Writes the band's 16th k with the held pad, as advance does.
+// The band's layer a part plays in (as beats.js notesOf has it): the hats in the top one, the rest
+// of the drums in the drums one, the chords in the keys.
+const layerOf = (part, drum) => (part === 'drums' ? (drum === 'hats' ? 'top' : 'drums') : part === 'chords' ? 'keys' : part);
+
+// Writes the band's 16th k with the held pad, as advance does, and says what it wrote: { part, drum,
+// layer, notes }.
 function paint(studio, h, k) {
   const beat = studio.beat, part = h.part, end = beat.bars * 16, pos = ((k % end) + end) % end;
-  const drum = part === 'drums' ? DRUMS[h.row] : null;
+  const drum = part === 'drums' ? DRUMS[h.row] : null, left = { part, drum, layer: layerOf(part, drum), notes: [] };
   beat[part] = beat[part].filter((x) => !(x.s === pos && (!drum || x.drum === drum)));
-  if (studio.erase) return null;
+  if (studio.erase) return left;
   const len = hitAt(rhythmOf(studio, part), pos % 16);
-  if (!len) return null;
+  if (!len) return left;
   let hit;
   if (drum) hit = { s: pos, drum, vel: Math.round((STUDIO.softest + (1 - STUDIO.softest) * h.x) * 100) / 100 };
   else {
@@ -318,5 +324,5 @@ function paint(studio, h, k) {
   }
   beat[part].push(hit);
   beat[part].sort((a, b) => a.s - b.s);
-  return notesOf(beat, part, hit);
+  return { ...left, notes: notesOf(beat, part, hit).notes };
 }

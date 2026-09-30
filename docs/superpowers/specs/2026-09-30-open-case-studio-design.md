@@ -216,7 +216,7 @@ The plan's prototype settled what this spec left open, and changed two small thi
 - **With the mouse, Erase is a switch:** click it and it lights red, paint over what to wipe, click it again. A mouse can't hold two things at once. Backspace still erases while it's held.
 - **Z and X** move the bass pad an octave down or up, as they move your octave when you play. The Range button steps through the three.
 - **The settings:** drag the tempo (2 pixels a beat per minute) or the swing up or down. Click the key or the length to step on to the next, or drag them.
-- **The timing:** a press up to 60 ms after a 16th catches it, and a hold writes 50 ms ahead of the playhead, so the band plays what it writes on time. Letting go within 50 ms of a 16th still writes it. These are in `tuning.js` (`STUDIO`).
+- **The timing:** a press up to 60 ms after a 16th catches it, and a hold writes 50 ms ahead of the playhead. The band schedules 200 ms ahead, so it has always already scheduled the old notes of a 16th you paint: the sound cuts that part's old notes there (and a bass note or chord the new one stops) within a few milliseconds, and plays what's written on its 16th. Letting go within 50 ms of a 16th still writes it. These are in `tuning.js` (`STUDIO`).
 - **From the keys:** a drum plays at 0.7 of full, and a note or chord at the middle tone. A held bass note plays at 0.8, a chord at 0.5.
 - **The chords' names:** the pad names the key's triads (Am, Bdim, C). The strip names each chord as its sound stacks it: Am7 on the nylon guitar, Am9 on the electric piano, and the lo-fi's and the funk's by their own voicings.
 - **A set's bars:** 60 for the lo-fi, 100 for the bossa nova, 76 for the funk, 56 for the reggae and 52 for the ballad.

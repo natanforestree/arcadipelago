@@ -46,7 +46,8 @@ test("holding the drum pad writes the rhythm into that strip as the playhead pas
   const written = hold(studio, { row: DRUMS.indexOf('snare'), x: 1 }, 0, 16);
   assert.deepEqual(studio.beat.drums.filter((h) => h.drum === 'snare').map((h) => [h.s, h.vel]), [[0, 1], [4, 1], [8, 1], [12, 1]]);
   assert.deepEqual(studio.beat.drums.filter((h) => h.drum === 'kick').map((h) => h.s), [4], "the kick at the same 16th stays: it's another strip");
-  assert.deepEqual(written.map((w) => [w.layer, w.s]), [['drums', 0], ['drums', 4], ['drums', 8], ['drums', 12]], 'for the sound, as the band would play them');
+  assert.deepEqual(written.filter((w) => w.notes.length).map((w) => [w.layer, w.s]), [['drums', 0], ['drums', 4], ['drums', 8], ['drums', 12]], 'for the sound, as the band would play them');
+  assert.deepEqual(written.map((w) => w.s), [...Array(16).keys()], 'and every 16th in between, left empty');
   hold(studio, { row: 1, x: 0 }, 16, 32);
   assert.ok(studio.beat.drums.filter((h) => h.drum === 'snare').every((h) => h.s >= 16 || h.vel === 1), 'bar 1 untouched');
   assert.equal(studio.beat.drums.find((h) => h.drum === 'snare' && h.s === 16).vel, STUDIO.softest, 'the left of the pad is softest');
@@ -92,12 +93,30 @@ test('a press a hair after a 16th still catches it; a later one waits for the ne
   assert.deepEqual(studio.beat.drums.map((h) => h.s), [4, 10], 'not 8: it went by too long before');
 });
 
-test('what a hold writes is written a moment ahead of the playhead, so the band plays it on time', () => {
+test('what a hold writes is written a moment ahead of the playhead, just before it sounds', () => {
   const studio = blank();
   studio.rhythm.drums = rhythm('drums', [[0, 1], [4, 1], [8, 1], [12, 1]]);
   press(studio, 0.01, { row: 0, x: 1 });
   const written = advance(studio, at16(studio, 4) - STUDIO.ahead + 0.001);
-  assert.deepEqual(written.map((w) => w.s), [0, 4], '16th 4 is written just before it sounds');
+  assert.deepEqual(written.filter((w) => w.notes.length).map((w) => w.s), [0, 4], '16th 4 is written just before it sounds');
+  assert.equal(written.at(-1).s, 4, 'and nothing after it yet');
+});
+
+test('a hold reports every 16th it paints for the sound, the ones it leaves empty too, with the part and the drum strip', () => {
+  const studio = blank();
+  studio.rhythm.drums = rhythm('drums', [[0, 1]]);
+  const hats = hold(studio, { row: DRUMS.indexOf('hats'), x: 1 }, 0, 3);
+  assert.deepEqual(hats.map((w) => [w.part, w.drum, w.layer, w.s, w.notes.length]), [
+    ['drums', 'hats', 'top', 0, 1], ['drums', 'hats', 'top', 1, 0], ['drums', 'hats', 'top', 2, 0],
+  ], 'no hit in the rhythm on 1 and 2: emptied, and said so');
+  setErase(studio, true);
+  const erased = hold(studio, { row: DRUMS.indexOf('kick'), x: 1 }, 16, 18);
+  setErase(studio, false);
+  assert.deepEqual(erased.map((w) => [w.part, w.drum, w.layer, w.s, w.notes.length]), [['drums', 'kick', 'drums', 16, 0], ['drums', 'kick', 'drums', 17, 0]], 'erased');
+  setTab(studio, 'chords');
+  studio.rhythm.chords = rhythm('chords', [[0, 16]]);
+  const chords = hold(studio, { col: 0, y: 0.5 }, 0, 2);
+  assert.deepEqual(chords.map((w) => [w.part, w.drum, w.layer, w.s, w.notes.length > 0]), [['chords', null, 'keys', 0, true], ['chords', null, 'keys', 1, false]]);
 });
 
 test('moving your finger changes the note from the next 16th on', () => {
