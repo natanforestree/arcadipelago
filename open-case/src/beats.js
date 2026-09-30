@@ -111,6 +111,8 @@ export function chordOf(beat, hit) {
 
 export const bassNote = (beat, hit) => keyNote(beat.mood, hit.degree, BASS_C);
 
+// A white key's letter: C to B.
+export const noteLetter = (pitch) => LETTERS[WHITE.indexOf(mod(pitch, 12))];
 
 // The timing of a beat: how long a beat and a bar last, when 16th s sounds (in seconds from the
 // band's first 16th) and which 16th is nearest a time. The swing pushes the second 16th of each pair

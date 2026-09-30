@@ -214,7 +214,10 @@ for i, cl in ipairs(D.CLOUDS) do clouds[i] = { cl[1], cl[2], cl[4] } end
 local colorNames = {
   { "ink", C.ink }, { "charcoal", C.charcoal }, { "light", C.light }, { "gold", C.yellow[2] },
   { "goldDark", C.yellow[1] }, { "grey", C.coat[2] }, { "greyDark", C.coat[1] }, { "red", C.red[2] },
-  { "go", C.go }, { "night", C.night[3] },
+  { "go", C.go }, { "night", C.night[3] }, { "dusk", C.night[1] },
+  -- the studio's parts: the drums orange, the bass blue, the chords green, each with its shadow
+  { "drums", C.sky[6] }, { "drumsDark", C.sky[5] }, { "bass", C.blue[2] }, { "bassDark", C.blue[1] },
+  { "chords", C.go }, { "chordsDark", C.leaf[3] },
 }
 local colors = {}
 for i, c in ipairs(colorNames) do colors[i] = ('    "%s": "%s"'):format(c[1], c[2]) end

@@ -13,6 +13,7 @@ import {
 import { STOCK, PEDALS, owns, stockItem } from './gear.js';
 import { card, trying, CARD, BUTTON } from './shop.js';
 import { loopState } from './looper.js';
+import { drawStudio } from './studioview.js';
 
 export const W = 320, H = 180;
 const FONT = '8px Silkscreen, monospace';
@@ -135,6 +136,14 @@ export function createRenderer(g, art) {
   const text = (s, x, y, c = C.light, align = 'left') => {
     g.font = FONT;
     g.textAlign = align;
+    g.textBaseline = 'top';
+    g.fillStyle = c;
+    g.fillText(s, Math.round(x), Math.round(y));
+  };
+  // Text in the 16px font, centred on x: the count-in's digit, the studio's rhythm number.
+  const big = (s, x, y, c) => {
+    g.font = '16px Silkscreen, monospace';
+    g.textAlign = 'center';
     g.textBaseline = 'top';
     g.fillStyle = c;
     g.fillText(s, Math.round(x), Math.round(y));
@@ -464,11 +473,13 @@ export function createRenderer(g, art) {
   //   loopSaid: null | { what: 'layer' | 'full' | 'cancelled' | 'removed' | 'cleared', layer, time }
   //     (the loop pedal's last news, and when: see loopWords; with none showing, loopCue takes its
   //     place over the strip: the count-in, or the recording's progress),
-  //   shop: the shop's state (shop.js) on the shop screen, debug: null | { reported, measured } }
+  //   shop: the shop's state (shop.js) on the shop screen, studio: the studio's state (studio.js) on
+  //   the studio screen, where t is the band time of the beat it plays, debug: null | { reported, measured } }
   return function draw(view) {
     const { screen, set, scene, keys, t, time } = view;
     g.imageSmoothingEnabled = false;
     if (screen === 'shop') return shopView(view);
+    if (screen === 'studio') return drawStudio({ px, text, big, C }, view.studio, t);
     park(view);
     const flying = figures(view);
     if (set) {

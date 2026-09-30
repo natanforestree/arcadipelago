@@ -13,6 +13,8 @@ import { STOCK, PEDALS, INSTRUMENTS, freshGear, buy, stomp } from '../src/gear.j
 import { createShop, choose, CARD, BUTTON } from '../src/shop.js';
 import { createLoop, record, step, loopLength } from '../src/looper.js';
 import { stoodAt } from './helpers.js';
+import { createStudio, setTab } from '../src/studio.js';
+import { STRIP } from '../src/studioview.js';
 const { bar: BAR, beat: BEAT } = LOFI_CLOCK;
 const LOOP_LENGTH = loopLength(createLoop());
 
@@ -658,4 +660,53 @@ test("with another beat, the bar counter counts that set's bars, and listeners n
   const beat = set.clock.beat;
   assert.match(personFrame(p, 10 * beat + 0.05, 0, beat), /-nod-1-/, "head down on the funk's beat");
   assert.match(personFrame(p, 10 * beat + beat * 0.6, 0, beat), /-nod-0-/);
+});
+
+test("the studio screen: the top bar, the wheel, the buttons and each tab's pad", () => {
+  const studio = createStudio({ slots: Array(6).fill(null), chosen: null });
+  const drawOn = (tab, over = {}) => {
+    const g = fakeContext();
+    setTab(studio, tab);
+    Object.assign(studio, over);
+    createRenderer(g, art)(view({ screen: 'studio', studio, t: 4.2 }));
+    return g;
+  };
+  const drums = drawOn('drums');
+  for (const s of ['Lo-fi', 'drums', 'bass', 'chords', 'mix', '80', 'C maj', '58%', '4', 'kick', 'snare', 'hats', 'perc', 'lo-fi kit', 'erase', 'clear', 'undo']) {
+    assert.ok(drums.texts.includes(s), s);
+  }
+  assert.ok(drums.positions.some((p) => p.s === '4' && p.font.startsWith('16px')), "the wheel's rhythm number, in the big font");
+  assert.ok(drums.sprites.length === 0, 'no park behind it');
+  const bass = drawOn('bass');
+  for (const s of ['C', 'D', 'E', 'F', 'G', 'A', 'B', 'round bass', 'oct 0']) assert.ok(bass.texts.includes(s), s);
+  const chords = drawOn('chords');
+  for (const s of ['Dm', 'Em', 'F', 'Am', 'Bdim', 'electric piano']) assert.ok(chords.texts.includes(s), s);
+  const mix = drawOn('mix');
+  for (const s of ['pump', 'pad', 'vinyl', 'm']) assert.ok(mix.texts.includes(s), s);
+});
+
+test("the studio's strip: every part's notes in its own lane and colour, the chords named, and the playhead", () => {
+  const studio = createStudio({ slots: Array(6).fill(null), chosen: null });
+  const g = fakeContext();
+  createRenderer(g, art)(view({ screen: 'studio', studio, t: 4.5 }));
+  const C = data.colors, [x0, y0, w, h] = STRIP;
+  const inStrip = g.rects.filter(([x, y]) => x >= x0 && x < x0 + w && y >= y0 && y < y0 + h);
+  for (const colour of [C.drums, C.drumsDark, C.bass, C.chordsDark]) assert.ok(inStrip.some((r) => r[4] === colour), colour);
+  for (const s of ['1', '2', '3', '4', 'Dm9', 'G13', 'Cmaj9', 'Am9']) assert.ok(g.texts.includes(s), s);
+  const playhead = inStrip.filter(([, , rw, rh, c]) => rw === 1 && rh > 30 && c === C.light);
+  assert.equal(playhead.length, 1);
+  assert.equal(playhead[0][0], x0 + Math.round((4.5 / 12) * 64 * (w / 64)), 'a bar and a half in: 1.5 of the 4 bars');
+});
+
+test('the list of beats, and the question when your slots are full, over the pad', () => {
+  const studio = createStudio({ slots: Array(6).fill(null), chosen: null });
+  studio.list = true;
+  const g = fakeContext();
+  createRenderer(g, art)(view({ screen: 'studio', studio, t: 0 }));
+  for (const s of ['ready-made', 'yours', 'Lo-fi', 'Bossa nova', 'Funk', 'Reggae', 'Slow ballad', 'empty', 'busking', 'new', 'busk to this', 'close']) assert.ok(g.texts.includes(s), s);
+  studio.list = false;
+  studio.asking = { make: 'copy' };
+  const q = fakeContext();
+  createRenderer(q, art)(view({ screen: 'studio', studio, t: 0 }));
+  assert.ok(q.texts.includes('your slots are full: replace which?') && q.texts.includes('esc: leave them all'));
 });
