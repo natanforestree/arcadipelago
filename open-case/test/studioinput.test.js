@@ -222,24 +222,22 @@ test('holding the swing steps it on the same way, and it stays at 75%; a held ke
   assert.equal(studio.beat.mood, 'C', 'the key steps once, as the mouse comes up');
 });
 
-test('a press that then moves up or down becomes a drag, from where the tempo was when the mouse went down, and stops repeating', () => {
+test('a press that moves before it has repeated becomes a drag from where the tempo was when the mouse went down, and stops repeating', () => {
   const studio = blank(), drag = { what: null };
   const [x, y] = upper(SETTINGS.bpm);
   mouseDown(studio, drag, x, y, 0, 0);
   assert.equal(studio.beat.bpm, 91);
   mouseMove(studio, drag, x + 3, y - 1);
   assert.equal(studio.beat.bpm, 91, 'less than a drag step: still a press');
-  tick(studio, drag, 0.45);
-  assert.equal(studio.beat.bpm, 92, 'so it repeats');
   mouseMove(studio, drag, x, y + 4);
-  assert.equal(studio.beat.bpm, 88, 'two steps down from 90, where it was when the mouse went down');
+  assert.equal(studio.beat.bpm, 88, "two steps down from 90, where it was when the mouse went down: the press's step is undone");
   tick(studio, drag, 1);
   tick(studio, drag, 3);
-  assert.equal(studio.beat.bpm, 88, 'no more repeats');
+  assert.equal(studio.beat.bpm, 88, 'no repeats once it is a drag');
   mouseMove(studio, drag, x, y - 20);
   assert.equal(studio.beat.bpm, 100, '2 pixels a beat per minute, as before');
   mouseUp(studio, drag);
-  assert.equal(studio.undo.length, 1, 'the press, its repeat and the drag: one change');
+  assert.equal(studio.undo.length, 1, 'the press and the drag: one change');
   mouseDown(studio, drag, ...mid(BUTTONS.undo), 0, 4);
   assert.equal(studio.beat.bpm, 90);
   const [sx, sy] = lower(SETTINGS.swing);
@@ -247,6 +245,24 @@ test('a press that then moves up or down becomes a drag, from where the tempo wa
   mouseMove(studio, drag, sx, sy - 16);
   mouseUp(studio, drag);
   assert.equal(studio.beat.swing, 0.58, 'the swing dragged up 8 points from off (the press, at off, changed nothing)');
+});
+
+test('once a hold has repeated, a drift up or down carries on from where the hold got to', () => {
+  const studio = blank(), drag = { what: null };
+  const [x, y] = upper(SETTINGS.bpm);
+  mouseDown(studio, drag, x, y, 0, 0);
+  tick(studio, drag, 2.01);
+  assert.equal(studio.beat.bpm, 115, 'held 2 s');
+  mouseMove(studio, drag, x, y + 2);
+  assert.equal(studio.beat.bpm, 114, "a drift of 2 pixels down: a step down from 115, the hold's progress kept");
+  tick(studio, drag, 3);
+  assert.equal(studio.beat.bpm, 114, 'and no more repeats');
+  mouseMove(studio, drag, x, y - 20);
+  assert.equal(studio.beat.bpm, 125, 'then up 20 pixels: 10 steps up from 115');
+  mouseUp(studio, drag);
+  assert.equal(studio.undo.length, 1, 'the press, the hold and the drag: one change');
+  mouseDown(studio, drag, ...mid(BUTTONS.undo), 0, 4);
+  assert.equal(studio.beat.bpm, 90);
 });
 
 test('with every slot full, a press or a hold on a ready-made beat\'s tempo asks which slot to replace, and nothing changes', () => {
@@ -261,6 +277,40 @@ test('with every slot full, a press or a hold on a ready-made beat\'s tempo asks
   assert.equal(LOFI.bpm, 80);
   assert.equal(studio.version, before, 'no change at all');
   assert.deepEqual(beats.slots.map((b) => b.bpm), [90, 90, 90, 90, 90, 90]);
+});
+
+test('a press refused (every slot full) never repeats: Esc while still holding leaves it asked and answered, not asked again', () => {
+  const beats = empty();
+  for (let i = 0; i < STUDIO.slots; i++) beats.slots[i] = blankBeat(`Beat ${i + 1}`);
+  const studio = createStudio(beats), drag = { what: null }, held = { key: null }, before = studio.version;
+  mouseDown(studio, drag, ...upper(SETTINGS.bpm), 0, 0);
+  assert.deepEqual(studio.asking, { make: 'copy' });
+  keyDown(studio, held, key('Escape'), 0);
+  assert.equal(studio.asking, null, 'Esc: leave them all');
+  for (let i = 1; i <= 120; i++) tick(studio, drag, i / 60);
+  assert.equal(studio.asking, null, 'the hold does not ask again');
+  mouseUp(studio, drag);
+  assert.equal(studio.beat, LOFI);
+  assert.equal(studio.version, before);
+});
+
+test('opening the name box (Cmd+S) while holding an arrow ends the hold: nothing steps under the box, or after it closes', () => {
+  const studio = blank(), drag = { what: null }, held = { key: null };
+  mouseDown(studio, drag, ...upper(SETTINGS.bpm), 0, 0);
+  tick(studio, drag, 0.2);
+  keyDown(studio, held, key('KeyS', { metaKey: true, key: 's' }), 0);
+  assert.ok(studio.naming);
+  mouseMove(studio, drag, ...upper(SETTINGS.bpm).map((v, i) => (i ? v - 20 : v)));
+  assert.equal(studio.beat.bpm, 91, 'no drag under the name box, even before the next frame');
+  tick(studio, drag, 1);
+  tick(studio, drag, 2);
+  assert.equal(studio.beat.bpm, 91, 'nothing steps under the name box');
+  keyDown(studio, held, key('Escape', { key: 'Escape' }), 0);
+  assert.equal(studio.naming, null);
+  tick(studio, drag, 3);
+  mouseMove(studio, drag, ...upper(SETTINGS.bpm).map((v, i) => (i ? v - 20 : v)));
+  mouseUp(studio, drag);
+  assert.equal(studio.beat.bpm, 91, 'the hold ended with the box: no repeats and no drag after it closes');
 });
 
 test('the scroll wheel over the tempo or the swing steps it as its arrows do (wheel up is ▲), at most once in 60 ms', () => {
@@ -288,6 +338,36 @@ test('the scroll wheel over the tempo or the swing steps it as its arrows do (wh
   scroll(studio, ...mid(SETTINGS.mood), -100, 14, wheel);
   scroll(studio, ...mid(SETTINGS.bars), -100, 14.1, wheel);
   assert.equal(JSON.stringify(studio.beat), was, 'the key and the length: untouched');
+});
+
+test('back-to-back wheel steps on one setting are one change: 25 notches, one Undo; a pause, another setting or another change starts afresh', () => {
+  const studio = blank(), drag = { what: null }, wheel = {};
+  const [bx, by] = mid(SETTINGS.bpm), [sx, sy] = mid(SETTINGS.swing);
+  for (let i = 0; i < 25; i++) scroll(studio, bx, by, -100, 10 + i * 0.1, wheel);
+  assert.equal(studio.beat.bpm, 115);
+  assert.equal(studio.undo.length, 1, '25 notches a tenth of a second apart: one change');
+  mouseDown(studio, drag, ...mid(BUTTONS.undo), 0, 13);
+  assert.deepEqual([studio.beat.bpm, studio.undo.length], [90, 0], 'one Undo takes them all back');
+  scroll(studio, bx, by, -100, 20, wheel);
+  click(studio, drag, upper(SETTINGS.swing), 20.1);
+  scroll(studio, bx, by, -100, 20.2, wheel);
+  assert.equal(studio.undo.length, 3, 'a wheel step after another change is a change of its own');
+  scroll(studio, sx, sy, -100, 20.3, wheel);
+  scroll(studio, bx, by, -100, 20.4, wheel);
+  assert.equal(studio.undo.length, 5, 'so is one on another setting, and back again');
+  scroll(studio, bx, by, -100, 21, wheel);
+  assert.equal(studio.undo.length, 6, 'and one after a pause of half a second');
+  scroll(studio, bx, by, -100, 21.4, wheel);
+  assert.deepEqual([studio.beat.bpm, studio.undo.length], [95, 6], 'within half a second, the same change');
+  mouseDown(studio, drag, ...mid(BUTTONS.undo), 0, 22);
+  assert.equal(studio.beat.bpm, 93, 'Undo takes back the last run of steps');
+  setTempo(studio, 140);
+  const n = studio.undo.length;
+  scroll(studio, bx, by, -100, 30, wheel);
+  scroll(studio, bx, by, 100, 30.1, wheel);
+  assert.deepEqual([studio.beat.bpm, studio.undo.length], [139, n + 1], "a step that changed nothing (at 140) doesn't hide the next in the change before");
+  mouseDown(studio, drag, ...mid(BUTTONS.undo), 0, 31);
+  assert.equal(studio.beat.bpm, 140);
 });
 
 test("the rhythm wheel's scrolling is as it was: every event turns it, however close", () => {

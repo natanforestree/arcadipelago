@@ -27,6 +27,7 @@ const SLOW = Math.round((HOLD.fast - HOLD.wait) / HOLD.every); // repeats after 
 // When repeat n (from 0) of a hold is due, in seconds after the mouse went down.
 const repeatAt = (n) => (n <= SLOW ? HOLD.wait + n * HOLD.every : HOLD.fast + (n - SLOW) * HOLD.faster);
 const WHEEL_GAP = 0.06; // seconds: the scroll wheel steps a setting at most this often
+const WHEEL_RUN = 0.5; // seconds: wheel steps on one setting closer than this are one change for Undo
 
 // A key goes down. Returns what main.js should do beyond the studio: 'leave' (Esc, with nothing
 // open to close), or null. `held` is the controls' own state: { key } for a pad key held.
@@ -139,12 +140,15 @@ export function mouseDown(studio, drag, x, y, t, now = 0) {
     case 'setting': {
       // The tempo and the swing step as the mouse goes down, up on their upper half and down on
       // their lower; the key and the length step as it comes up (mouseUp). Either way, a drag
-      // takes over from where the setting was when the mouse went down.
+      // takes over from where the setting was when the mouse went down (or, after a hold has
+      // repeated, from where the hold got to: mouseMove).
       const from = settingIndex(studio, target.which), before = studio.version;
       if (target.dir) setSetting(studio, target.which, stepped(target.which, from, target.dir), false);
-      // dir, down and repeats: an arrow's hold (tick), none for the key or the length.
+      // dir, down and repeats: an arrow's hold (tick), none for the key or the length, nor for a
+      // press refused (every slot full, so it asked which to replace).
+      const dir = studio.asking ? 0 : target.dir ?? 0;
       Object.assign(drag, {
-        what: 'setting', which: target.which, y, from, begun: studio.version !== before, moved: false, dir: target.dir ?? 0, down: now, repeats: 0,
+        what: 'setting', which: target.which, y, from, begun: studio.version !== before, moved: false, dir, down: now, repeats: 0,
       });
       break;
     }
@@ -209,8 +213,15 @@ export function mouseMove(studio, drag, x, y) {
     fader(studio, drag.which, faderValue(y), drag.begun);
     if (studio.version !== before) drag.begun = true;
   } else if (drag.what === 'setting') {
+    if (studio.naming) {
+      drag.what = null; // the name box opened over it (Cmd+S): that ends the press, as in tick
+      return;
+    }
     const steps = Math.trunc((drag.y - y) / DRAG[drag.which]);
     if (!steps && !drag.moved) return;
+    // The drag counts from where the setting was before the press's own step (so it undoes that
+    // step); but once the hold has repeated, from where the hold got to.
+    if (!drag.moved && drag.repeats) drag.from = settingIndex(studio, drag.which);
     drag.moved = true;
     const before = studio.version;
     setSetting(studio, drag.which, drag.from + steps, drag.begun);
@@ -219,9 +230,15 @@ export function mouseMove(studio, drag, x, y) {
 }
 
 // Every frame while the studio is open, at page time `now`: a tempo or swing arrow still held (and
-// not dragged) steps again when its next repeat is due, as part of the same change.
+// not dragged) steps again when its next repeat is due, as part of the same change. Not while a
+// question is on screen; and the name box opening over it (Cmd+S) ends the press.
 export function tick(studio, drag, now) {
-  if (drag.what !== 'setting' || !drag.dir || drag.moved || studio.asking) return;
+  if (drag.what !== 'setting') return;
+  if (studio.naming) {
+    drag.what = null;
+    return;
+  }
+  if (!drag.dir || drag.moved || studio.asking) return;
   while (now >= drag.down + repeatAt(drag.repeats)) {
     const before = studio.version;
     setSetting(studio, drag.which, stepped(drag.which, settingIndex(studio, drag.which), drag.dir), drag.begun);
@@ -242,16 +259,20 @@ export function mouseUp(studio, drag) {
 
 // The scroll wheel (dy, down the page) at page time `now`: over the rhythm wheel it turns it, and over
 // the tempo, the swing or the octave button it steps it as its arrows do, wheel up for ▲. A trackpad
-// sends a stream of small events, so those step at most once every WHEEL_GAP seconds: `wheel` is the
-// controls' state for that, { at } the time of the last such step.
+// sends a stream of small events, so those step at most once every WHEEL_GAP seconds; and a run of
+// steps on one setting, each within WHEEL_RUN of the last and nothing else changed between, is one
+// change for Undo (so a swipe doesn't fill the undo list). `wheel` is the controls' state for that:
+// { at, which, version, begun }, the last step's time and control, the beat's version after it, and
+// whether its run has changed the beat yet.
 export function scroll(studio, x, y, dy, now = 0, wheel = {}) {
   const target = studioHit(studio, x, y);
   if (!dy || !target) return;
   if (target.hit === 'wheel') turnRhythm(studio, Math.sign(dy));
   else if (target.dir && (wheel.at === undefined || now - wheel.at >= WHEEL_GAP)) {
-    wheel.at = now;
-    const dir = dy < 0 ? 1 : -1;
-    if (target.hit === 'setting') setSetting(studio, target.which, stepped(target.which, settingIndex(studio, target.which), dir), false);
+    const dir = dy < 0 ? 1 : -1, which = target.which, before = studio.version;
+    const again = wheel.begun && wheel.which === which && now - wheel.at < WHEEL_RUN && wheel.version === before;
+    if (target.hit === 'setting') setSetting(studio, which, stepped(which, settingIndex(studio, which), dir), again);
     else moveRange(studio, dir); // the octave button, the only other with arrows
+    Object.assign(wheel, { at: now, which, version: studio.version, begun: again || studio.version !== before });
   }
 }

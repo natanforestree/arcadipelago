@@ -505,6 +505,13 @@ function game(art) {
   addEventListener('mouseup', () => {
     if (screen === 'studio') mouseUp(studio, studioDrag);
   });
+  // A Ctrl+click on a Mac opens the context menu, and its mouseup may never come: the menu is kept
+  // off the studio, and everything held lets go, so no arrow's hold or drag is left running.
+  canvas.addEventListener('contextmenu', (e) => {
+    if (screen !== 'studio') return;
+    e.preventDefault();
+    letGoStudio();
+  });
   canvas.addEventListener('wheel', (e) => {
     if (screen !== 'studio') return;
     e.preventDefault();
