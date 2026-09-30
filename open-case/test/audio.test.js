@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createAudio, pluckSamples, softClip, safetyCurve, VOICING } from '../src/audio.js';
 import { fakeAudioContext } from './fake-audio.js';
-import { LOFI, LOFI_CLOCK, READY, readyBeat, clockOf, bandAt } from '../src/beats.js';
+import { LOFI, LOFI_CLOCK, READY, readyBeat, clockOf, bandAt, cloneBeat } from '../src/beats.js';
 import { PLAY, GROOVE, LAYERS } from '../src/tuning.js';
 import { PEDALS, INSTRUMENTS } from '../src/gear.js';
 import { createLoop, record, note, release, step, due, loopLength } from '../src/looper.js';
@@ -906,4 +906,56 @@ test('changing the beat mid-loop carries on from the same 16th, timing the rest 
     const eighth = 60 / 100 / 2;
     assert.ok(gaps.slice(1).every((g) => Math.abs(g - eighth / 2) < 1e-6 || Math.abs(g - eighth) < 1e-6), `${gaps}`);
     assert.ok(hats[0] > 1 && audio.bandStart !== start, 'nothing already scheduled moves; the band just carries on');
+  }));
+
+// The studio edits the beat the band is playing in place (audio.startBand(at, studio.beat), then
+// studio.js changes it), and hands the band that same beat again. A hat on every 16th, so each one
+// shows when it sounds.
+const everyHat = () => ({
+  ...cloneBeat(LOFI), mix: { ...LOFI.mix, vinyl: false, pad: false }, bpm: 90, swing: 0.5, chords: [], bass: [],
+  drums: Array.from({ length: 64 }, (_, s) => ({ s, drum: 'hats', vel: 0.5 })),
+});
+// Changes the band's own beat in place with change(beat), a moment into the loop, then hands it back;
+// returns when the 16ths sounded before the change and those after. The band starts at 0, so a slower
+// tempo puts its first 16th before the audio clock's zero: it plays on all the same.
+function changeInPlace(ctx, audio, change, until = 1.2) {
+  const beat = everyHat();
+  audio.startBand(0, beat);
+  audio.setLayer('top', true, 0);
+  audio.setLayer('drums', true, 0); // so the stand-in percussion is out
+  runBand(ctx, audio, until);
+  const hatTimes = (from) => [...new Set(ctx().started.slice(from).filter((x) => x.kind === 'buffer').map((x) => x.t.toFixed(6)))].map(Number).sort((a, b) => a - b);
+  const before = hatTimes(0);
+  change(beat);
+  audio.setBeat(beat);
+  const n = ctx().started.length;
+  runBand(ctx, audio, until + 2);
+  return { before, after: hatTimes(n) };
+}
+
+test("changing the tempo of the band's own beat in place: the next 16th keeps its time, the rest follow the new tempo", () => {
+  for (const bpm of [120, 70]) {
+    withAudio((ctx) => {
+      const audio = createAudio(memoryStorage());
+      audio.start();
+      const { before, after } = changeInPlace(ctx, audio, (b) => (b.bpm = bpm));
+      const was = 60 / 90 / 4, now = 60 / bpm / 4;
+      assert.ok(Math.abs(after[0] - (before.at(-1) + was)) < 1e-6, `${bpm} bpm: the next 16th at ${after[0]}, wanted ${before.at(-1) + was}`);
+      const gaps = after.slice(1).map((t, i) => t - after[i]);
+      assert.ok(gaps.length > 4 && gaps.every((g) => Math.abs(g - now) < 1e-6), `${bpm} bpm: ${gaps}`);
+    });
+  }
+});
+
+test("changing the swing of the band's own beat in place: the next 16th keeps its time, the rest follow the new swing", () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    // Stopped where the next 16th is an off one (9), which the swing moves.
+    const { before, after } = changeInPlace(ctx, audio, (b) => (b.swing = 0.75), 1.2);
+    const beatLen = 60 / 90, clock = clockOf({ bpm: 90, swing: 0.75 });
+    assert.ok(Math.abs(after[0] - (before.at(-1) + beatLen / 4)) < 1e-6, `the next 16th at ${after[0]}, wanted ${before.at(-1) + beatLen / 4}`);
+    const gaps = after.slice(1).map((t, i) => t - after[i]);
+    const want = after.slice(1).map((_, i) => clock.timeOf16th(10 + i) - clock.timeOf16th(9 + i));
+    assert.ok(gaps.every((g, i) => Math.abs(g - want[i]) < 1e-6), `${gaps} wanted ${want}`);
   }));

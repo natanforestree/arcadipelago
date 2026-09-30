@@ -210,7 +210,9 @@ export function createAudio(storage) {
   let muted = storage.get(MUTE_KEY) === '1';
   let volume = Number(storage.get(VOLUME_KEY) ?? 0.8);
   if (!(volume >= 0 && volume <= 1)) volume = 0.8;
-  let loopAt = -1, next16 = 0, stopAt = Infinity, crackleAt = 0, hiss = null;
+  // loopAt: the band's first 16th on the audio clock, or null with no band (a new tempo can put it
+  // before the clock's zero, so it can be below 0)
+  let loopAt = null, next16 = 0, stopAt = Infinity, crackleAt = 0, hiss = null;
   const layerOn = {}; // whether each layer slot is on (the Pump follows the kick only while you can hear it)
   const bandPlucks = new Map(); // `${voice}:${note}` -> AudioBuffer: the band's plucked strings
   let loopDone = 0; // your loop's notes are scheduled up to this band time
@@ -794,11 +796,14 @@ export function createAudio(storage) {
 
   // The band carries on with `b` in place of the beat it was playing (the studio's changes), from the
   // same 16th: at a new tempo, the 16ths still to come are timed by it, so nothing jumps or repeats.
+  // The studio changes the very beat the band plays, in place, so a new tempo or swing shows against
+  // the band's own clock (made when it last started or retimed), not against the beat. It's for the
+  // studio, where no loop pedal plays, so it doesn't re-base your loop's schedule (loopDone).
   function setBeat(b) {
     if (!ctx) return;
     const next = clockOf(b);
-    const retimed = b.bpm !== beat.bpm || b.swing !== beat.swing;
-    if (loopAt >= 0 && retimed) loopAt += clock.timeOf16th(next16) - next.timeOf16th(next16);
+    const retimed = next.beat !== clock.beat || next.timeOf16th(1) !== clock.timeOf16th(1);
+    if (loopAt !== null && retimed) loopAt += clock.timeOf16th(next16) - next.timeOf16th(next16);
     beat = b;
     clock = next;
     if (retimed) {
@@ -813,7 +818,7 @@ export function createAudio(storage) {
   // when the band has already scheduled that 16th: at its time, or at once if that's already past. A
   // 16th not yet scheduled is left to the band, which will play what's written there.
   function playWritten(layer, notes, s) {
-    if (!ctx || loopAt < 0 || s >= next16) return;
+    if (!ctx || loopAt === null || s >= next16) return;
     const at = Math.max(ctx.currentTime, loopAt + clock.timeOf16th(s));
     for (const n of notes) playBand(layer, n, at, loopAt + clock.timeOf16th(s + n.len) - at);
   }
@@ -841,7 +846,7 @@ export function createAudio(storage) {
   // Stops the band and your loop at once: nothing more is scheduled, and what's still sounding fades
   // out quickly.
   function stopBand() {
-    loopAt = -1;
+    loopAt = null;
     if (!ctx) return;
     const at = ctx.currentTime;
     band.gain.cancelScheduledValues(at); // drop a shop try's chord that hadn't started yet
@@ -912,7 +917,7 @@ export function createAudio(storage) {
   // band times (seconds since the band's first 16th), as looper.js's due does. Returns the looped
   // notes it scheduled, each with `at`, its time on the audio clock.
   function update(loopDue = null) {
-    if (!ctx || ctx.state !== 'running' || loopAt < 0) return [];
+    if (!ctx || ctx.state !== 'running' || loopAt === null) return [];
     const t = ctx.currentTime;
     // After a stall, skip what's already late rather than playing it all at once.
     const at16 = (s) => loopAt + clock.timeOf16th(s);
@@ -976,7 +981,7 @@ export function createAudio(storage) {
   return {
     start, now, warm, noteOn, noteOff, setRing, setInstrument, setPedal, startBand, setBeat, playWritten, tryBand, endBand, stopBand,
     stopLoop, countIn, setLayer, update, coin, clap, reportedLatency, heardAt,
-    // the band's first 16th on the audio clock (-1 with no band): band time counts from it
+    // the band's first 16th on the audio clock (null with no band): band time counts from it
     get bandStart() {
       return loopAt;
     },

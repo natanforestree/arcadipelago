@@ -567,14 +567,18 @@ function game(art) {
       }
       // The studio: a held pad writes as the playhead reaches it, and the notes on 16ths the band had
       // already scheduled are played for it; each change of the beat goes to the band, and is kept once
-      // you let go.
+      // you let go. A change goes to the band before the hold reads the band's time too, so after a new
+      // tempo it reads it on the band's new clock (and again after, for what the hold wrote).
       if (studio) {
-        for (const w of advance(studio, bandTime())) audio.playWritten(w.layer, w.notes, w.s);
-        if (studio.version !== studioSeen) {
+        const toBand = () => {
+          if (studio.version === studioSeen) return;
           audio.setBeat(studio.beat);
           studioSeen = studio.version;
           studioSaved = false;
-        }
+        };
+        toBand();
+        for (const w of advance(studio, bandTime())) audio.playWritten(w.layer, w.notes, w.s);
+        toBand();
         if (!studioSaved && !studio.held) {
           keepBeats();
           studioSaved = true;
