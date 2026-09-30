@@ -424,7 +424,7 @@ function game(art) {
   });
 
   // The studio: its beat plays round and round, every part at once, while you make it. Esc leaves for
-  // the park, ready for the next set.
+  // the park, ready for the next set, and so does Busk to this, once it has kept your choice.
   document.getElementById('studio').addEventListener('click', () => {
     if (logging) logChoice(storage, 'studio');
     letGoStudio();
@@ -481,7 +481,7 @@ function game(art) {
   canvas.addEventListener('mousedown', (e) => {
     if (screen !== 'studio' || e.button !== 0) return;
     e.preventDefault();
-    if (mouseDown(studio, studioDrag, ...scenePoint(e), bandTime()) === 'busk') keepBeats();
+    if (mouseDown(studio, studioDrag, ...scenePoint(e), bandTime()) === 'busk') leaveStudio(); // it keeps your beats
   });
   addEventListener('mousemove', (e) => {
     if (screen !== 'studio') return;
@@ -612,6 +612,7 @@ function game(art) {
         bars: set ? set.t / (endTime(set) / PARK.bars) : skyBar, studio,
         time: (now - t0) / 1000, still: reducedMotion.matches, flocks, gear, stomp: stomped, shop,
         loop: shop ? shop.loop : set ? loop : null, loopSaid,
+        busking: fixedBeat || owns(gear, 'studio') ? setBeat().name : null,
         debug: debug ? latency : null,
       });
       out.drawImage(off, 0, 0, canvas.width, canvas.height);

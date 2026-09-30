@@ -230,6 +230,27 @@ test('waiting for the first note, and paused', () => {
   assert.deepEqual(g.rects.at(-1).slice(0, 4), [0, 0, W, H], 'dimmed under the pause card');
 });
 
+test("waiting for the first note, the park names the beat your set will play when it's given one, and is as it was when not", () => {
+  const draw = (over) => {
+    const g = fakeContext();
+    createRenderer(g, art)(view(over));
+    return g;
+  };
+  const g = draw({ screen: 'ready', busking: 'Funk 2' });
+  const line = g.positions.find((p) => p.s === 'busking to Funk 2'), prompt = g.positions.find((p) => p.s === 'play a note to start the set');
+  assert.ok(line && prompt, 'the beat, and the prompt');
+  assert.ok(line.y + 8 <= prompt.y, 'above it, clear of it');
+  assert.deepEqual([prompt.x, prompt.y, prompt.align], [W / 2, 60, 'center'], 'the prompt where it always was');
+  assert.equal(line.align, 'center');
+  const longest = draw({ screen: 'ready', busking: 'x'.repeat(24) }).positions.find((p) => p.s.startsWith('busking to '));
+  assert.ok(longest.s.length * 6 <= W - 8, 'the longest name a beat can have fits across the screen');
+  const plain = draw({ screen: 'ready' });
+  assert.deepEqual(plain.positions.map((p) => [p.s, p.x, p.y]), draw({ screen: 'ready', busking: null }).positions.map((p) => [p.s, p.x, p.y]));
+  assert.ok(!plain.texts.some((s) => s.startsWith('busking')), 'without the studio, the prompt alone, as today');
+  assert.ok(plain.texts.includes('play a note to start the set'));
+  assert.ok(!draw({ busking: 'Funk 2', set: createSet(1) }).texts.some((s) => s.startsWith('busking')), 'not once the set is playing');
+});
+
 test('an unknown frame is an error, not a blank', () => {
   const draw = createRenderer(fakeContext(), { ...art, frames: { ...art.frames, ground: undefined } });
   assert.throws(() => draw(view({})), /no sprite called ground/);

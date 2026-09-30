@@ -479,7 +479,9 @@ export function createRenderer(g, art) {
   //     (the loop pedal's last news, and when: see loopWords; with none showing, loopCue takes its
   //     place over the strip: the count-in, or the recording's progress),
   //   shop: the shop's state (shop.js) on the shop screen, studio: the studio's state (studio.js) on
-  //   the studio screen, where t is the band time of the beat it plays, debug: null | { reported, measured } }
+  //   the studio screen, where t is the band time of the beat it plays, debug: null | { reported, measured },
+  //   busking: null | the name of the beat your next set plays, said over the prompt on the 'ready'
+  //     screen (with the studio yours, or ?beat=; without, the prompt is alone) }
   return function draw(view) {
     const { screen, set, scene, keys, t, time } = view;
     g.imageSmoothingEnabled = false;
@@ -507,7 +509,10 @@ export function createRenderer(g, art) {
     }
     if (keys && screen !== 'title') hud(view, screen === 'ready' ? null : set);
     if (screen === 'title') title();
-    else if (screen === 'ready') text('play a note to start the set', W / 2, 60, C.light, 'center');
+    else if (screen === 'ready') {
+      if (view.busking) text(`busking to ${view.busking}`, W / 2, 50, C.gold, 'center');
+      text('play a note to start the set', W / 2, 60, C.light, 'center');
+    }
     else if (screen === 'paused') { // dimmed, under the pause card (index.html)
       g.globalAlpha = 0.5;
       px(0, 0, W, H, C.ink);
