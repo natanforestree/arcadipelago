@@ -2,8 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBot, lickBot, goodSet, wanderSet } from '../src/bots.js';
 import { createSet, stepSet, playNote, releaseNote, runSet, summary, momentsOf } from '../src/set.js';
-import { sixteenthAt, inKey, timeOf16th } from '../src/groove.js';
-import { GROOVE, DT } from '../src/tuning.js';
+import { LOFI, LOFI_CLOCK, inKey, setBars, clockOf, readyBeat } from '../src/beats.js';
+import { DT } from '../src/tuning.js';
+const { sixteenthAt, timeOf16th } = LOFI_CLOCK;
+const SET_BARS = setBars(LOFI);
 
 const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 const coins = (bot) => SEEDS.map((seed) => runSet(seed, bot(seed)).coins);
@@ -47,7 +49,7 @@ test('every bot is the same from a seed, and different across seeds; each starts
       const notes = bot(seed);
       assert.equal(notes[0].t, 0, `bot seed ${seed} first note`);
       assert.ok(notes.every((n, i) => i === 0 || n.t >= notes[i - 1].t), `bot seed ${seed} in time order`);
-      assert.ok(notes.every((n) => n.t < timeOf16th(GROOVE.setBars * 16) && n.len > 0), `bot seed ${seed} within set`);
+      assert.ok(notes.every((n) => n.t < timeOf16th(SET_BARS * 16) && n.len > 0), `bot seed ${seed} within set`);
     }
   }
 });
@@ -63,7 +65,7 @@ test('the random bot plays 1 to 3 notes a beat, from the whole row at octave 0, 
     assert.ok(len16 >= 1 && len16 <= 4, `${len16}`);
   }
   assert.ok([...perBeat.values()].every((k) => k >= 1 && k <= 3));
-  assert.ok(perBeat.size < GROOVE.setBars * 4, 'with some rests');
+  assert.ok(perBeat.size < SET_BARS * 4, 'with some rests');
   assert.ok(notes.some((n) => !inKey(n.pitch)), 'black keys too');
 });
 
@@ -102,4 +104,14 @@ test("the honest set's callbacks land: the crowd hears it bring ideas back on ev
   // Every seed manages 10-12 with the fix (ideas.findLast in goodSet); before it, findLast was find
   // and callbacks fell to 2-6. 8 is a floor comfortably below today's low and above the broken range.
   assert.ok(perSeedCallbacks.every((c) => c >= 8), `callbacks per seed: ${perSeedCallbacks}`);
+});
+
+test("a bot plays over another beat in that beat's time: the bossa's 16ths, within its 100 bars", () => {
+  const bossa = readyBeat('bossa'), clock = clockOf(bossa), end = clock.timeOf16th(setBars(bossa) * 16);
+  for (const bot of [randomBot, lickBot, goodSet, wanderSet]) {
+    const notes = bot(3, bossa);
+    assert.ok(notes.length > 50 && notes.every((n) => n.t < end), bot.name);
+    for (const n of notes.slice(1, 40)) assert.ok(Math.abs(clock.timeOf16th(clock.sixteenthAt(n.t)) - n.t) < 1e-9, `${bot.name} on a 16th`);
+  }
+  assert.ok(runSet(3, goodSet(3, bossa), bossa).phase === 'over');
 });

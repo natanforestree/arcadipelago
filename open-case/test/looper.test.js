@@ -1,8 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createLoop, record, note, release, ring, step, undo, due, loopState, LOOP_LENGTH, countBeats } from '../src/looper.js';
-import { BAR, BEAT } from '../src/groove.js';
+import { createLoop, record, note, release, ring, step, undo, due, loopState, loopLength, countBeats } from '../src/looper.js';
+import { LOFI_CLOCK, clockOf, readyBeat } from '../src/beats.js';
 import { LOOP } from '../src/tuning.js';
+const { bar: BAR, beat: BEAT } = LOFI_CLOCK;
+const LOOP_LENGTH = loopLength(createLoop());
 
 const SIXTEENTH = BEAT / 4;
 const play = (loop, t, id, pitch, over = {}) => note(loop, t, id, { pitch, strength: 3, legato: false, ...over });
@@ -210,4 +212,15 @@ test('over many passes nothing drifts', () => {
   const far = due(loop, 1000 * LOOP_LENGTH, 1001 * LOOP_LENGTH);
   assert.equal(far.length, 1);
   assert.ok(Math.abs(((far[0].t - (BAR + 0.123)) / LOOP_LENGTH) - Math.round((far[0].t - (BAR + 0.123)) / LOOP_LENGTH)) < 1e-9);
+});
+
+test("a loop of another beat records 4 of that beat's bars, from its own bar lines", () => {
+  const clock = clockOf(readyBeat('funk'));
+  const loop = createLoop(clock);
+  assert.ok(Math.abs(loopLength(loop) - 4 * 2.4) < 1e-9);
+  assert.ok(record(loop, 1));
+  assert.ok(Math.abs(loop.take.from - 2.4) < 1e-9, "the funk's next bar line");
+  assert.deepEqual(countBeats(loop).map((t) => Math.round(t * 100) / 100), [1.2, 1.8], 'its beats, 0.6 s apart');
+  assert.equal(step(loop, 2.4 + 9.6 - 0.01), null);
+  assert.equal(step(loop, 2.4 + 9.6), 'layer');
 });

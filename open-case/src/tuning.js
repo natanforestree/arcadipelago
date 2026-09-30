@@ -6,9 +6,6 @@ export const TICK_HZ = 60;
 export const DT = 1 / TICK_HZ;
 
 export const GROOVE = {
-  bpm: 80,
-  swing: 0.58, // the second 16th of each pair lands at this share of the pair
-  setBars: 60, // 15 times round the 4-bar loop: 3 minutes
   setSeconds: 180, // a set lasts about this long, whatever its beat's tempo (beats.js setBars)
   ahead: 0.2, // seconds of band scheduled ahead of the audio clock
   layerLead: 0.25, // seconds before a bar line that its layers are decided (more than `ahead`)
@@ -113,9 +110,13 @@ export const LAYER_HOLD = 2;
 export const LOG_SIZE = 50; // sets kept in the test log
 
 // The park's life (scene.js and render.js): the sunset over each set, and what moves in the
-// background. Bars count from a set's first note; seconds for the clouds, birds and pigeons' pecking
-// run on the page's clock, so they carry on over the title and between sets.
+// background. Its evening counts the park's own bars from a set's first note: PARK.bars of them over
+// the whole set, however many bars the set's beat gives it, so the sun always sets across the set.
+// (With the lo-fi's 60 bars, a park bar is a bar.) The pigeons stay away for bars of the beat itself.
+// Seconds for the clouds, birds and pigeons' pecking run on the page's clock, so they carry on over
+// the title and between sets.
 export const PARK = {
+  bars: 60, // the park's bars in a set
   stageBars: 15, // the sky moves on a stage (dusk 0 to night 4) every this many bars...
   bandFirst: 3, // ...its top band first, this many bars into the stage...
   bandStep: 2, // ...then each band below it this many bars later, so the horizon's is the last

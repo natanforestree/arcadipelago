@@ -3,6 +3,7 @@
 // a click lands on. Pure, so it's tested in Node; main.js runs it and render.js draws it.
 import { STOCK, PEDALS, owns } from './gear.js';
 import { createLoop } from './looper.js';
+import { LOFI_CLOCK } from './beats.js';
 
 // The card along the bottom of the shop, and the button on it: [x, y, w, h] in scene pixels.
 export const CARD = [4, 138, 312, 38];
@@ -11,9 +12,10 @@ export const BUTTON = [262, 159, 48, 13];
 // The pedals on the rack come first (the loop pedal last of them), then the instruments on their
 // stands, so the arrow keys move along the rack and then along the floor. soldAt: the page time of
 // the last sale (the shopkeeper nods). loop: while the loop pedal is chosen, the loop you try it with
-// (looper.js), which main.js plays over the band; null otherwise.
-export function createShop() {
-  return { at: 0, soldAt: -Infinity, loop: null };
+// (looper.js), which main.js plays over the band; null otherwise. clock: the timing of the beat the band
+// plays while you try it (beats.js clockOf).
+export function createShop(clock = LOFI_CLOCK) {
+  return { at: 0, soldAt: -Infinity, loop: null, clock };
 }
 
 export const chosen = (shop) => STOCK[shop.at];
@@ -23,7 +25,7 @@ export const chosen = (shop) => STOCK[shop.at];
 export function choose(shop, at) {
   shop.at = at;
   if (chosen(shop).kind !== 'loop') shop.loop = null;
-  else shop.loop ??= createLoop();
+  else shop.loop ??= createLoop(shop.clock);
 }
 
 // The arrow keys: one item left (-1) or right (1), round from the last back to the first.

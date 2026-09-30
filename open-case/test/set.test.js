@@ -2,9 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createSet, stepSet, playNote, momentsOf, endTime } from '../src/set.js';
-import { BAR } from '../src/groove.js';
+import { LOFI_CLOCK, readyBeat } from '../src/beats.js';
 import { DT } from '../src/tuning.js';
 import { stoodAt } from './helpers.js';
+const { bar: BAR } = LOFI_CLOCK;
 
 // Steps a set until time `until`, returning every event with the time it came.
 function runTo(set, until) {
@@ -54,10 +55,10 @@ test('a single person hesitating never makes the music flicker', () => {
 
 test('the set lasts 60 bars, then fades a bar, the listeners still there tip once, and the end card comes', () => {
   const set = createSet(1);
-  const early = runTo(set, endTime() - 1);
+  const early = runTo(set, endTime(set) - 1);
   stoodAt(set.crowd, 'student', 0);
   stoodAt(set.crowd, 'elder', 1);
-  const events = [...early, ...runTo(set, endTime() + BAR + 2)];
+  const events = [...early, ...runTo(set, endTime(set) + BAR + 2)];
   const end = events.find((e) => e.type === 'end'), over = events.find((e) => e.type === 'over');
   assert.ok(end.at >= 180 && end.at < 180 + DT * 1.5);
   assert.ok(over.at - end.at >= BAR + 1 - DT && over.at - end.at < BAR + 1 + DT * 1.5);
@@ -73,12 +74,36 @@ test('key moments come in time order, a key going up before the next goes down',
 });
 
 test("gear only changes how you sound: the crowd's rules never see it, or the loop", () => {
-  // The rules (the set, the ears, the crowd, the groove, the bots) import nothing from the shop, the
+  // The rules (the set, the ears, the crowd, the beats, the bots) import nothing from the shop, the
   // gear, the loop pedal or the sound, so a set played with every pedal on, or over a loop, scores
   // exactly as one without.
-  for (const f of ['set', 'listen', 'crowd', 'groove', 'bots']) {
+  for (const f of ['set', 'listen', 'crowd', 'beats', 'bots']) {
     const src = readFileSync(new URL(`../src/${f}.js`, import.meta.url), 'utf8');
     const imports = [...src.matchAll(/from '\.\/([a-z]+)\.js'/g)].map((m) => m[1]);
     for (const other of imports) assert.ok(!['gear', 'shop', 'audio', 'main', 'looper'].includes(other), `${f}.js imports ${other}.js`);
   }
+});
+
+test("a set of another beat keeps its tempo: the funk's 76 bars of 2.4 s, its layers decided at its own bar lines", () => {
+  const set = createSet(1, readyBeat('funk'));
+  assert.equal(set.beat.id, 'funk');
+  assert.equal(set.bars, 76);
+  assert.ok(Math.abs(set.clock.bar - 2.4) < 1e-9 && Math.abs(endTime(set) - 182.4) < 1e-9);
+  stoodAt(set.crowd, 'student', 0);
+  const events = runTo(set, 2 * set.clock.bar);
+  const [e] = events.filter((x) => x.type === 'layers');
+  assert.equal(e.bar, 1);
+  assert.ok(e.at < set.clock.bar && e.at > set.clock.bar - 0.3, "just before the funk's first bar line");
+  const rest = runTo(set, endTime(set) + set.clock.bar + 2);
+  const end = rest.find((x) => x.type === 'end'), over = rest.find((x) => x.type === 'over');
+  assert.ok(end.at >= 182.4 && end.at < 182.4 + DT * 1.5);
+  assert.ok(over.at - end.at >= set.clock.bar + 1 - DT && over.at - end.at < set.clock.bar + 1 + DT * 1.5, 'a bar of the funk to fade');
+});
+
+test("a set's ears count its beat's bars", () => {
+  const set = createSet(1, readyBeat('ballad'));
+  playNote(set, 60, 3, 0.1);
+  runTo(set, set.clock.bar * 2 + 0.01);
+  assert.equal(set.listen.bar, 2);
+  assert.equal(set.listen.notes[0].s, 0);
 });

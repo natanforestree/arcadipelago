@@ -6,8 +6,9 @@ import {
   skyStages, sunDrop, windowLit, lampState, starsOut, trainX, cloudX, createFlocks, birdsAt, pigeonsAt, frameOf,
   PIGEONS, TRAIN_LENGTH, PIGEON_FLY, PIGEON_WALK,
 } from '../src/scene.js';
-import { BAR } from '../src/groove.js';
+import { LOFI_CLOCK } from '../src/beats.js';
 import { PARK } from '../src/tuning.js';
+const { bar: BAR } = LOFI_CLOCK;
 
 test('each note leaves a glyph that floats up from the guitar, higher notes higher, and fades over 2 bars', () => {
   const scene = createScene();
@@ -208,4 +209,15 @@ test('after the tab sleeps for an hour, the sky holds at most one flock, not an 
   assert.ok(birds.length <= PARK.flockMost, `${birds.length} birds`);
   assert.ok(flocks.flying.length <= 1);
   assert.ok(flocks.next > 3600, 'the next flock is still to come');
+});
+
+test("the park keeps its own bars over a set of any beat: the train by the park's, the pigeons by the beat's", () => {
+  const bar = 2.4, parkBar = 182.4 / PARK.bars; // the funk: 76 bars of 2.4 s, so a park bar is 3.04 s
+  const scene = createScene(3, { bar, parkBar });
+  const at = scene.trainBar * parkBar;
+  assert.equal(trainX(scene, at - 0.01), null);
+  assert.equal(trainX(scene, at), -TRAIN_LENGTH, "the train comes at its park bar, whatever the beat");
+  sceneNote(scene, 60, 0, 10, 4); // loud: the pigeons fly
+  assert.ok(pigeonsAt(scene, 10 + PARK.pigeonsAway * bar - 0.01, 0).every((p) => p.pose !== 'walk'), 'still away');
+  assert.ok(pigeonsAt(scene, 10 + PARK.pigeonsAway * bar + 0.1, 0).every((p) => p.pose === 'walk'), 'back after 4 of the beat\'s bars');
 });

@@ -5,51 +5,54 @@
 // pedals as they are at the time.
 //
 // Times are band time: seconds since the band's first 16th (in a set, since your first note), so the
-// bar lines fall on whole numbers of BAR. Pure, so it's tested in Node; main.js runs it, audio.js
+// bar lines fall on whole numbers of the beat's bar (the loop's clock). Pure, so it's tested in Node; main.js runs it, audio.js
 // plays it and render.js shows it. The crowd never hears it: set.js and the rules never import it.
 import { LOOP } from './tuning.js';
-import { BAR, BEAT } from './groove.js';
+import { LOFI_CLOCK } from './beats.js';
 
-export const LOOP_LENGTH = LOOP.bars * BAR; // seconds: one pass of the chords
-const EARLY = (LOOP.early * BEAT) / 4; // seconds: how early a note can be for a recording's first bar line
+// Seconds: one pass of the loop, LOOP.bars of its beat's bars.
+export const loopLength = (loop) => LOOP.bars * loop.clock.bar;
+// Seconds: how early a note can be for a recording's first bar line.
+const early = (loop) => (LOOP.early * loop.clock.beat) / 4;
 
-// { layers, take, ring }: the layers so far, oldest first, each { from: the band time its recording
+// { clock, layers, take, ring }: the beat's timing (beats.js clockOf), the layers so far, oldest first, each { from: the band time its recording
 // started, notes }; the recording waiting or under way, { from, armed, notes, sounding }, or null; and
 // whether Space is held. `armed` is the band time R was pressed, for the count-in (countBeats). Each
 // note is { at: seconds after its layer's first bar line (a hair below 0 if it came early), pitch,
 // strength, legato, len: seconds it sounded, null while it still does }.
-export function createLoop() {
-  return { layers: [], take: null, ring: false };
+export function createLoop(clock = LOFI_CLOCK) {
+  return { clock, layers: [], take: null, ring: false };
 }
 
 // R at band time t: arms a recording from the next bar line. Returns false, doing nothing, while a
 // recording is waiting or under way, or when the loop is full.
 export function record(loop, t) {
   if (loop.take || loop.layers.length >= LOOP.layers) return false;
-  loop.take = { from: (Math.floor(t / BAR) + 1) * BAR, armed: t, notes: [], sounding: [] };
+  const bar = loop.clock.bar;
+  loop.take = { from: (Math.floor(t / bar) + 1) * bar, armed: t, notes: [], sounding: [] };
   return true;
 }
 
 // The band times of the count-in's clicks for the recording that's waiting: every beat (a whole
-// multiple of BEAT) strictly after R was pressed and strictly before the bar line it arms from, in
-// order ([] with no take). Integer beat indices, not repeated addition, keep the times exact multiples
-// of BEAT; a small tolerance keeps float error from ever including the bar line itself.
+// multiple of the clock's beat) strictly after R was pressed and strictly before the bar line it arms
+// from, in order ([] with no take). Integer beat indices, not repeated addition, keep the times exact
+// multiples of a beat; a small tolerance keeps float error from ever including the bar line itself.
 export function countBeats(loop) {
   const take = loop.take;
   if (!take) return [];
-  const out = [];
-  for (let k = Math.floor(take.armed / BEAT) + 1; k * BEAT < take.from - 1e-9; k++) out.push(k * BEAT);
+  const out = [], beat = loop.clock.beat;
+  for (let k = Math.floor(take.armed / beat) + 1; k * beat < take.from - 1e-9; k++) out.push(k * beat);
   return out;
 }
 
 // A note you play starts at band time t (id: its key, for its release). It's kept if a recording is
-// under way, or about to start within EARLY. Striking a pitch that's still ringing from Space ends the
+// under way, or about to start within a 16th (LOOP.early). Striking a pitch that's still ringing from Space ends the
 // ringing note there, as it does in the sound. Returns whether the note was kept.
 export function note(loop, t, id, { pitch, strength, legato }) {
   const take = loop.take;
   if (!take) return false;
-  for (const s of take.sounding.filter((x) => x.ringing && x.note.pitch === pitch)) end(take, s, t);
-  if (t < take.from - EARLY || t >= take.from + LOOP_LENGTH) return false;
+  for (const s of take.sounding.filter((x) => x.ringing && x.note.pitch === pitch)) end(loop, s, t);
+  if (t < take.from - early(loop) || t >= take.from + loopLength(loop)) return false;
   const n = { at: t - take.from, pitch, strength, legato, len: null };
   take.notes.push(n);
   take.sounding.push({ id, note: n, ringing: false });
@@ -61,19 +64,20 @@ export function release(loop, t, id) {
   const s = loop.take?.sounding.find((x) => x.id === id && !x.ringing);
   if (!s) return;
   if (loop.ring) s.ringing = true;
-  else end(loop.take, s, t);
+  else end(loop, s, t);
 }
 
 // Space goes down (on) or comes up at band time t. Letting it go ends every note still ringing.
 export function ring(loop, t, on) {
   loop.ring = on;
   if (on || !loop.take) return;
-  for (const s of loop.take.sounding.filter((x) => x.ringing)) end(loop.take, s, t);
+  for (const s of loop.take.sounding.filter((x) => x.ringing)) end(loop, s, t);
 }
 
 // A recorded note stops sounding at band time t, or where its recording ends if that's sooner.
-function end(take, s, t) {
-  s.note.len = Math.max(0, Math.min(t, take.from + LOOP_LENGTH) - take.from - s.note.at);
+function end(loop, s, t) {
+  const take = loop.take;
+  s.note.len = Math.max(0, Math.min(t, take.from + loopLength(loop)) - take.from - s.note.at);
   take.sounding.splice(take.sounding.indexOf(s), 1);
 }
 
@@ -81,8 +85,8 @@ function end(take, s, t) {
 // still sounding cut off at its end, and step returns 'layer'; otherwise null.
 export function step(loop, t) {
   const take = loop.take;
-  if (!take || t < take.from + LOOP_LENGTH) return null;
-  for (const s of [...take.sounding]) end(take, s, t);
+  if (!take || t < take.from + loopLength(loop)) return null;
+  for (const s of [...take.sounding]) end(loop, s, t);
   loop.layers.push({ from: take.from, notes: take.notes });
   loop.take = null;
   return 'layer';
@@ -105,15 +109,15 @@ export function undo(loop) {
 // layer plays from the end of its recording, time after time. A recording's notes are due from then
 // too, so a note played early for its first bar line sounds just as early the first time round.
 export function due(loop, from, to) {
-  const out = [];
+  const out = [], length = loopLength(loop);
   const layers = loop.take ? [...loop.layers, loop.take] : loop.layers;
   layers.forEach((layer, i) => {
     for (const n of layer.notes) {
-      const first = layer.from + LOOP_LENGTH + n.at; // its first time round
+      const first = layer.from + length + n.at; // its first time round
       // Each time is worked out from the first, never added up, so nothing drifts.
-      for (let k = Math.max(0, Math.floor((from - first) / LOOP_LENGTH)); first + k * LOOP_LENGTH < to; k++) {
-        const t = first + k * LOOP_LENGTH;
-        if (t >= from) out.push({ t, pitch: n.pitch, strength: n.strength, legato: n.legato, len: n.len ?? LOOP_LENGTH - n.at, layer: i });
+      for (let k = Math.max(0, Math.floor((from - first) / length)); first + k * length < to; k++) {
+        const t = first + k * length;
+        if (t >= from) out.push({ t, pitch: n.pitch, strength: n.strength, legato: n.legato, len: n.len ?? length - n.at, layer: i });
       }
     }
   });

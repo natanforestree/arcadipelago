@@ -18,7 +18,7 @@
 import { createAudio } from './audio.js';
 import { createInput } from './input.js';
 import { layoutPitches, shopKey } from './keys.js';
-import { createSet, stepSet, playNote, releaseNote, summary, runSet, momentsOf } from './set.js';
+import { createSet, stepSet, playNote, releaseNote, summary, runSet, momentsOf, endTime } from './set.js';
 import { crowdSize, personName } from './crowd.js';
 import { createScene, createFlocks, sceneNote, sceneLoopNote, sceneEvents, stepScene, FLIGHT } from './scene.js';
 import { createRenderer, W, H } from './render.js';
@@ -30,8 +30,8 @@ import { loadArt } from './assets.js';
 import { PEDALS, loadGear, saveGear, earn, buy, play, stomp, stockItem, owns } from './gear.js';
 import { createShop, choose, move, action, trying, hit } from './shop.js';
 import { createLoop, record, note, release, ring, step, undo, due, countBeats } from './looper.js';
-import { BAR } from './groove.js';
-import { DT, LAYERS } from './tuning.js';
+import { LOFI, clockOf } from './beats.js';
+import { DT, LAYERS, PARK } from './tuning.js';
 
 // The module is running, so the page's "couldn't start" message will never be needed.
 document.getElementById('nostart')?.remove();
@@ -79,6 +79,7 @@ function game(art) {
 
   let screen = 'title'; // 'ready' (waiting for your first note), 'playing', 'paused', 'over', 'shop', 'thanks'
   let set = null, scene = createScene(pageSeed), start = 0, seed = 0;
+  let beat = LOFI; // the beat your sets play (beats.js)
   let botMoments = null, botNext = 0, botFed = 0;
   const latency = { reported: null, measured: null };
   // Your savings and gear. With ?coins=N your savings are N, and nothing is kept.
@@ -117,13 +118,13 @@ function game(art) {
   // A new set begins with a note at audio time `at` (your first note, or the bot's start).
   function begin(at) {
     seed = fixedSeed ?? Date.now() % 2147483647;
-    set = createSet(seed);
-    scene = createScene(seed);
+    set = createSet(seed, beat);
+    scene = createScene(seed, { bar: set.clock.bar, parkBar: endTime(set) / PARK.bars });
     start = at;
-    audio.startBand(at);
+    audio.startBand(at, beat);
     for (const { id, min } of LAYERS) audio.setLayer(id, min === 0, at);
     setPedals = new Set(gear.on);
-    loop = createLoop();
+    loop = createLoop(set.clock);
     ring(loop, 0, ringHeld);
     setLayers = 0;
     screen = 'playing';
@@ -163,7 +164,7 @@ function game(art) {
       shopBand = !shopBand;
       if (shopBand) {
         start = audio.now() + 0.1;
-        audio.tryBand(start);
+        audio.tryBand(start, beat);
         ring(shop.loop, 0, ringHeld);
       } else audio.stopBand();
     }
@@ -305,7 +306,7 @@ function game(art) {
 
   function handle(events) {
     for (const e of events) {
-      if (e.type === 'layers') for (const { id } of LAYERS) audio.setLayer(id, e.layers[id], start + e.bar * BAR);
+      if (e.type === 'layers') for (const { id } of LAYERS) audio.setLayer(id, e.layers[id], start + e.bar * set.clock.bar);
       else if (e.type === 'coin') audio.coin(start + set.t + FLIGHT);
       else if (e.type === 'end') {
         audio.endBand(start + set.t);
@@ -323,7 +324,7 @@ function game(art) {
           }
         }
         const crowd = crowdSize(set.crowd);
-        if (crowd > 0) audio.clap(crowd, start + set.t + BAR * 0.5);
+        if (crowd > 0) audio.clap(crowd, start + set.t + set.clock.bar * 0.5);
       } else if (e.type === 'over') showEnd();
     }
     sceneEvents(scene, events, set.t);
@@ -395,7 +396,7 @@ function game(art) {
     audio.stopBand();
     set = null;
     scene = createScene(pageSeed);
-    shop = createShop();
+    shop = createShop(clockOf(beat));
     screen = 'shop';
     sound();
   });
@@ -487,7 +488,7 @@ function game(art) {
       latency.reported = audio.reportedLatency();
       draw({
         screen: screen === 'thanks' || screen === 'over' ? 'playing' : screen,
-        set, scene, keys: input.keys, t: set ? set.t : shop?.loop ? audio.now() - start : 0, bars: set ? set.t / BAR : skyBar,
+        set, scene, keys: input.keys, t: set ? set.t : shop?.loop ? audio.now() - start : 0, bars: set ? set.t / (endTime(set) / PARK.bars) : skyBar,
         time: (now - t0) / 1000, still: reducedMotion.matches, flocks, gear, stomp: stomped, shop,
         loop: shop ? shop.loop : set ? loop : null, loopSaid,
         debug: debug ? latency : null,

@@ -11,10 +11,12 @@
 // 'loud', and also 'phrase' ({ clean, loud, notes }) when a phrase ends and 'bar' ({ bar, count, off,
 // rest }) at each bar line, for the crowd's tastes.
 import { RULES } from './tuning.js';
-import { BAR, BEAT, sixteenthAt, inKey, isStrong, isOff16th } from './groove.js';
+import { LOFI_CLOCK, inKey, isStrong, isOff16th } from './beats.js';
 
-export function createListener() {
+// clock: the set's beat's timing (beats.js clockOf), for its 16ths, beats and bars.
+export function createListener(clock = LOFI_CLOCK) {
   return {
+    clock,
     notes: [], // { pitch, s, strength, echo }: echo is the most times a shape it's part of has come round lately
     shapes: [], // shapes[i]: the key of the shape ending at note i (null for the set's first 3 notes)
     held: 0, // keys down
@@ -48,8 +50,8 @@ export const shapeKey = (notes, i) => keyOf(shapeOf(notes, i));
 
 export function noteOn(l, pitch, t, strength) {
   // A beat of quiet ended the last phrase, even if no update has run since to notice.
-  if (l.phrase && l.held === 0 && t - l.quietAt >= RULES.phraseEndBeats * BEAT) endPhrase(l);
-  const s = sixteenthAt(t);
+  if (l.phrase && l.held === 0 && t - l.quietAt >= RULES.phraseEndBeats * l.clock.beat) endPhrase(l);
+  const s = l.clock.sixteenthAt(t);
   const i = l.notes.length;
   const note = { pitch, s, strength, echo: 1 };
   l.notes.push(note);
@@ -183,9 +185,9 @@ function barLine(l, b) {
 
 // Time passes: bar lines and phrase ends.
 export function tick(l, t) {
-  while (t >= (l.bar + 1) * BAR) {
+  while (t >= (l.bar + 1) * l.clock.bar) {
     l.bar++;
     barLine(l, l.bar);
   }
-  if (l.phrase && l.held === 0 && t - l.quietAt >= RULES.phraseEndBeats * BEAT) endPhrase(l);
+  if (l.phrase && l.held === 0 && t - l.quietAt >= RULES.phraseEndBeats * l.clock.beat) endPhrase(l);
 }

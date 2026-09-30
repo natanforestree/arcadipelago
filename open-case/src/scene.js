@@ -4,7 +4,7 @@
 // the birds overhead). Pure, so it's tested in Node; render.js draws it. Times are seconds on the
 // set's clock, except the birds' and the pigeons' pecking, which run on the page's clock (`time`).
 import { createRng, nextRandom, randomBetween } from './rng.js';
-import { BAR } from './groove.js';
+import { LOFI_CLOCK } from './beats.js';
 import { PARK, RULES } from './tuning.js';
 
 export const GUITAR = [152, 128]; // where notes float up from
@@ -31,9 +31,12 @@ const PIGEON_CYCLE = 6; // seconds: each pigeon pecks, then shuffles a few pixel
 // hair below zero).
 export const frameOf = (count, n) => ((Math.floor(count) % n) + n) % n;
 
-export function createScene(seed = 1) {
+// bar: seconds in a bar of the set's beat (the pigeons stay away PARK.pigeonsAway of them); parkBar:
+// seconds in one of the park's bars (the set's length over PARK.bars), which the train's time counts.
+export function createScene(seed = 1, { bar = LOFI_CLOCK.bar, parkBar = bar } = {}) {
   const rng = createRng((seed ^ PARK_SEED) >>> 0);
   return {
+    bar, parkBar,
     trail: [], flights: [], caseCoins: 0, gold: null, clapFrom: -1,
     // your loop's notes, { pitch, t }, in time order (t may be a moment ahead: scheduled that way)
     loopTrail: [],
@@ -51,9 +54,10 @@ export function createScene(seed = 1) {
 export function sceneNote(scene, pitch, index, t, strength = 0) {
   scene.trail.push({ pitch, index, t });
   scene.lastNote = t;
-  if (strength >= RULES.loudStrength && (scene.scaredAt === null || t - scene.scaredAt >= PARK.pigeonsAway * BAR)) {
+  const away = PARK.pigeonsAway * scene.bar;
+  if (strength >= RULES.loudStrength && (scene.scaredAt === null || t - scene.scaredAt >= away)) {
     // Scattered while walking back in: fly on from there, not from home.
-    const back = scene.scaredAt === null ? -1 : t - scene.scaredAt - PARK.pigeonsAway * BAR;
+    const back = scene.scaredAt === null ? -1 : t - scene.scaredAt - away;
     scene.flyFrom = back >= 0 && back < PIGEON_WALK ? back / PIGEON_WALK : 1;
     scene.scaredAt = t;
   }
@@ -145,7 +149,7 @@ export const starsOut = (bar) => Math.max(0, bar - PARK.starsFrom + 1);
 
 // The distant train's left end at set time t, or null when it isn't passing.
 export function trainX(scene, t) {
-  const k = (t - scene.trainBar * BAR) / PARK.trainCross;
+  const k = (t - scene.trainBar * scene.parkBar) / PARK.trainCross;
   if (k < 0 || k > 1) return null;
   return Math.round(-TRAIN_LENGTH + k * (320 + TRAIN_LENGTH));
 }
@@ -202,7 +206,7 @@ export function pigeonsAt(scene, t, time) {
       out.push({ x: Math.round(start + (60 + i * 12) * since), y: Math.round(hy - up), pose: 'fly', frame: frameOf(since * 8 + i, 2), dir: 1 });
       return;
     }
-    const back = since - PARK.pigeonsAway * BAR; // seconds since they started walking back
+    const back = since - PARK.pigeonsAway * scene.bar; // seconds since they started walking back
     if (back < 0) return;
     if (back < PIGEON_WALK) {
       out.push({ x: Math.round(from + (hx - from) * (back / PIGEON_WALK)), y: hy, pose: 'walk', frame: frameOf(time * 6 + i, 2), dir: -1 });

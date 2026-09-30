@@ -7,12 +7,14 @@ import { createScene, createFlocks, sceneNote, sceneLoopNote, CASE, PIGEONS, LOO
 import { createKeyState } from '../src/keys.js';
 import { goodSet } from '../src/bots.js';
 import { KINDS, LOOKS } from '../src/crowd.js';
-import { BAR, BEAT } from '../src/groove.js';
+import { LOFI_CLOCK, readyBeat } from '../src/beats.js';
 import { INTEREST, LOOP } from '../src/tuning.js';
 import { STOCK, PEDALS, INSTRUMENTS, freshGear, buy, stomp } from '../src/gear.js';
 import { createShop, choose, CARD, BUTTON } from '../src/shop.js';
-import { createLoop, record, step, LOOP_LENGTH } from '../src/looper.js';
+import { createLoop, record, step, loopLength } from '../src/looper.js';
 import { stoodAt } from './helpers.js';
+const { bar: BAR, beat: BEAT } = LOFI_CLOCK;
+const LOOP_LENGTH = loopLength(createLoop());
 
 // The real frame data, with a stand-in for the sheet's image.
 const data = JSON.parse(readFileSync(new URL('../assets/sprites.json', import.meta.url), 'utf8'));
@@ -644,4 +646,16 @@ test("the loop pedal's key line is no longer than another item's, so it never ru
   const loopKeys = keysFor('loop');
   const otherKeys = keysFor(STOCK.find((s) => s.kind !== 'loop').id);
   assert.ok(loopKeys.length <= otherKeys.length, `${loopKeys} (${loopKeys.length}) vs ${otherKeys} (${otherKeys.length})`);
+});
+
+test("with another beat, the bar counter counts that set's bars, and listeners nod on its beats", () => {
+  const funk = readyBeat('funk');
+  const set = createSet(1, funk), g = fakeContext();
+  set.t = 2.5 * set.clock.bar;
+  createRenderer(g, art)(view({ set, t: set.t, bars: 2 }));
+  assert.ok(g.texts.includes('bar 3/76'), g.texts.filter((x) => x.startsWith('bar')).join());
+  const p = { kind: 'student', look: 1, x: 100, y: 150, dir: -1, state: 'stopped', interest: 0.9, id: 0 };
+  const beat = set.clock.beat;
+  assert.match(personFrame(p, 10 * beat + 0.05, 0, beat), /-nod-1-/, "head down on the funk's beat");
+  assert.match(personFrame(p, 10 * beat + beat * 0.6, 0, beat), /-nod-0-/);
 });

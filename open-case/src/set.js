@@ -7,19 +7,25 @@
 //   { type: 'coin', person, coins, why } a coin lands in the case ('callback', 'happy' or 'end')
 //   { type: 'hooked', person }  { type: 'left', person, happy }
 //   { type: 'layers', bar, layers }     the layers playing from bar `bar` on (decided just before it)
-//   { type: 'end' }                     bar 60 is over: fade the band, clap
+//   { type: 'end' }                     the set's last bar is over: fade the band, clap
 //   { type: 'over' }                    the end card
 import { createListener, noteOn, noteOff, tick } from './listen.js';
 import { createCrowd, hear, stepCrowd, crowdSize, endTips } from './crowd.js';
-import { BAR } from './groove.js';
+import { LOFI, clockOf, setBars } from './beats.js';
 import { GROOVE, LAYERS, LAYER_HOLD, DT } from './tuning.js';
 
-export function createSet(seed) {
+// A set of `beat` (beats.js): the band plays it, and its tempo sets the set's 16ths, beats and bars
+// (clock) and how many bars the set lasts (bars).
+export function createSet(seed, beat = LOFI) {
+  const clock = clockOf(beat);
   return {
     seed,
+    beat,
+    clock,
+    bars: setBars(beat),
     t: 0,
     phase: 'playing', // then 'ending' (the fade and the applause), then 'over'
-    listen: createListener(),
+    listen: createListener(clock),
     crowd: createCrowd(seed),
     coins: 0,
     layers: Object.fromEntries(LAYERS.map((l) => [l.id, l.min === 0])),
@@ -31,7 +37,8 @@ export function createSet(seed) {
   };
 }
 
-export const endTime = () => GROOVE.setBars * BAR;
+// When the set's last bar is over, in seconds from its first note.
+export const endTime = (set) => set.bars * set.clock.bar;
 
 export function playNote(set, pitch, strength, t) {
   if (set.phase === 'playing') noteOn(set.listen, pitch, t, strength);
@@ -76,15 +83,16 @@ export function stepSet(set, dt = DT) {
   l.events.length = 0;
   stepCrowd(c, dt, t);
   set.most = Math.max(set.most, crowdSize(c));
-  while (set.phase === 'playing' && t >= (set.decided + 1) * BAR - GROOVE.layerLead && set.decided + 1 < GROOVE.setBars) {
+  const bar = set.clock.bar;
+  while (set.phase === 'playing' && t >= (set.decided + 1) * bar - GROOVE.layerLead && set.decided + 1 < set.bars) {
     set.decided++;
     decideLayers(set, set.decided);
   }
-  if (set.phase === 'playing' && t >= endTime()) {
+  if (set.phase === 'playing' && t >= endTime(set)) {
     set.phase = 'ending';
     c.open = false;
     endTips(c);
-    set.overAt = t + BAR + GROOVE.applause; // a bar's fade, then applause
+    set.overAt = t + bar + GROOVE.applause; // a bar's fade, then applause
     set.events.push({ type: 'end' });
   } else if (set.phase === 'ending' && t >= set.overAt) {
     set.phase = 'over';
@@ -114,8 +122,8 @@ export function momentsOf(notes) {
 }
 
 // Plays a whole set without sound or screen, as the tests and the end card's "Run the bots" do.
-export function runSet(seed, notes) {
-  const set = createSet(seed);
+export function runSet(seed, notes, beat = LOFI) {
+  const set = createSet(seed, beat);
   const moments = momentsOf(notes);
   let i = 0;
   while (set.phase !== 'over') {

@@ -5,7 +5,7 @@
 // your loop's), the memory strip, the gear strip, the music shop, and the title, pause and ?debug
 // overlays. The end card is HTML (index.html).
 import { CROWD, PLAY, LAYERS, INTEREST, LOOP } from './tuning.js';
-import { BAR, BEAT } from './groove.js';
+import { LOFI_CLOCK } from './beats.js';
 import {
   GUITAR, coinAt, glyphAt, loopGlyphAt, GOLD, skyStages, sunDrop, windowLit, lampState, starsOut, trainX, cloudX,
   birdsAt, pigeonsAt, frameOf,
@@ -40,7 +40,7 @@ const CUE_CELL_W = 5, CUE_CELL_H = 3, CUE_CELL_GAP = 1; // the recording cue's f
 const CUE_TEXT_GAP = 3; // between "rec" and its first cell
 const CUE_CELL_Y = 163; // roughly the middle of "rec"'s 8px row (top at 160)
 const CUE_LEFT_MIN = 177; // keeps "rec" clear of the case sprite's rim, whose red lining reads as the word's
-const BEATS_PER_BAR = 4; // this song's fixed 4/4 meter: always 4, unlike LOOP.bars (how many bars a loop take is)
+const BEATS_PER_BAR = 4; // every beat's 4/4 meter: always 4, unlike LOOP.bars (how many bars a loop take is)
 const NOD_SHOW = 1.2; // seconds the shopkeeper nods after a sale...
 const NOD_FPS = 4; // ...this many nods a second
 
@@ -56,12 +56,12 @@ export function shapeTags(shapes) {
 
 // The frame a passer-by shows, as the person they are (their kind and look): walking by where they
 // are (so a slower walker steps slower), and standing still facing you, breathing, or nodding on the
-// beat once they're hooked.
-export function personFrame(p, t, time) {
+// beat once they're hooked (beat: seconds in a beat of the set's beat).
+export function personFrame(p, t, time, beat = LOFI_CLOCK.beat) {
   const facingYou = p.state === 'stopped' || p.state === 'joining';
   const face = (facingYou ? (p.x < CROWD.playerX ? 1 : -1) : p.dir) > 0 ? 'right' : 'left';
   if (p.state !== 'stopped') return `${p.kind}-${p.look}-walk-${frameOf((Math.abs(p.x) + Math.abs(p.y)) / STEP, 4)}-${face}`;
-  if (p.interest > INTEREST.hook) return `${p.kind}-${p.look}-nod-${t / BEAT - Math.floor(t / BEAT) < NOD ? 1 : 0}-${face}`;
+  if (p.interest > INTEREST.hook) return `${p.kind}-${p.look}-nod-${t / beat - Math.floor(t / beat) < NOD ? 1 : 0}-${face}`;
   return `${p.kind}-${p.look}-stand-${frameOf(time / BREATH + p.id * 0.37, 2)}-${face}`;
 }
 
@@ -78,7 +78,7 @@ export function youFrame(scene, t, time, instrument) {
 // green while the loop plays.
 export function loopLight(loop, t) {
   const state = loop ? loopState(loop, t) : 'empty';
-  if (state === 'waiting') return frameOf(t / (BEAT / 2), 2) === 0 ? 'red' : 'dark';
+  if (state === 'waiting') return frameOf(t / (loop.clock.beat / 2), 2) === 0 ? 'red' : 'dark';
   return { recording: 'red', playing: 'green' }[state] ?? 'dark';
 }
 
@@ -94,32 +94,33 @@ export function loopWords({ what, layer }) {
 // 1, counted down to the bar line itself rather than up from wherever R joined the count, so a caller
 // whose clock lags a hair behind the bar line — set.t, stepped in whole ticks, trails the audio clock
 // slightly — still reads the beat it's really in, not the tail of the one before); while recording,
-// elapsed e = t - take.from (0 <= e < LOOP_LENGTH): on the last bar's beats 2-4, { count, closing:
-// true } (3, 2, 1, so you know when it closes); otherwise { bars: e / BAR } (0 up to just under
-// LOOP.bars, fractional).
+// elapsed e = t - take.from (0 <= e < loopLength): on the last bar's beats 2-4, { count, closing:
+// true } (3, 2, 1, so you know when it closes); otherwise { bars: e / bar } (0 up to just under
+// LOOP.bars, fractional). Beats and bars are the loop's beat's (loop.clock).
 export function loopCue(loop, t) {
   const take = loop?.take;
   if (!take) return null;
+  const { beat, bar } = loop.clock;
   if (t < take.from) {
     // Ceil'd, not floor'd: however close t sits below a beat boundary, it's still that beat's count.
     // The small tolerance stops a boundary landing a hair above its exact multiple (float error) from
     // ceiling to one more than it should.
-    const count = Math.min(BEATS_PER_BAR, Math.max(1, Math.ceil((take.from - t) / BEAT - 1e-9)));
+    const count = Math.min(BEATS_PER_BAR, Math.max(1, Math.ceil((take.from - t) / beat - 1e-9)));
     return { count };
   }
   const e = t - take.from;
-  const lastBarFrom = (LOOP.bars - 1) * BAR;
-  if (e >= lastBarFrom + BEAT) {
-    return { count: Math.max(1, BEATS_PER_BAR - Math.floor((e - lastBarFrom) / BEAT)), closing: true };
+  const lastBarFrom = (LOOP.bars - 1) * bar;
+  if (e >= lastBarFrom + beat) {
+    return { count: Math.max(1, BEATS_PER_BAR - Math.floor((e - lastBarFrom) / beat)), closing: true };
   }
-  return { bars: e / BAR };
+  return { bars: e / bar };
 }
 
-// The trees: still when motion is reduced, rustling just after each bar line of a set, and otherwise
-// swaying slowly.
-export function treeFrame(t, time, playing, still) {
+// The trees: still when motion is reduced, rustling just after each bar line of a set (bar: seconds in
+// a bar of its beat), and otherwise swaying slowly.
+export function treeFrame(t, time, playing, still, bar = LOFI_CLOCK.bar) {
   if (still) return 0;
-  if (playing && t >= 0 && t % BAR < RUSTLE) return 2;
+  if (playing && t >= 0 && t % bar < RUSTLE) return 2;
   return Math.sin(time * SWAY) > 0.4 ? 1 : 0;
 }
 
@@ -170,7 +171,7 @@ export function createRenderer(g, art) {
     data.windows.forEach(([x, y], i) => {
       if (windowLit(scene, i, bar)) px(x, y, 2, 2, C.gold);
     });
-    sprite(`trees-${treeFrame(t, time, !!set, still)}`, 0, 0);
+    sprite(`trees-${treeFrame(t, time, !!set, still, set?.clock.bar)}`, 0, 0);
     sprite('ground', 0, 0);
     const lamp = lampState(bar, time, still);
     if (lamp !== 'off') sprite('pool', 0, 0);
@@ -200,7 +201,7 @@ export function createRenderer(g, art) {
     ];
     if (gear.instrument === 'electric') things.push({ y: data.feet.amp, draw: () => sprite('amp', 0, 0) });
     if (owns(gear, 'loop')) things.push({ y: data.feet.loop, draw: () => sprite(`pedal-loop-${loopLight(loop, t)}`, 0, 0) });
-    if (set) for (const p of set.crowd.people) things.push({ y: p.y, draw: () => sprite(personFrame(p, t, time), p.x, p.y) });
+    if (set) for (const p of set.crowd.people) things.push({ y: p.y, draw: () => sprite(personFrame(p, t, time, set.clock.beat), p.x, p.y) });
     const flying = [];
     for (const b of pigeonsAt(scene, t, time)) {
       const name = `pigeon-${b.pose}-${b.frame}-${b.dir > 0 ? 'right' : 'left'}`;
@@ -288,7 +289,7 @@ export function createRenderer(g, art) {
     text(`oct ${keys.octave >= 0 ? '+' : ''}${keys.octave}`, 4, 170);
     for (let i = 0; i < PLAY.strengthMax; i++) px(52 + i * 5, 172, 4, 4, i < keys.strength ? C.light : C.ink);
     if (keys.lock) text('lock', 78, 170, C.gold);
-    if (set) text(`bar ${Math.min(60, Math.floor(set.t / BAR) + 1)}/60`, W - 4, 170, C.light, 'right');
+    if (set) text(`bar ${Math.min(set.bars, Math.floor(set.t / set.clock.bar) + 1)}/${set.bars}`, W - 4, 170, C.light, 'right');
     // The gear strip: each pedal you own in its own place, with its key, lit while it's on; the name
     // of the one just stomped shows above it for a moment.
     PEDALS.forEach((id, i) => {
@@ -440,9 +441,9 @@ export function createRenderer(g, art) {
       if (p.lastRule) text(RULE_WORDS[p.lastRule] ?? p.lastRule, p.x, y + 4, C.light, 'center');
     }
     const l = set.listen;
-    const beat = Math.floor((set.t % BAR) / BEAT) + 1;
+    const { bar, beat: beatLen } = set.clock, beat = Math.floor((set.t % bar) / beatLen) + 1;
     const lines = [
-      `bar ${Math.min(60, Math.floor(set.t / BAR) + 1)} beat ${beat}`,
+      `bar ${Math.min(set.bars, Math.floor(set.t / bar) + 1)} beat ${beat}`,
       `layers ${LAYERS.filter((x) => set.layers[x.id]).map((x) => x.id).join(' ')}`,
       `crowd ${set.crowd.people.filter((p) => p.state === 'joining' || p.state === 'stopped').length}  coins ${set.coins}`,
       `shapes ${shapeTags(l.shapes.slice(-16))}`,

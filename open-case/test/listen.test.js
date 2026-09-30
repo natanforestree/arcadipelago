@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createListener, tick, noteOff, shapeKey } from '../src/listen.js';
-import { timeOf16th, BEAT, inKey } from '../src/groove.js';
+import { LOFI_CLOCK, inKey } from '../src/beats.js';
 import { play, wait, heard, names, opening } from './helpers.js';
+const { timeOf16th, beat: BEAT } = LOFI_CLOCK;
 
 test('a phrase ends once no key has been held, and no note started, for a whole beat', () => {
   const l = createListener();

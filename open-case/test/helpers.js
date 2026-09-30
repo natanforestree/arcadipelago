@@ -1,8 +1,9 @@
 // Shared test helpers.
-import { timeOf16th } from '../src/groove.js';
+import { LOFI_CLOCK } from '../src/beats.js';
 import { noteOn, noteOff, tick } from '../src/listen.js';
 import { stepCrowd } from '../src/crowd.js';
 import { DT, CROWD } from '../src/tuning.js';
+const { timeOf16th } = LOFI_CLOCK;
 
 // Plays notes into a listener, in time order: each is [16th, pitch, length in 16ths = 1, strength = 3].
 // A key goes up a hair before its length is up, so a rest of exactly a beat ends a phrase.

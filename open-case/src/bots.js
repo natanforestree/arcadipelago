@@ -1,5 +1,6 @@
 // Players that aren't Nathan, all deterministic from a seed. Each returns a whole set's notes,
-// [{ t, pitch, strength, len }] in seconds from the first note, for runSet() or for the browser to play.
+// [{ t, pitch, strength, len }] in seconds from the first note, for runSet() or for the browser to play,
+// over a beat (beats.js; the lo-fi unless told), whose tempo times the notes and sets the set's length.
 //   randomBot: random keys from the whole row, 1 to 3 notes a beat. The too-random side.
 //   lickBot:   one 4-note lick over and over, a beat's rest between. The too-repetitive side.
 //   goodSet:   the scripted honest set for the headline test: ideas in the key, answered, and brought
@@ -7,10 +8,8 @@
 //   wanderSet: in key and in varied phrases, but never bringing an idea back. The tests keep it
 //              between the honest set and the random bot.
 import { createRng, nextRandom } from './rng.js';
-import { timeOf16th } from './groove.js';
-import { GROOVE } from './tuning.js';
+import { LOFI, clockOf, setBars } from './beats.js';
 
-const SET_16THS = GROOVE.setBars * 16;
 const pick = (rng, list) => list[Math.floor(nextRandom(rng) * list.length)];
 const int = (rng, lo, hi) => lo + Math.floor(nextRandom(rng) * (hi - lo + 1));
 function shuffle(rng, list) {
@@ -21,21 +20,22 @@ function shuffle(rng, list) {
   return list;
 }
 
-// A note from 16th s lasting len 16ths (released a hair early, so a rest of exactly a beat still ends
-// a phrase).
-function note(s, len, pitch, strength = 3) {
-  const t = timeOf16th(s);
-  return { t, pitch, strength, len: timeOf16th(s + len) - t - 0.01 };
+// A note from 16th s lasting len 16ths of the beat's clock (released a hair early, so a rest of
+// exactly a beat still ends a phrase).
+function note(clock, s, len, pitch, strength = 3) {
+  const t = clock.timeOf16th(s);
+  return { t, pitch, strength, len: clock.timeOf16th(s + len) - t - 0.01 };
 }
 
-export function randomBot(seed) {
+export function randomBot(seed, beat = LOFI) {
   const rng = createRng(seed * 7919 + 1);
+  const clock = clockOf(beat), total = setBars(beat) * 16;
   const notes = [];
-  for (let beat = 0; beat * 4 < SET_16THS; beat++) {
+  for (let b = 0; b * 4 < total; b++) {
     if (nextRandom(rng) < 0.15) continue; // an occasional rest
     const count = int(rng, 1, 3);
     const slots = shuffle(rng, [0, 1, 2, 3]).slice(0, count).sort((a, b) => a - b);
-    for (const k of slots) notes.push(note(beat * 4 + k, int(rng, 1, 4), 60 + int(rng, 0, 17)));
+    for (const k of slots) notes.push(note(clock, b * 4 + k, int(rng, 1, 4), 60 + int(rng, 0, 17)));
   }
   if (notes.length) notes[0] = { ...notes[0], t: 0 }; // the first note starts the set
   return notes;
@@ -43,8 +43,9 @@ export function randomBot(seed) {
 
 const PENTA = [55, 57, 60, 62, 64, 67, 69, 72, 74, 76, 79, 81]; // C major pentatonic, G3 to A5
 
-export function lickBot(seed) {
+export function lickBot(seed, beat = LOFI) {
   const rng = createRng(seed * 104729 + 2);
+  const clock = clockOf(beat), total = setBars(beat) * 16;
   let i = int(rng, 3, 7);
   const lick = [PENTA[i]];
   for (let k = 0; k < 3; k++) {
@@ -53,7 +54,7 @@ export function lickBot(seed) {
   }
   const notes = [];
   // The lick on 8ths (2 beats), then a beat's rest: every 3 beats.
-  for (let s = 0; s + 8 <= SET_16THS; s += 12) lick.forEach((p, k) => notes.push(note(s + k * 2, 2, p)));
+  for (let s = 0; s + 8 <= total; s += 12) lick.forEach((p, k) => notes.push(note(clock, s + k * 2, 2, p)));
   return notes;
 }
 
@@ -83,12 +84,13 @@ function moved(rng, idea) {
   return d ? idea.pitches.map((p) => p + d) : null;
 }
 
-export function goodSet(seed) {
+export function goodSet(seed, beat = LOFI) {
   const rng = createRng(seed * 15485863 + 3);
+  const clock = clockOf(beat), total = setBars(beat) * 16;
   const notes = [];
   const ideas = [];
   let s = 0, phrase = 0;
-  while (s < SET_16THS - 16) {
+  while (s < total - 16) {
     const bar = Math.floor(s / 16);
     // Choose the opening: bring back an old idea changed, answer the last one, or say something new.
     const old = ideas.findLast((o) => bar - o.bar >= 9 && bar - o.calledBar >= 17);
@@ -115,7 +117,7 @@ export function goodSet(seed) {
     const strength = pick(rng, [2, 3, 3]);
     let at = s;
     pitches.forEach((p, k) => {
-      notes.push(note(at, k < 3 ? gaps[k] : 2, p, strength));
+      notes.push(note(clock, at, k < 3 ? gaps[k] : 2, p, strength));
       if (k < 3) at += gaps[k];
     });
     let deg = SCALE.indexOf(pitches[3]);
@@ -127,32 +129,33 @@ export function goodSet(seed) {
       at += gap;
       deg = Math.max(0, Math.min(SCALE.length - 1, deg + pick(rng, [-2, -1, -1, 1, 1, 2, 3])));
       const last = k === tail - 1;
-      notes.push(note(at, last ? int(rng, 3, 6) : gap, SCALE[deg], strength));
+      notes.push(note(clock, at, last ? int(rng, 3, 6) : gap, SCALE[deg], strength));
     }
     const end = at + 6;
     s = end + int(rng, 5, 10); // a rest of more than a beat after the last note ends
     phrase++;
   }
   if (notes.length) notes[0] = { ...notes[0], t: 0 };
-  return notes.filter((n) => n.t < timeOf16th(SET_16THS));
+  return notes.filter((n) => n.t < clock.timeOf16th(total));
 }
 
 // Phrases of 5 to 9 notes wandering the scale in varied rhythms, a rest after each; no idea returns.
-export function wanderSet(seed) {
+export function wanderSet(seed, beat = LOFI) {
   const rng = createRng(seed * 31 + 5);
+  const clock = clockOf(beat), total = setBars(beat) * 16;
   const notes = [];
   let s = 0;
-  while (s < SET_16THS - 16) {
+  while (s < total - 16) {
     let deg = int(rng, 5, 12);
     const count = int(rng, 5, 9);
     for (let k = 0; k < count; k++) {
       const gap = pick(rng, [1, 2, 2, 3, 4]);
-      notes.push(note(s, gap, SCALE[deg]));
+      notes.push(note(clock, s, gap, SCALE[deg]));
       s += gap;
       deg = Math.max(0, Math.min(SCALE.length - 1, deg + pick(rng, [-2, -1, -1, 1, 1, 2])));
     }
     s += int(rng, 5, 10);
   }
   if (notes.length) notes[0] = { ...notes[0], t: 0 };
-  return notes.filter((n) => n.t < timeOf16th(SET_16THS));
+  return notes.filter((n) => n.t < clock.timeOf16th(total));
 }

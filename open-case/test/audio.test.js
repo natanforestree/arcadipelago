@@ -2,10 +2,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createAudio, pluckSamples, softClip, safetyCurve, VOICING } from '../src/audio.js';
 import { fakeAudioContext } from './fake-audio.js';
-import { BAR, BEAT, timeOf16th } from '../src/groove.js';
+import { LOFI_CLOCK } from '../src/beats.js';
 import { PLAY, GROOVE, LAYERS } from '../src/tuning.js';
 import { PEDALS, INSTRUMENTS } from '../src/gear.js';
-import { createLoop, record, note, release, step, due, LOOP_LENGTH } from '../src/looper.js';
+import { createLoop, record, note, release, step, due, loopLength } from '../src/looper.js';
+const { bar: BAR, beat: BEAT, timeOf16th } = LOFI_CLOCK;
+const LOOP_LENGTH = loopLength(createLoop());
 
 function memoryStorage() {
   const m = new Map();
