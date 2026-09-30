@@ -1,7 +1,8 @@
 -- The music shop in the flat style, for the sprite sheet (sprites.lua): the room (the door with its
 -- "back to the park" sign, the window onto the park at dusk, the pedal rack, the chalkboard, the
--- floor), the counter in front of the shopkeeper, the shopkeeper, and the stock on display, each item
--- as it stands and as it looks chosen (lifted two pixels and lit up). Everything is drawn where it
+-- floor), the counter in front of the shopkeeper, the shopkeeper, and the stock on display (the pedals
+-- on the rack, the instruments on the floor, the studio's groovebox on the counter), each item as it
+-- stands and as it looks chosen (lifted two pixels and lit up). Everything is drawn where it
 -- goes on the game's 320x180 screen; the card along the bottom (y 138 down) and the words on the
 -- sign and the chalkboard are drawn by render.js.
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.-)[^/]+$") or ""
@@ -21,6 +22,7 @@ S.BOARD = { 248, 10, 314, 44 } -- the chalkboard (the savings: render.js)
 S.COUNTER = { 232, 74, W - 1, 112 }
 S.KEEPER = { 266, 74 } -- the shopkeeper's middle, and the counter's top where she stands behind it
 S.LIFT = 2 -- pixels a chosen item rises
+S.GROOVEBOX = { 234, 66 } -- the studio's groovebox: its top-left, on the counter left of the shopkeeper
 
 -- Where each item stands: a pedal's top-left on the rack's shelf (the pedals, then the wider loop
 -- pedal), or a guitar's or keyboard's place on the floor ({ x of the middle for a guitar, x of the
@@ -318,7 +320,21 @@ local function uprightGuitar(b, id, lift)
   stamp(b, x - #g.head[1] // 2, top - g.neck - #g.head, g.head)
 end
 
+-- The studio's groovebox, 17 by 8, on the counter: a little screen, two knobs, and pads in the
+-- studio's colours for its parts (orange drums, blue bass, green chords).
+local GROOVEBOX = {
+  "hhhhhhhhhhhhhhhhh",
+  "hkkkkkkkkkkkkkkkh",
+  "hkooookOOkuukookh",
+  "hkooookOOkuukookh",
+  "hkkkkkkkkkkkkkkkh",
+  "hkwkwkkOOkuukookh",
+  "hkkkkkkOOkuukookh",
+  "hhhhhhhhhhhhhhhhh",
+}
+
 local function displayed(b, id, lift)
+  if id == "studio" then return stamp(b, S.GROOVEBOX[1], S.GROOVEBOX[2] - lift, GROOVEBOX) end
   if RACK_X[id] then return rackPedal(b, id, lift) end
   if UPRIGHT[id] then
     D.shadow(b, FLOOR_AT[id], S.STANDS + 0.5, 8, 1.5)
@@ -345,7 +361,7 @@ end
 local LIGHTER = {
   [C.wood[1]] = C.wood[2], [C.wood[2]] = C.wood[3], [C.red[1]] = C.red[2], [C.yellow[1]] = C.yellow[2],
   [C.blue[1]] = C.blue[2], [C.sky[3]] = C.sky[4], [C.leaf[3]] = C.go, [C.ink] = C.charcoal,
-  [C.charcoal] = C.coat[1], [C.coat[2]] = C.light,
+  [C.charcoal] = C.coat[1], [C.coat[2]] = C.light, [C.sky[6]] = C.sky[7],
 }
 
 -- An item of stock as it stands in the shop (chosen: lifted and lit up), with its hit box for clicks

@@ -25,3 +25,7 @@ test('the page loads the game as a module, with its icon and the Silkscreen font
 test('the sound check has a choice of beats', () => {
   assert.match(html, /<label>Beat <select id="sound-beat"><\/select><\/label>/);
 });
+
+test('the end card has a Studio button, hidden until the studio is yours', () => {
+  assert.match(html, /<button id="studio" type="button" hidden>Studio<\/button>/);
+});

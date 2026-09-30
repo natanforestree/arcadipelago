@@ -9,7 +9,7 @@ export const ACOUSTIC = 'acoustic';
 
 // Everything in the shop, in the order you move through it: the pedals on the rack (the loop pedal
 // last, since R and Backspace work it rather than a number key), then the instruments on their
-// stands. Each price and pedal key is from tuning.js.
+// stands, then the studio's groovebox on the counter. Each price and pedal key is from tuning.js.
 export const STOCK = [
   { id: 'overdrive', kind: 'pedal', name: 'Overdrive', about: 'Warm grit, more of it the harder you pick.' },
   { id: 'chorus', kind: 'pedal', name: 'Chorus', about: 'A slow shimmer, like two guitars at once.' },
@@ -22,6 +22,7 @@ export const STOCK = [
   { id: 'electric', kind: 'instrument', name: 'Electric guitar', about: 'A clean tone that sings, through a small amp.' },
   { id: 'epiano', kind: 'instrument', name: 'Electric piano', about: 'A bell-like tone. Space is its sustain pedal.' },
   { id: 'synth', kind: 'instrument', name: 'Synth', about: 'A soft saw-wave lead. Space holds its notes.' },
+  { id: 'studio', kind: 'studio', name: 'Studio', about: 'Make your own beats to busk to.' },
 ].map((item) => ({ price: 0, key: null, ...item, ...SHOP[item.id] }));
 
 export const stockItem = (id) => STOCK.find((item) => item.id === id) ?? null;

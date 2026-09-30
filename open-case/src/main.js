@@ -32,6 +32,9 @@ import { PEDALS, loadGear, saveGear, earn, buy, play, stomp, stockItem, owns } f
 import { createShop, choose, move, action, trying, hit } from './shop.js';
 import { createLoop, record, note, release, ring, step, undo, due, countBeats } from './looper.js';
 import { LOFI, clockOf, readyBeat } from './beats.js';
+import { createStudio, loadBeats, saveBeats, chosenBeat, advance } from './studio.js';
+import { keyDown, keyUp, mouseDown, mouseMove, mouseUp, scroll } from './studioinput.js';
+import { studioHit } from './studioview.js';
 import { DT, LAYERS, PARK } from './tuning.js';
 
 // The module is running, so the page's "couldn't start" message will never be needed.
@@ -79,9 +82,8 @@ function game(art) {
   const t0 = performance.now();
   const pageTime = () => (performance.now() - t0) / 1000; // seconds since the page opened
 
-  let screen = 'title'; // 'ready' (waiting for your first note), 'playing', 'paused', 'over', 'shop', 'thanks'
+  let screen = 'title'; // 'ready' (waiting for your first note), 'playing', 'paused', 'over', 'shop', 'studio', 'thanks'
   let set = null, scene = createScene(pageSeed), start = 0, seed = 0;
-  let beat = fixedBeat ?? LOFI; // the beat your sets play (beats.js)
   let botMoments = null, botNext = 0, botFed = 0;
   const latency = { reported: null, measured: null };
   // Your savings and gear. With ?coins=N your savings are N, and nothing is kept.
@@ -92,6 +94,14 @@ function game(art) {
   // on a ?coins page (earn, below); they're just never kept, same as keep() above.
   const logging = !bot && debugSavings === null;
   let shop = null; // the shop's state (shop.js) while you're in it
+  // Your beats (studio.js): six slots and the one your sets play, kept like your gear (not on a ?coins
+  // page). The studio's state while you're in it, and the last change of its beat handed to the band.
+  const beats = loadBeats(storage);
+  const keepBeats = () => debugSavings === null && saveBeats(storage, beats);
+  let studio = null, studioSeen = -1, studioSaved = true;
+  const studioHeld = { key: null }, studioDrag = { what: null };
+  // The beat your sets play: ?beat='s, or with the studio yours, the one you chose there; else the lo-fi.
+  const setBeat = () => fixedBeat ?? (owns(gear, 'studio') ? chosenBeat(beats) : LOFI);
   let stomped = null; // the last pedal stomped: { id, on, time } (its name shows over the gear strip)
   let setPedals = new Set(); // every pedal that's been on during this set, for the log
   // The loop pedal's loop in a set, empty at each set's start (in the shop, the one you try it with
@@ -120,10 +130,10 @@ function game(art) {
   // A new set begins with a note at audio time `at` (your first note, or the bot's start).
   function begin(at) {
     seed = fixedSeed ?? Date.now() % 2147483647;
-    set = createSet(seed, beat);
+    set = createSet(seed, setBeat());
     scene = createScene(seed, { bar: set.clock.bar, parkBar: endTime(set) / PARK.bars });
     start = at;
-    audio.startBand(at, beat);
+    audio.startBand(at, set.beat);
     for (const { id, min } of LAYERS) audio.setLayer(id, min === 0, at);
     setPedals = new Set(gear.on);
     loop = createLoop(set.clock);
@@ -166,7 +176,7 @@ function game(art) {
       shopBand = !shopBand;
       if (shopBand) {
         start = audio.now() + 0.1;
-        audio.tryBand(start, beat);
+        audio.tryBand(start, setBeat());
         ring(shop.loop, 0, ringHeld);
       } else audio.stopBand();
     }
@@ -343,13 +353,14 @@ function game(art) {
     // The log is Nathan's own too, and also skips a ?coins page: see `logging` above.
     if (logging) {
       const pedals = PEDALS.filter((id) => setPedals.has(id));
-      logSet(storage, { date: new Date().toISOString(), coins: s.coins, stopped: s.stopped, instrument: gear.instrument, pedals, layers: setLayers });
+      logSet(storage, { date: new Date().toISOString(), coins: s.coins, stopped: s.stopped, instrument: gear.instrument, pedals, layers: setLayers, beat: set.beat.name });
     }
     loop = createLoop(); // the loop belongs to the set, and it's over
     document.getElementById('end-coins').textContent = `${s.coins} coin${s.coins === 1 ? '' : 's'} in the case.`;
     document.getElementById('end-saved').textContent = `Saved: ${gear.savings} coin${gear.savings === 1 ? '' : 's'}.`;
     document.getElementById('end-saved').hidden = !!bot;
     document.getElementById('shop').hidden = !!bot;
+    document.getElementById('studio').hidden = !!bot || !owns(gear, 'studio');
     document.getElementById('end-stopped').textContent = `${s.stopped} ${s.stopped === 1 ? 'person' : 'people'} stopped to listen.`;
     document.getElementById('end-longest').textContent = s.longest
       ? `${personName(s.longest.kind, art.data.looks[s.longest.kind][s.longest.look])} stayed longest: ${Math.round(s.longest.seconds)} seconds.`
@@ -366,7 +377,7 @@ function game(art) {
     const sets = readLog(storage).map((e) => ({
       date: e.date,
       text: `${e.coins} coins, ${e.stopped} stopped, ${[e.instrument ?? 'acoustic', ...(e.pedals ?? [])].join(' + ')}, `
-        + `${e.layers ? `${e.layers} loop layer${e.layers === 1 ? '' : 's'}, ` : ''}${e.choice ?? 'no choice yet'}`,
+        + `${e.layers ? `${e.layers} loop layer${e.layers === 1 ? '' : 's'}, ` : ''}${e.beat ? `${e.beat}, ` : ''}${e.choice ?? 'no choice yet'}`,
     }));
     const buys = readBuys(storage).map((e) => ({ date: e.date, text: `bought the ${stockItem(e.id)?.name.toLowerCase() ?? e.id} for ${e.price}` }));
     document.getElementById('log').replaceChildren(...[...sets, ...buys].sort((a, b) => b.date.localeCompare(a.date)).map((e) => {
@@ -398,10 +409,67 @@ function game(art) {
     audio.stopBand();
     set = null;
     scene = createScene(pageSeed);
-    shop = createShop(clockOf(beat));
+    shop = createShop(clockOf(setBeat()));
     screen = 'shop';
     sound();
   });
+
+  // The studio: its beat plays round and round, every part at once, while you make it. Esc leaves for
+  // the park, ready for the next set.
+  document.getElementById('studio').addEventListener('click', () => {
+    if (logging) logChoice(storage, 'studio');
+    end.hidden = true;
+    audio.stopBand();
+    set = null;
+    scene = createScene(pageSeed);
+    studio = createStudio(beats);
+    studioSeen = studio.version;
+    const at = audio.now() + 0.1;
+    audio.startBand(at, studio.beat);
+    for (const { id } of LAYERS) audio.setLayer(id, true, at);
+    screen = 'studio';
+  });
+  function leaveStudio() {
+    keepBeats();
+    studio = null;
+    audio.stopBand();
+    screen = 'ready';
+    canvas.style.cursor = '';
+  }
+  const bandTime = () => audio.now() - audio.bandStart;
+  addEventListener('keydown', (e) => {
+    if (screen !== 'studio') return;
+    if (e.code === 'Tab' || e.code === 'Backspace' || e.code.startsWith('Arrow') || ((e.metaKey || e.ctrlKey) && e.code === 'KeyZ')) e.preventDefault();
+    const what = keyDown(studio, studioHeld, e, bandTime());
+    if (what === 'leave') leaveStudio();
+  });
+  addEventListener('keyup', (e) => {
+    if (screen === 'studio') keyUp(studio, studioHeld, e);
+  });
+  // Where the mouse is, in scene pixels.
+  const scenePoint = (e) => {
+    const r = canvas.getBoundingClientRect();
+    return [((e.clientX - r.left) / r.width) * W, ((e.clientY - r.top) / r.height) * H];
+  };
+  canvas.addEventListener('mousedown', (e) => {
+    if (screen !== 'studio' || e.button !== 0) return;
+    e.preventDefault();
+    if (mouseDown(studio, studioDrag, ...scenePoint(e), bandTime()) === 'busk') keepBeats();
+  });
+  addEventListener('mousemove', (e) => {
+    if (screen !== 'studio') return;
+    const [x, y] = scenePoint(e);
+    if (studioDrag.what) mouseMove(studio, studioDrag, x, y);
+    else canvas.style.cursor = studioHit(studio, x, y) ? 'pointer' : '';
+  });
+  addEventListener('mouseup', () => {
+    if (screen === 'studio') mouseUp(studio, studioDrag);
+  });
+  canvas.addEventListener('wheel', (e) => {
+    if (screen !== 'studio') return;
+    e.preventDefault();
+    scroll(studio, ...scenePoint(e), e.deltaY);
+  }, { passive: false });
 
   // The shop: the arrow keys choose, Enter buys (or plays an instrument you own), Esc or the door
   // leaves for the park, ready for the next set.
@@ -460,6 +528,8 @@ function game(art) {
       get set() { return set; },
       get scene() { return scene; },
       get shop() { return shop; },
+      get studio() { return studio; },
+      beats,
       get loop() { return heardLoop(); },
       audio, input, latency, art, flocks, gear,
     };
@@ -477,6 +547,21 @@ function game(art) {
         }
         stepScene(scene, set.t);
       }
+      // The studio: a held pad writes as the playhead reaches it, and the notes on 16ths the band had
+      // already scheduled are played for it; each change of the beat goes to the band, and is kept once
+      // you let go.
+      if (studio) {
+        for (const w of advance(studio, bandTime())) audio.playWritten(w.layer, w.notes, w.s);
+        if (studio.version !== studioSeen) {
+          audio.setBeat(studio.beat);
+          studioSeen = studio.version;
+          studioSaved = false;
+        }
+        if (!studioSaved && !studio.held) {
+          keepBeats();
+          studioSaved = true;
+        }
+      }
       // The loop: a recording moves on (and in a set, a finished one counts for the log, and says so
       // over the strip), and the notes due soon are scheduled with the band's; in the park, each rises
       // from the loop pedal.
@@ -490,7 +575,8 @@ function game(art) {
       latency.reported = audio.reportedLatency();
       draw({
         screen: screen === 'thanks' || screen === 'over' ? 'playing' : screen,
-        set, scene, keys: input.keys, t: set ? set.t : shop?.loop ? audio.now() - start : 0, bars: set ? set.t / (endTime(set) / PARK.bars) : skyBar,
+        set, scene, keys: input.keys, t: set ? set.t : studio ? bandTime() : shop?.loop ? audio.now() - start : 0,
+        bars: set ? set.t / (endTime(set) / PARK.bars) : skyBar, studio,
         time: (now - t0) / 1000, still: reducedMotion.matches, flocks, gear, stomp: stomped, shop,
         loop: shop ? shop.loop : set ? loop : null, loopSaid,
         debug: debug ? latency : null,

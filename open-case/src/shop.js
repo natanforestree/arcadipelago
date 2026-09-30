@@ -49,6 +49,7 @@ export function card(shop, gear) {
   if (!mine) says = act ? 'Enter to buy' : `Not enough coins yet (you have ${gear.savings})`;
   else if (item.kind === 'pedal') says = `On your board: key ${item.key}`;
   else if (item.kind === 'loop') says = 'On your board: R';
+  else if (item.kind === 'studio') says = 'After a set: Studio, on the end card';
   else says = act ? 'Enter to play it' : "You're playing it";
   return { name: item.name, price: mine ? 'yours' : `${item.price} coins`, about: item.about, says, button: act?.act ?? null };
 }

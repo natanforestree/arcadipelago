@@ -9,13 +9,14 @@ function memoryStorage() {
 }
 const withSavings = (savings) => ({ ...freshGear(), savings });
 
-test('the stock: five pedals on keys 2 to 6 in chain order, the loop pedal, then the instruments, priced from tuning.js', () => {
-  assert.deepEqual(STOCK.map((s) => s.id), ['overdrive', 'chorus', 'tremolo', 'delay', 'reverb', 'loop', ACOUSTIC, 'ukulele', 'electric', 'epiano', 'synth']);
+test('the stock: five pedals on keys 2 to 6 in chain order, the loop pedal, the instruments, then the studio, priced from tuning.js', () => {
+  assert.deepEqual(STOCK.map((s) => s.id), ['overdrive', 'chorus', 'tremolo', 'delay', 'reverb', 'loop', ACOUSTIC, 'ukulele', 'electric', 'epiano', 'synth', 'studio']);
   assert.deepEqual(PEDALS, ['overdrive', 'chorus', 'tremolo', 'delay', 'reverb']);
   assert.deepEqual(PEDALS.map((id) => STOCK.find((s) => s.id === id).key), [2, 3, 4, 5, 6]);
   assert.deepEqual(INSTRUMENTS, [ACOUSTIC, 'ukulele', 'electric', 'epiano', 'synth']);
   for (const item of STOCK) if (item.id !== ACOUSTIC) assert.equal(item.price, SHOP[item.id].price, item.id);
-  assert.equal(STOCK.reduce((sum, item) => sum + item.price, 0), 1050, 'the whole stock costs 1050 coins');
+  assert.equal(STOCK.find((s) => s.id === 'studio').price, 150);
+  assert.equal(STOCK.reduce((sum, item) => sum + item.price, 0), 1200, 'the whole stock costs 1200 coins');
   for (const item of STOCK) assert.ok(item.name && item.about.length <= 48, `${item.id}: a name, and a line that fits the card`);
 });
 

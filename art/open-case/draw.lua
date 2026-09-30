@@ -78,6 +78,7 @@ local PX = {
   n = C.path[2], N = C.path[1],
   a = C.skin3[2], A = C.skin3[1], m = C.skin4[2], M = C.skin4[1], -- tan and deep brown skin
   f = C.rose[2], F = C.rose[1], j = C.teal[2], J = C.teal[1], x = C.auburn, z = C.blonde,
+  O = C.sky[6], -- the studio's drums orange (the groovebox's pads)
 }
 D.PX = PX
 

@@ -151,6 +151,7 @@ export const SHOP = {
   electric: { price: 150 },
   epiano: { price: 200 },
   synth: { price: 250 },
+  studio: { price: 150 },
 };
 
 // The studio (studio.js): your slots, how far back Undo goes, how late a press can be and still catch
