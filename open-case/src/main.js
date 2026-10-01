@@ -5,8 +5,9 @@
 // the audio is suspended, so the set's clock stops with it. Notes reach the set the moment they're
 // played, timed in seconds since the first note.
 //
-// Before each set, the map (atlas.js, atlasview.js) asks where to busk and what track to play, your
-// last answers already chosen: the park, the station at rush hour or the night market (places.js),
+// The game opens on the map (atlas.js, atlasview.js); the sound starts on its first key or click.
+// Before each set it asks where to busk and what track to play, your last answers already chosen: the
+// park, the station at rush hour or the night market (places.js),
 // each with its own crowd and scene. Between sets, the end card leads back to it, or to the music
 // shop: your coins are saved, and your gear (gear.js) changes how your notes sound, wherever you
 // play and while you try things in the shop. Once the loop pedal is yours, R records your notes into a
@@ -72,7 +73,7 @@ const touchOnly = matchMedia('(pointer: coarse)').matches && !matchMedia('(any-p
 if (touchOnly) document.getElementById('phone').hidden = false;
 else if (params.has('sound')) soundCheck(audio, { debug: anyDebug });
 else {
-  // The art and the map load before the title card shows; if they can't, or the game can't start, say
+  // The art and the map load before the game opens; if they can't, or the game can't start, say
   // something went wrong.
   const atlasRoot = document.getElementById('atlas');
   Promise.all([loadArt(), createAtlasView(atlasRoot, { place: (id) => atlasOn.place(id), track: (i) => atlasOn.track(i) })]).then(([art, atlasView]) => game(art, atlasView)).catch((err) => {
@@ -95,7 +96,8 @@ function game(art, atlasView) {
   const t0 = performance.now();
   const pageTime = () => (performance.now() - t0) / 1000; // seconds since the page opened
 
-  let screen = 'title'; // 'map', 'ready' (waiting for your first note), 'playing', 'paused', 'over', 'shop', 'studio', 'thanks'
+  // On the map, except on the pages that skip it (?studio, ?place=, ?bot=), which open on a title card.
+  let screen = bot || tryStudio || fixedPlace ? 'title' : 'map'; // 'title', 'map', 'ready' (waiting for your first note), 'playing', 'paused', 'over', 'shop', 'studio', 'thanks'
   // Where you busk: ?place='s, or the place you chose last time on the map (kept unless the page keeps
   // nothing). The map's state while it's up (atlas.js).
   let place = fixedPlace ?? loadPlace(storage), atlas = null;
@@ -146,6 +148,9 @@ function game(art, atlasView) {
   fit();
   addEventListener('resize', fit);
 
+  // Whether this visit's first set has begun: until then, the waiting screen teaches the keys.
+  let taught = false;
+
   // A new set begins with a note at audio time `at` (your first note, or the bot's start).
   function begin(at) {
     seed = fixedSeed ?? Date.now() % 2147483647;
@@ -159,6 +164,7 @@ function game(art, atlasView) {
     ring(loop, 0, ringHeld);
     setLayers = 0;
     screen = 'playing';
+    taught = true;
   }
 
   // The loop you hear: the set's, or in the shop the one you're trying (null while you aren't).
@@ -264,18 +270,26 @@ function game(art, atlasView) {
     }
   }
 
-  // Any key at all dismisses the title card and starts the sound (browsers only allow sound after a
-  // key press or a click). It's heard before the keys are read, and it plays no note. Esc and a lone
-  // modifier don't count as user activation in every browser, so an AudioContext started from one
-  // would stay suspended: leave them alone, doing nothing, on the title card. It opens the map (with
-  // ?studio, the studio; with a bot, the bot's set).
+  // The sound starts on a key press or a click (browsers only allow it after one), once per page. It's
+  // started before the key is read, and it plays no note.
+  let soundStarted = false;
+  function startSound() {
+    audio.start();
+    if (soundStarted) return;
+    soundStarted = true;
+    warmLayout();
+  }
+
+  // The pages that skip the map open on a title card: any key dismisses it and starts the sound. Esc and
+  // a lone modifier don't count as user activation in every browser, so an AudioContext started from
+  // one would stay suspended: leave them alone, doing nothing, on the title card. It does what the page
+  // starts: with ?studio, the studio; with a bot, the bot's set; with ?place=, the place.
   addEventListener('keydown', (e) => {
     if (screen !== 'title' || e.metaKey || e.ctrlKey || e.altKey) return;
     if (NON_ACTIVATING_KEYS.has(e.key)) return;
     e.preventDefault();
     e.stopImmediatePropagation();
-    audio.start();
-    warmLayout();
+    startSound();
     if (bot) startBot();
     else if (tryStudio) openStudio();
     else openMap();
@@ -320,10 +334,19 @@ function game(art, atlasView) {
       toPlace();
     }
   }
-  atlasOn.place = (id) => screen === 'map' && atlasDid(clickPlace(atlas, id));
-  atlasOn.track = (i) => screen === 'map' && atlasDid(clickTrack(atlas, i));
+  atlasOn.place = (id) => {
+    if (screen !== 'map') return;
+    startSound();
+    atlasDid(clickPlace(atlas, id));
+  };
+  atlasOn.track = (i) => {
+    if (screen !== 'map') return;
+    startSound();
+    atlasDid(clickTrack(atlas, i));
+  };
   addEventListener('keydown', (e) => {
     if (screen !== 'map' || e.metaKey || e.ctrlKey || e.altKey || (e.repeat && !e.code.startsWith('Arrow'))) return;
+    if (!NON_ACTIVATING_KEYS.has(e.key)) startSound();
     const what = atlasKey(atlas, e.code);
     if (what || e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault(); // no scrolling
     if (what) atlasDid(what);
@@ -700,7 +723,7 @@ function game(art, atlasView) {
         bars: set ? set.t / (endTime(set) / PARK.bars) : skyBar, studio,
         time: (now - t0) / 1000, still: reducedMotion.matches, flocks, gear, stomp: stomped, shop,
         loop: shop ? shop.loop : set ? loop : null, loopSaid,
-        busking: setBeat().name,
+        busking: setBeat().name, teach: !taught,
         debug: debug ? latency : null,
       });
       out.drawImage(off, 0, 0, canvas.width, canvas.height);
@@ -711,5 +734,6 @@ function game(art, atlasView) {
     }
     requestAnimationFrame(frame);
   };
+  if (screen === 'map') openMap(); // the game opens on the map
   requestAnimationFrame(frame);
 }

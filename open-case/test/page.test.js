@@ -23,7 +23,7 @@ test('the page loads the game as a module, with its icon, the Silkscreen font an
   assert.match(html, /family=Pixelify\+Sans/);
 });
 
-test('the map has its place on the page, hidden until the title card is gone', () => {
+test('the map has its place on the page, hidden until the game is on the map', () => {
   assert.match(html, /<div id="atlas" hidden[^>]*><\/div>/);
 });
 
@@ -33,4 +33,13 @@ test('the sound check has a choice of beats', () => {
 
 test('the end card has a Studio button, hidden until the studio is yours', () => {
   assert.match(html, /<button id="studio" type="button" hidden>Studio<\/button>/);
+});
+
+test('the pause card lists the keys', () => {
+  const pause = html.match(/<form class="card" id="pause"[\s\S]*?<\/form>/)[0];
+  for (const s of ['Z X octave', '2 to 6 pedals', 'Esc to play on.']) assert.ok(pause.includes(s), s);
+});
+
+test('the map has no minimap or compass', () => {
+  assert.ok(!/minimap|compass/.test(html + scripts));
 });

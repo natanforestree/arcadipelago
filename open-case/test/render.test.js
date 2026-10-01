@@ -67,15 +67,39 @@ function allGear(instrument = 'acoustic') {
   return gear;
 }
 
-test('the title shows the name, the key layout and how to start, over the park at dusk', () => {
+test('the title card shows the name and how to start, over the park at dusk, and no key chart', () => {
   const g = fakeContext();
   createRenderer(g, art)(view({ screen: 'title' }));
-  assert.ok(g.texts.includes('Open Case'));
-  assert.ok(['A', 'W', "'", 'press any key'].every((s) => g.texts.includes(s)));
-  assert.ok(g.texts.includes('2-6 pedals   R loop   backspace undo'), 'the pedal keys and the loop pedal\'s');
+  assert.ok(['Open Case', 'press any key'].every((s) => g.texts.includes(s)));
+  assert.ok(!g.texts.includes('A') && !g.texts.includes('W'), 'no keyboard');
+  assert.ok(!g.texts.includes('2-6 pedals   R loop   backspace undo'), 'no control lines');
   assert.ok(g.rects.some(([x, y, w]) => x === 0 && y === 0 && w === W), 'the sky behind it');
   for (const n of ['ground', 'lamp-off', 'you-acoustic-idle-', 'case', 'sun']) assert.ok(drawn(g, n).length, n);
   assert.equal(drawn(g, 'pool').length, 0, 'the lamp is off at dusk');
+});
+
+test('the first set of a visit waits with the key chart: the beat, the keys, the controls, how to start', () => {
+  const g = fakeContext();
+  createRenderer(g, art)(view({ screen: 'ready', teach: true, busking: 'Lo-fi' }));
+  for (const s of ['busking to Lo-fi', 'A', 'W', "'", 'Z X octave   C V softer/louder   space ring', '1 scale lock   M mute   esc pause',
+    '2-6 pedals   R loop   backspace undo', 'play a note to start the set']) assert.ok(g.texts.includes(s), s);
+  assert.ok(!g.texts.includes('press any key'));
+  const card = g.rects.find(([x, y, w, h, c]) => x === 40 && y === 34 && w === 240 && h === 112 && c === data.colors.ink);
+  assert.ok(card, 'on the dark card');
+  const at = (s) => g.positions.find((p) => p.s === s);
+  assert.ok(at('busking to Lo-fi').y < at('A').y && at('A').y < at('play a note to start the set').y);
+  const bare = fakeContext();
+  createRenderer(bare, art)(view({ screen: 'ready', teach: true }));
+  assert.ok(!bare.texts.some((s) => s.startsWith('busking')), 'no beat line without a beat');
+  assert.ok(bare.texts.includes('A') && bare.texts.includes('play a note to start the set'));
+});
+
+test('a later set waits with the short prompt and no key chart', () => {
+  const g = fakeContext();
+  createRenderer(g, art)(view({ screen: 'ready', busking: 'Lo-fi' }));
+  assert.ok(g.texts.includes('busking to Lo-fi') && g.texts.includes('play a note to start the set'));
+  assert.ok(!g.texts.includes('A') && !g.texts.includes('2-6 pedals   R loop   backspace undo'));
+  assert.ok(!g.rects.some(([x, y, w, h]) => x === 40 && y === 34 && w === 240 && h === 112), 'no big card');
 });
 
 test('a set in full swing draws everyone, their reactions, the trail and the strip without error', () => {

@@ -2,7 +2,7 @@
 // reference (his friend's atlas) shows its world. On it: the land and the pictures standing on it
 // (assets/map/ and map.json, made by art/open-case/map/), each place's label and the gold pin over the
 // chosen one, two clouds drifting over with their shadows; over it: the title, the track you'll play
-// (or the "What track?" panel), the minimap and the keys' hint. The view is SCREEN map pixels, scaled to
+// (or the "What track?" panel) and the keys' hint. The view is SCREEN map pixels, scaled to
 // fit the window; it glides to each place you choose. A click on a place, its label or a track calls
 // on.place(id) or on.track(i), for main.js to hand to atlas.js.
 import { PLACE_IDS, PLACE_WORDS } from './places.js';
@@ -14,7 +14,6 @@ const GLIDE = 6; // how fast the view glides to a place: about this share of the
 const CLOUD_SPEED = 6; // map pixels a second a cloud drifts east
 const CLOUD_SHADOW = [40, 70]; // where a cloud's shadow falls, from the cloud
 const BOB = 2; // pixels the pin bobs up and down
-const MINI = [192, 108]; // the minimap, in its own pixels
 const PIN = '<svg width="22" height="30" viewBox="0 0 11 15" shape-rendering="crispEdges"><path d="M3 0h5v1h1v1h1v1h1v4h-1v2h-1v2h-1v2h-1v2h-1v1h-1v-1h-1v-2h-1v-2h-1v-2h-1v-2h-1v-4h1v-1h1v-1h1z" fill="#fcd062"/><path d="M4 3h3v1h1v3h-1v1h-3v-1h-1v-3h1z" fill="#1c1626"/><rect x="3" y="1" width="2" height="1" fill="#fff2cc"/></svg>';
 
 function el(tag, className, parent, text) {
@@ -92,14 +91,6 @@ export async function createAtlasView(root, on, base = new URL('../assets/map/',
   el('h2', null, panel, 'What track?');
   const rows = el('div', 'rows', panel);
   el('div', 'foot', panel, '↑↓ choose · enter busk here · esc back');
-  const mini = el('div', 'minimap', stage);
-  const miniCanvas = el('canvas', null, mini);
-  [miniCanvas.width, miniCanvas.height] = MINI;
-  const miniG = miniCanvas.getContext('2d');
-  const miniCap = el('div', 'cap', mini);
-  el('span', null, miniCap, 'the city');
-  const miniAt = el('span', null, miniCap);
-  el('div', 'compass', stage, 'N ↑');
   const hint = el('div', 'hint', stage);
 
   const fit = () => stage.style.setProperty('--s', String(Math.min(innerWidth / SCREEN[0], innerHeight / SCREEN[1])));
@@ -162,17 +153,6 @@ export async function createAtlasView(root, on, base = new URL('../assets/map/',
       }
       hint.textContent = a.panel ? '↑↓ choose a track · enter to busk · esc back'
         : `← → choose a place · enter ${a.straightGo ? 'to busk here' : 'to go'}`;
-      miniG.imageSmoothingEnabled = true;
-      miniG.drawImage(land, 0, 0, MINI[0], MINI[1]);
-      const k = MINI[0] / mapW;
-      for (const id of PLACE_IDS) {
-        const [lx, ly] = map.places[id].label;
-        miniG.fillStyle = id === place ? '#fcd062' : '#f3ead0';
-        miniG.fillRect(Math.round(lx * k) - 2, Math.round(ly * k) - 4, 4, 4);
-      }
-      miniG.strokeStyle = '#f3ead0';
-      miniG.strokeRect(Math.round(view.x * k) + 0.5, Math.round(view.y * k) + 0.5, Math.round(SCREEN[0] * k), Math.round(SCREEN[1] * k));
-      miniAt.textContent = `${a.at + 1} / ${PLACE_IDS.length}`;
     },
     hide() {
       root.hidden = true;

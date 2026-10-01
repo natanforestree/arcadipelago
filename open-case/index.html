@@ -50,7 +50,7 @@
     #atlas .label:focus-visible .name, #atlas .row:focus-visible { outline: 2px solid #fcd062; }
     #atlas .pin { position: absolute; transform: translate(-50%, -100%); pointer-events: none; filter: drop-shadow(2px 2px 0 #10201a); }
     #atlas .title { position: absolute; left: 26px; top: 40px; margin: 0; font-size: 44px; font-weight: 600; line-height: 1; text-shadow: 3px 3px 0 #10201a; }
-    #atlas .chip, #atlas .panel, #atlas .minimap { position: absolute; background: #1c2c22db; border: 2px solid #d6e2be47; }
+    #atlas .chip, #atlas .panel { position: absolute; background: #1c2c22db; border: 2px solid #d6e2be47; }
     #atlas .chip { right: 26px; top: 22px; display: flex; gap: 12px; align-items: center; padding: 9px 14px; }
     #atlas .chip .music { font-size: 22px; color: #fcd062; }
     #atlas .chip .big { font-size: 22px; font-weight: 600; line-height: 1; }
@@ -58,17 +58,13 @@
     #atlas .panel { right: 26px; top: 22px; width: 300px; display: grid; gap: 4px; padding: 14px 16px; }
     #atlas .panel h2 { margin: 0 0 4px; font-size: 24px; font-weight: 600; }
     #atlas .rows { display: grid; gap: 2px; }
-    #atlas .eyebrow, #atlas .foot, #atlas .hint, #atlas .compass, #atlas .minimap .cap, #atlas .row small, #atlas .chip .small { font-family: Silkscreen, monospace; letter-spacing: 0.12em; text-transform: uppercase; }
+    #atlas .eyebrow, #atlas .foot, #atlas .hint, #atlas .row small, #atlas .chip .small { font-family: Silkscreen, monospace; letter-spacing: 0.12em; text-transform: uppercase; }
     #atlas .eyebrow { margin-top: 6px; font-size: 10px; color: #b9c2a6; }
     #atlas .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 5px 8px; background: none; border: 0; font: 17px 'Pixelify Sans', monospace; color: inherit; text-align: left; cursor: pointer; }
     #atlas .row small { font-size: 10px; color: #b9c2a6; }
     #atlas .row.on { background: #fcd0622e; outline: 2px solid #fcd062; color: #fcd062; }
     #atlas .row.on small { color: #fcd062; }
     #atlas .foot { margin-top: 8px; font-size: 10px; color: #b9c2a6; }
-    #atlas .minimap { left: 26px; bottom: 26px; padding: 4px; }
-    #atlas .minimap canvas { display: block; image-rendering: pixelated; }
-    #atlas .minimap .cap { display: flex; justify-content: space-between; margin-top: 3px; font-size: 9px; color: #b9c2a6; }
-    #atlas .compass { position: absolute; left: 30px; bottom: 160px; font-size: 12px; text-shadow: 1px 1px 0 #10201a; }
     #atlas .hint { position: absolute; right: 26px; bottom: 24px; font-size: 10px; color: #b9c2a6; text-shadow: 1px 1px 0 #10201a; }
     a.back { z-index: 2; }
   </style>
@@ -93,6 +89,7 @@
   <form class="card" id="pause" hidden onsubmit="return false">
     <h2>Paused</h2>
     <p>Esc to play on.</p>
+    <p>Play on the keys: A to ' and W E T Y U O P. Z X octave, C V softer or louder, Space lets notes ring, 1 scale lock, 2 to 6 pedals, R loop, Backspace undo, M mute.</p>
     <label>Volume <input id="volume" type="range" min="0" max="100"></label>
     <label><input id="mute" type="checkbox"> Mute (M)</label>
   </form>

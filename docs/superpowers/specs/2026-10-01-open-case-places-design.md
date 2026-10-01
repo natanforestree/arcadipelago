@@ -250,6 +250,10 @@ Nathan opens the game, sees the city, picks the station and a track, and busks t
 - **The shop** says "back to the map" on its sign and card, since that's where Esc and the door now go.
 - **The art:** six colours join the palette for the station's stone and the market's brick, 55 in all, and the sheet has 583 frames (under 100 KB). The map's files come to 445 KB, its land alone 313 KB.
 
+## Later
+
+On 2026-10-01, after it went live, Nathan asked for the game to open on the map rather than the title card ("it just doesn't flow well or make sense"). So the game now opens on the map, and the sound starts on its first key or click. The title card is left only for the pages that skip the map (`?studio`, `?place=`, `?bot=`), and it shows just the name and "press any key". The key chart moved to the waiting screen of the first set of each visit, and the pause card lists the keys. The minimap and the compass were removed from the map.
+
 ## Not in this change
 
 - More places. The lighthouse, the marina and the village are scenery for now.

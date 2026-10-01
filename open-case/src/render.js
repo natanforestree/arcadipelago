@@ -3,8 +3,8 @@
 // busk in (the park and its sunset, the station and its trains, the night market and its lanterns),
 // you on your crate with your instrument, your pedals and the loop pedal, the open case and the band's
 // speaker, the passers-by, their reactions, the pigeons and birds (or the market's cat), the note
-// trail (and your loop's), the memory strip, the gear strip, the music shop, and the title, pause and
-// ?debug overlays. The end card and the map are HTML (index.html, atlasview.js).
+// trail (and your loop's), the memory strip, the gear strip, the music shop, and the title card (on the
+// pages that skip the map), the key chart, and the pause and ?debug overlays. The end card and the map are HTML (index.html, atlasview.js).
 import { CROWD, PLAY, LAYERS, INTEREST, LOOP } from './tuning.js';
 import { LOFI_CLOCK } from './beats.js';
 import {
@@ -450,16 +450,26 @@ export function createRenderer(g, art) {
     }
   }
 
+  // The title card, on the pages that skip the map (?studio, ?place=, ?bot=): the name and how to start.
   function title() {
     g.globalAlpha = 0.9;
-    px(40, 34, 240, 112, C.ink);
+    px(80, 62, 160, 56, C.ink);
     g.globalAlpha = 1;
     g.font = '16px Silkscreen, monospace';
     g.textAlign = 'center';
     g.textBaseline = 'top';
     g.fillStyle = C.light;
-    g.fillText('Open Case', W / 2, 42);
-    // the key layout: GarageBand's Musical Typing
+    g.fillText('Open Case', W / 2, 72);
+    text('press any key', W / 2, 100, C.gold, 'center');
+  }
+
+  // The key chart, on a dark card, for the first set of a visit: the beat you'll play, the keys (the
+  // layout is GarageBand's Musical Typing), the other controls, and how to start.
+  function keyChart(busking) {
+    g.globalAlpha = 0.9;
+    px(40, 34, 240, 112, C.ink);
+    g.globalAlpha = 1;
+    if (busking) text(`busking to ${busking}`, W / 2, 42, C.gold, 'center');
     const whites = ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ';', "'"];
     const blacks = { 0: 'W', 1: 'E', 3: 'T', 4: 'Y', 5: 'U', 7: 'O', 8: 'P' };
     whites.forEach((k, i) => {
@@ -473,7 +483,7 @@ export function createRenderer(g, art) {
     text('Z X octave   C V softer/louder   space ring', W / 2, 106, C.grey, 'center');
     text('1 scale lock   M mute   esc pause', W / 2, 116, C.grey, 'center');
     text('2-6 pedals   R loop   backspace undo', W / 2, 126, C.grey, 'center');
-    text('press any key', W / 2, 136, C.gold, 'center');
+    text('play a note to start the set', W / 2, 136, C.gold, 'center');
   }
 
   // The music shop: the room and the shopkeeper (nodding just after a sale), the stock with its tags
@@ -555,7 +565,8 @@ export function createRenderer(g, art) {
   //   shop: the shop's state (shop.js) on the shop screen, studio: the studio's state (studio.js) on
   //   the studio screen, where t is the band time of the beat it plays, debug: null | { reported, measured },
   //   busking: null | the name of the beat your next set plays, said over the prompt on the 'ready'
-  //     screen (with the studio yours, or ?beat=; without, the prompt is alone) }
+  //     screen (with the studio yours, or ?beat=; without, the prompt is alone),
+  //   teach: the 'ready' screen shows the key chart (the first set of the visit), not the short prompt }
   return function draw(view) {
     const { screen, set, scene, keys, t, time } = view;
     g.imageSmoothingEnabled = false;
@@ -583,6 +594,7 @@ export function createRenderer(g, art) {
     }
     if (keys && screen !== 'title') hud(view, screen === 'ready' ? null : set);
     if (screen === 'title') title();
+    else if (screen === 'ready' && view.teach) keyChart(view.busking);
     else if (screen === 'ready') {
       // on a dark backing, so it reads over the station's lamps and board, or the market's lanterns
       const lines = [view.busking && `busking to ${view.busking}`, 'play a note to start the set'].filter(Boolean);
