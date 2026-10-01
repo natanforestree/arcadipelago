@@ -6,7 +6,8 @@
 // hint. The view is SCREEN map pixels, scaled to fit the window; it glides to each stop you choose. A
 // click on a stop, its label or a track calls on.place(id) or on.track(i), and a click on the game's
 // title (the first map of a visit has one over everything, dimming the map, its clouds still
-// drifting) calls on.title(), for main.js to hand to atlas.js. While the title is up the map's own words (heading, track, hint) are hidden.
+// drifting) calls on.title(), for main.js to hand to atlas.js. While the title is up the map's own words (heading, track, hint)
+// are hidden.
 import { STOPS, PLACE_WORDS, SHOP_WORDS } from './places.js';
 import { moodName } from './beats.js';
 import { stopOf, trackOf, viewAt } from './atlas.js';
@@ -65,7 +66,7 @@ export async function createAtlasView(root, on, base = new URL('../assets/map/',
     label.type = 'button';
     Object.assign(label.style, { left: `${x}px`, top: `${y}px` });
     const name = el('span', 'name', label);
-    if (id === 'shop') el('span', 'note', name, '♪');
+    if (id === 'shop') el('span', 'music', name, '♪');
     else el('span', 'dot', name);
     name.append(words.name);
     el('span', 'crowd', label, words.crowd);
