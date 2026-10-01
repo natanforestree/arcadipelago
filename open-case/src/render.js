@@ -20,7 +20,7 @@ const FONT = '8px Silkscreen, monospace';
 const ICON_TIME = 1.6; // seconds a reaction shows over a head
 const REACT_FPS = 2.5; // a reaction's two frames alternate this many times a second
 const GOLD_PULSE = 8; // speed (rad/s) the callback's gold frame pulses at
-const DEBUG_PANEL_TOP = 32; // clears "they remember" (drawn at y 22, ~8px tall) with a couple of px to spare
+const DEBUG_PANEL_TOP = 32; // clears the strip of remembered ideas (its boxes end at y 20) with room to spare
 const CALLBACK_MARGIN = 4; // px the "callback!" popup keeps clear of both canvas edges
 const RULE_WORDS = { offKey: 'off key' }; // the ?debug view's words for rules, where they differ from their names
 const STRUM = 0.18; // seconds your picking hand takes over a strum's three frames
@@ -276,7 +276,6 @@ export function createRenderer(g, art) {
       const lo = Math.min(...ys), hi = Math.max(...ys), span = Math.max(1, hi - lo);
       ys.forEach((v, k) => px(x + 3 + k * 7, y + 12 - Math.round(((v - lo) / span) * 9), 3, 2, lit ? C.light : C.gold));
     }
-    text('they remember', 163, 22, C.grey, 'center'); // labels the strip for a first-time player; 163 is its centre (58..268)
     if (scene.gold) {
       // the gold arc from the old idea down to your guitar
       const k = Math.min(1, (t - scene.gold.t) / 0.5);

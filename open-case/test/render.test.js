@@ -93,7 +93,7 @@ test('a set in full swing draws everyone, their reactions, the trail and the str
   for (const r of ['repeat', 'offKey', 'callback', 'recognised', 'random', 'taste']) assert.equal(drawn(g, `react-${r}-`).length, 1, r);
   assert.equal(drawn(g, 'case-coin').length, 7, 'the coins in the case');
   assert.ok(g.texts.some((s) => s.startsWith('delay 12ms  key 18ms')), 'the debug panel');
-  assert.ok(g.texts.includes('they remember'), 'the strip is labelled for a first-time player');
+  assert.ok(!g.texts.includes('they remember'), "the strip has no label: Nathan found 'they remember' ominous");
   assert.ok(g.texts.includes('callback!'), 'a callback pops up by the lit box');
   assert.ok(g.rects.every(([x, y]) => x > -40 && x < W + 40 && y > -40 && y < H + 40));
 });
@@ -216,7 +216,6 @@ test('the callback popup only shows while the gold moment is active', () => {
   const scene = createScene(1);
   scene.gold = null;
   createRenderer(g, art)(view({ set, scene, t: set.t, bars: set.t / BAR }));
-  assert.ok(g.texts.includes('they remember'), 'the strip is still labelled with no callback live');
   assert.ok(!g.texts.includes('callback!'), 'no popup without a live callback');
 });
 
@@ -260,15 +259,15 @@ test('the debug panel tags your last notes by shape, repeats sharing a letter', 
   assert.equal(shapeTags([null, null, null, 'x', 'y', 'x', 'z']), '---ABAC');
 });
 
-test('the debug panel starts clear of the strip label, with a couple of px to spare', () => {
+test('the debug panel starts clear of the strip, with a couple of px to spare', () => {
   const g = fakeContext();
   const set = runSet(1, goodSet(1));
   const scene = createScene(1);
   createRenderer(g, art)(view({ set, scene, t: set.t, bars: set.t / BAR, debug: { reported: 12, measured: 18 } }));
-  const label = g.positions.find((p) => p.s === 'they remember');
+  const box = g.rects.find(([x, y, w, h]) => x === 58 && y === 4 && w === 30 && h === 16);
   const panel = g.rects.find(([x, , w]) => x === W - 132 && w === 130);
-  assert.ok(label && panel, 'both the label and the debug panel are drawn');
-  assert.ok(panel[1] - (label.y + 8) >= 2, "the panel's top clears the label's ink by at least 2px");
+  assert.ok(box && panel, "both the strip's first box and the debug panel are drawn");
+  assert.ok(panel[1] - (box[1] + box[3]) >= 2, "the panel's top clears the strip's boxes by at least 2px");
 });
 
 test('the callback word stays inside the screen for the rightmost lit box', () => {
