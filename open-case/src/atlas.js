@@ -16,11 +16,11 @@ export function trackList(beats) {
 
 const sameKey = (a, b) => !!a && !!b && (a.ready ? a.ready === b.ready : a.slot === b.slot);
 
-// The map as it opens: place (a place to busk, never the shop or home) the one chosen last time, chosen the
-// track chosen last time (studio.js beats.chosen; the first if it's gone). straightGo: the track is
-// already chosen (the studio's Busk to this), so Enter on a place goes straight there without the
-// panel. intro: the title is up over the map (the first map of a visit) until a key or a click
-// clears it.
+// The map as it opens: place (a place to busk, never the shop or home) the one chosen last time,
+// chosen the track chosen last time (studio.js beats.chosen; the first if it's gone). straightGo: the
+// track is already chosen (the studio's Busk to this), so Enter on a place goes straight there
+// without the panel. intro: the title is up over the map (the first map of a visit) until a key or a
+// click clears it.
 export function createAtlas({ place = 'park', tracks, chosen = null, straightGo = false, intro = false }) {
   return {
     intro,
