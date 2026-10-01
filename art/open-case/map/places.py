@@ -3,6 +3,8 @@
 #   the three places to busk: the park (a ring of trees round a lawn, a pond, the bandstand), the station
 #     (the glass train shed, its brick front and clock tower, a limestone forecourt with a fountain) and
 #     the night market (striped stalls under lanterns on warm brick, townhouses behind, a boardwalk);
+#   the music shop, on the road into town between the park and the station (a flat over a shopfront
+#     with a striped awning and a guitar in its lit window);
 #   the city, in loose clusters over the land between the park, the station and the village: towers by
 #     the station, flats further out, houses at the edges, trees in the gaps;
 #   the settlements without a name: a village with a church, two suburbs, a farm, a lighthouse, a marina;
@@ -14,16 +16,17 @@
 #   size      [w, h]: the map in screen pixels (the land at SCALE times its size)
 #   land      the land's picture
 #   pictures  [{ name, x, y }]: each picture's top left, in the order they're drawn (the city first)
-#   places    { id: { name, pin: [x, y], label: [x, y], view: [x, y] } }: each place's picture, where its
-#             gold pin points (just over its top), where its label hangs (under it), and the point the
-#             view centres on when it's chosen
+#   places    { id: { name, pin: [x, y], label: [x, y], view: [x, y] } }: each of the map's stops (the
+#             places to busk, then the music shop): its name, where its gold pin points (just over its
+#             picture's top), where its label hangs (under it), and the point the view centres on when
+#             it's chosen
 #   clouds    [{ name, x, y }]: where each cloud starts, drawn at SCALE times its size
 # It's deterministic: an unchanged script writes the same bytes.
 import json, math
 import sys
 from PIL import Image, ImageDraw
 sys.dont_write_bytecode = True  # no __pycache__ beside the scripts
-from layout import (W, H, SCALE, OUT, hsh, mix, step, darker, lighter, PICTURES, PLACES, BRIDGES, CITY, CITY_HEART, CLOUDS,
+from layout import (W, H, SCALE, OUT, hsh, mix, step, darker, lighter, PICTURES, STOPS, BRIDGES, CITY, CITY_HEART, CLOUDS,
                     in_city, masks)
 
 LEAF = [(16, 40, 36), (24, 58, 44), (34, 80, 50), (50, 104, 54), (76, 130, 58), (114, 156, 66), (158, 182, 86)]
@@ -450,6 +453,83 @@ def market():
     back_to_front(items)
     return cv
 
+
+def shop():
+    """The music shop on the road into town: a flat over a shopfront, its sign board with a gold note,
+    a striped awning over the door and a lit window with a guitar standing in it; a bit of pavement in
+    front, with a sandwich board, a lamp and a tree at each end. A little bigger than a city house."""
+    cv = Canvas(72, 56)
+    def slabs(x, y, d):  # the pavement's pale slabs, like the station's forecourt but smaller
+        if d > 0.88:
+            return (184, 174, 154)
+        row = y // 3
+        joint = y % 3 == 0 or (x + (row % 2) * 3) % 6 == 0
+        return (170, 158, 136) if joint else mix((216, 206, 182), (230, 222, 200), hsh(x // 6, row, 64))
+    ground(cv, 34, 49, 30, 5, slabs, 63)
+    x, y, w, h = 21, 46, 24, 25  # the front's bottom left, its width and its height to the eaves
+    wall, GREEN, GOLD = (234, 222, 200), (34, 78, 64), (252, 208, 98)
+    def house():
+        building(cv, x, y, w, h, 12, wall, (96, 100, 118), 'gable', lit=0.5, seed=5, floors=2, door=False)
+        cv.rect(x, y - h, x + w - 1, y - 1, wall)  # the front, painted afresh for the shop's own windows
+        for yy in range(y - h + 2, y, 3):
+            cv.line([(x, yy), (x + w - 1, yy)], darker(wall, 0.06))
+        for k, wx in enumerate(range(x + 4, x + w - 3, 7)):  # the flat upstairs, flowers on its sills
+            cv.rect(wx, y - h + 2, wx + 1, y - h + 4, (252, 216, 128) if k == 1 else (52, 50, 62))
+            cv.line([(wx - 1, y - h + 5), (wx + 2, y - h + 5)], (64, 108, 50))
+            cv.put(wx, y - h + 5, (222, 84, 92))
+            cv.put(wx + 2, y - h + 5, (248, 212, 98))
+        cv.line([(x - 1, y - 17), (x + w, y - 17)], lighter(wall, 0.5))  # the cornice over the shopfront
+        cv.rect(x, y - 16, x + w - 1, y - 14, GREEN)  # the sign board, gold letters round a note
+        cv.line([(x, y - 16), (x + w - 1, y - 16)], (62, 112, 90))
+        nx = x + w // 2
+        for lx in list(range(x + 2, nx - 3, 2)) + list(range(nx + 4, x + w - 2, 2)):
+            cv.put(lx, y - 15, (226, 196, 120))
+        for (ddx, ddy) in ((0, -18), (1, -18), (2, -17), (0, -17), (0, -16), (0, -15), (-1, -15), (-2, -15), (-1, -14), (-2, -14)):
+            cv.put(nx + ddx, y + ddy, GOLD)  # its flag pokes up over the board
+        cv.rect(x, y - 13, x + w - 1, y, GREEN)  # the shopfront
+        wx1 = x + w - 9  # the window, lit warm, the guitar standing in it
+        cv.rect(x + 2, y - 11, wx1, y - 1, (24, 50, 42))
+        for yy in range(y - 10, y - 1):
+            cv.line([(x + 3, yy), (wx1 - 1, yy)], mix((255, 244, 206), (246, 204, 128), (yy - (y - 10)) / 8))
+        guitar = ['..H..', '..N..', '..N..', '..N..', '.BBB.', '.BOB.', 'bBBBb', 'bBBBb', '.bbb.']
+        colours = {'H': (54, 32, 26), 'N': (90, 56, 38), 'B': (214, 104, 44), 'b': (128, 52, 32), 'O': (46, 26, 22)}
+        gx = (x + 2 + wx1) // 2 - 2
+        for r, row in enumerate(guitar):
+            for c, ch in enumerate(row):
+                if ch in colours:
+                    cv.put(gx + c, y - 10 + r, colours[ch])
+        cv.line([(x + 2, y - 1), (wx1, y - 1)], lighter(GREEN, 0.3))  # the sill
+        dx0 = x + w - 6  # the door, its glass lit
+        cv.rect(dx0, y - 10, dx0 + 3, y - 1, (22, 50, 42))
+        cv.rect(dx0 + 1, y - 9, dx0 + 2, y - 5, (246, 206, 128))
+        cv.put(dx0 + 2, y - 3, GOLD)
+        a, b = (204, 58, 66), (246, 238, 222)  # the striped awning, lit along its top, scalloped below
+        cv.rect(x - 1, y - 13, x + w, y - 11, b)
+        for xx in range(x - 1, x + w + 1):
+            if ((xx - x + 1) // 2) % 2 == 0:
+                cv.line([(xx, y - 13), (xx, y - 11)], a)
+                cv.put(xx, y - 10, a if (xx - x) % 2 == 0 else darker(a, 0.2))
+            elif (xx - x) % 2 == 0:
+                cv.put(xx, y - 10, darker(b, 0.12))
+        cv.line([(x - 1, y - 13), (x + w, y - 13)], lighter(a, 0.25))
+        for xx in range(x + 3, wx1):  # its shadow on the window
+            cv.shade(xx, y - 9, 0.2)
+    def board(px, py):  # a sandwich board by the door, chalked
+        cv.rect(px, py - 4, px + 2, py - 1, (52, 56, 54))
+        cv.line([(px, py - 4), (px + 2, py - 4)], (150, 112, 74))
+        cv.put(px + 1, py - 3, (236, 232, 220))
+        cv.put(px + 1, py - 2, GOLD)
+        cv.put(px, py, (100, 72, 48))
+        cv.put(px + 2, py, (100, 72, 48))
+        cv.put(px + 3, py, (0, 0, 0, 60))
+    items = [(y, 0, house), (49, 1, lambda: board(x + w - 3, 49)), (50, 2, lambda: lamp(cv, x - 4, 50))]
+    for k, px in enumerate((7, 65)):
+        items.append((50, 10 + k, lambda px=px: tree(cv, px, 50, 5, px + 3)))
+    for i, (px, py) in enumerate(((x + 6, 49), (x + 11, 51), (x + w + 4, 50))):
+        items.append((py, 20 + i, lambda px=px, py=py, i=i: person(cv, px, py, i + 3)))
+    back_to_front(items)
+    return cv
+
 # ---------------------------------------------------------------------------------------------
 # The settlements without a name
 
@@ -680,9 +760,9 @@ def truss(L=88):
 
 def city(pictures, M):
     """The city's buildings, loose on patches of paving over the land inside its outline, clear of the
-    roads, the water and the pictures standing in it (the station, the village, the park): towers
-    crowded round its heart by the station, flats further out, houses in gardens at the edges, trees in
-    the gaps. Returns the picture and its top left, in screen pixels."""
+    roads, the water and the pictures standing in it (the station, the village, the park, the shop):
+    towers crowded round its heart by the station, flats further out, houses in gardens at the edges,
+    trees in the gaps. Returns the picture and its top left, in screen pixels."""
     roads, water = M['kerb'].load(), M['water'].load()
     xs, ys = [p[0] for p in CITY], [p[1] for p in CITY]
     lx0, ly0, lx1, ly1 = min(xs) - 4, min(ys) - 50, max(xs) + 8, max(ys) + 6  # with headroom for the towers
@@ -695,7 +775,7 @@ def city(pictures, M):
     def clear_of(px0, py0, px1, py1):
         return all(ground_ok(*land(px, py)) for py in range(int(py0), int(py1) + 1, 2) for px in range(int(px0), int(px1) + 1, 2))
     keep_out = []  # the lower part of each picture standing in the city
-    for name in ('station', 'village', 'park'):
+    for name in ('station', 'village', 'park', 'shop'):
         cx, by, _, _ = PICTURES[name]
         im = pictures[name].img
         keep_out.append((cx * SCALE - im.width // 2 - lx0 * SCALE + 6, by * SCALE - im.height * 0.55 - ly0 * SCALE,
@@ -767,8 +847,8 @@ def top_row(cv):
 
 
 pictures = {
-    'park': park(), 'station': station(), 'market': market(), 'suburb1': suburb(3), 'suburb2': suburb(11),
-    'village': village(), 'farm': farm(), 'lighthouse': lighthouse(), 'marina': marina(),
+    'park': park(), 'station': station(), 'market': market(), 'shop': shop(), 'suburb1': suburb(3),
+    'suburb2': suburb(11), 'village': village(), 'farm': farm(), 'lighthouse': lighthouse(), 'marina': marina(),
 }
 the_city, city_at = city(pictures, masks())
 bridges = {'suspension': suspension(96), 'truss': truss(88)}
@@ -776,12 +856,12 @@ clouds = {'cloud1': cloud(120, 44, 5), 'cloud2': cloud(90, 34, 9)}
 
 placed = [{'name': 'city', 'x': city_at[0], 'y': city_at[1]}]
 places = {}
-NAMES = {'park': 'The Park', 'station': 'The Station', 'market': 'The Night Market'}
+NAMES = {'park': 'The Park', 'station': 'The Station', 'market': 'The Night Market', 'shop': 'The Music Shop'}
 for name, (cx, by, w, h) in sorted(PICTURES.items(), key=lambda kv: (kv[1][1], kv[0])):
     cv = pictures[name]
     x, y = cx * SCALE - cv.w // 2, by * SCALE - cv.h + 3
     placed.append({'name': name, 'x': x, 'y': y})
-    if name in PLACES:
+    if name in STOPS:
         places[name] = {'name': NAMES[name], 'pin': [cx * SCALE, y + top_row(cv) - 4], 'label': [cx * SCALE, by * SCALE + 6],
                         'view': [cx * SCALE, round(by * SCALE - cv.h * 0.4 - 17)]}
 for name, (bx, by, _) in BRIDGES.items():
@@ -794,7 +874,7 @@ data = {
     'size': [W * SCALE, H * SCALE],
     'land': 'land.png',
     'pictures': placed,
-    'places': {k: places[k] for k in PLACES},
+    'places': {k: places[k] for k in STOPS},
     'clouds': [{'name': name, 'x': x * SCALE, 'y': y * SCALE} for (name, x, y) in CLOUDS],
 }
 (OUT / 'map.json').write_text(json.dumps(data, indent=2) + '\n')

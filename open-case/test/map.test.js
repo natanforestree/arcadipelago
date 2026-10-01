@@ -1,6 +1,7 @@
 // Checks the committed map (open-case/assets/map/, written by art/open-case/map/land.py and places.py)
 // against what the map screen expects: every picture map.json names is there and lies on the map, each
-// place to busk has its pin, label and view on the map, and the whole map stays small.
+// stop (the places to busk, then the music shop) has its pin, label and view on the map, and the whole
+// map stays small.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -20,7 +21,7 @@ test('the land is half the map each way, shown at twice its size', () => {
 test('every picture map.json names is there and lies on the map, the city first, under the rest', () => {
   assert.equal(map.pictures[0].name, 'city');
   const names = map.pictures.map((p) => p.name);
-  for (const want of [...PLACE_IDS, 'city', 'suspension', 'truss', 'village', 'lighthouse', 'marina', 'farm']) assert.ok(names.includes(want), want);
+  for (const want of [...PLACE_IDS, 'shop', 'city', 'suspension', 'truss', 'village', 'lighthouse', 'marina', 'farm']) assert.ok(names.includes(want), want);
   assert.equal(new Set(names).size, names.length, 'each once');
   for (const { name, x, y } of map.pictures) {
     const { w, h } = png(name);
@@ -32,7 +33,7 @@ test('every picture map.json names is there and lies on the map, the city first,
 });
 
 test("each place to busk has its picture, its name, and its pin, label and view on the map, the pin over the picture", () => {
-  assert.deepEqual(Object.keys(map.places), PLACE_IDS);
+  assert.deepEqual(Object.keys(map.places), [...PLACE_IDS, 'shop'], 'the stops: the places to busk, then the shop');
   for (const id of PLACE_IDS) {
     const p = map.places[id], pic = map.pictures.find((q) => q.name === id), { w, h } = png(id);
     assert.equal(p.name, PLACE_WORDS[id].name);
@@ -40,6 +41,17 @@ test("each place to busk has its picture, its name, and its pin, label and view 
     assert.ok(p.pin[0] > pic.x && p.pin[0] < pic.x + w && p.pin[1] >= pic.y - 6 && p.pin[1] < pic.y + h, `${id}'s pin`);
     assert.ok(p.label[1] > p.pin[1], `${id}'s label hangs under it`);
   }
+});
+
+test('the music shop is the last stop, with its picture, its name, its pin over the picture and its label under it', () => {
+  const p = map.places.shop, pic = map.pictures.find((q) => q.name === 'shop');
+  assert.ok(p && pic, 'the shop has a stop and a picture');
+  const { w, h } = png('shop');
+  assert.equal(p.name, 'The Music Shop');
+  for (const [x, y] of [p.pin, p.label, p.view]) assert.ok(x >= 0 && x < W && y >= 0 && y < H, `shop: ${x}, ${y}`);
+  assert.ok(p.pin[0] > pic.x && p.pin[0] < pic.x + w && p.pin[1] >= pic.y - 6 && p.pin[1] < pic.y + h, "the shop's pin");
+  assert.ok(p.label[0] > pic.x && p.label[0] < pic.x + w, "the shop's label sits under its picture");
+  assert.ok(p.label[1] > p.pin[1], "the shop's label hangs under its pin");
 });
 
 test('the whole map stays under 500 KB', () => {

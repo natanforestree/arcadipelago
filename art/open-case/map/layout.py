@@ -102,13 +102,16 @@ PATHS = [
 RAIL = [(970, 300), (900, 300), (830, 300), (760, 300), (712, 300), (692, 300), (672, 300), (646, 292), (622, 274), (606, 262)]
 
 # Where each picture stands (places.py): its bottom middle and the size of the clear ground it needs,
-# where no trees grow: (x, y, w, h).
+# where no trees grow: (x, y, w, h). The music shop stands in the city on the road into town, just
+# above its kerb, halfway from the park to the station, where its label fits between theirs.
 PICTURES = {
     'park': (404, 262, 80, 50), 'station': (604, 270, 92, 52), 'market': (424, 438, 76, 44),
+    'shop': (500, 284, 32, 22),
     'suburb1': (250, 318, 70, 34), 'suburb2': (790, 420, 70, 34), 'farm': (870, 500, 54, 34),
     'lighthouse': (120, 178, 26, 30), 'marina': (334, 478, 60, 26), 'village': (650, 150, 56, 30),
 }
 PLACES = ['park', 'station', 'market']  # the pictures that are places to busk
+STOPS = PLACES + ['shop']  # the map's stops: the places to busk, then the music shop
 # Where the road and the railway cross the river, on bridges drawn from the side: each deck's left end
 # and its length.
 BRIDGES = {'suspension': (664, 344, 48), 'truss': (670, 300, 44)}
