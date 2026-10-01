@@ -630,6 +630,23 @@ test("in the shop, the band plays its electric piano alone, softer, so you can t
     assert.ok(tryLevel > 0 && tryLevel < setLevel * 0.7, `${tryLevel} next to ${setLevel} in a set`);
   }));
 
+test("on the map, the track you're choosing plays every part, softer than in a set", () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    audio.previewBand(1, readyBeat('funk'));
+    const last = (g) => g.gain.events.at(-1)[1];
+    for (const { id } of LAYERS) assert.equal(last(ctx().busGain(id)), 1, id);
+    assert.equal(last(ctx().busGain('perc')), 0, 'the drums play, so no stand-in percussion');
+    const band = ctx().busGain('keys').outs[0];
+    const preview = band.gain.events.filter(([how, , t]) => how === 'set' && t === 1).at(-1)[1];
+    audio.startBand(5);
+    const set = band.gain.events.filter(([how, , t]) => how === 'set' && t === 5).at(-1)[1];
+    assert.ok(preview > 0 && preview < set * 0.7, `${preview} next to ${set} in a set`);
+    audio.previewBand(6, readyBeat('bossa')); // the next track you choose takes over, as softly
+    assert.equal(band.gain.events.filter(([how, , t]) => how === 'set' && t === 6).at(-1)[1], preview);
+  }));
+
 test('choosing the loop pedal in the shop, then moving straight on: the tried chord never sounds', () =>
   withAudio((ctx) => {
     const audio = createAudio(memoryStorage());

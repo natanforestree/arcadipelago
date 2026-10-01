@@ -31,6 +31,7 @@ const BRIGHT = [0.2, 0.35, 0.55, 0.8]; // the acoustic's pick's brightness by st
 const BAND_LEVEL = 0.55; // the band bus's level under your instrument
 // ...and in the shop, where the electric piano plays alone while you try the loop pedal.
 const TRY_LEVEL = 0.35;
+const PREVIEW_LEVEL = 0.3; // the band's level on the map, as you choose a track
 // The percussion standing in for the drums: on only while the drums slot is off. Lo-fi and soft, not
 // a metronome: a shaker, a finger snap and a low tap, not a beeping tone.
 const PERC_SHAKER_HZ = 7000; // the shaker: bright but soft noise
@@ -902,6 +903,13 @@ export function createAudio(storage) {
     wobble.gain.setTargetAtTime(0, at, 0.5);
   }
 
+  // A track heard on the map while you choose it: every part playing, softly.
+  function previewBand(at, b = LOFI) {
+    if (!ctx) return;
+    startBand(at, b, PREVIEW_LEVEL);
+    for (const { id } of LAYERS) setLayer(id, true, at);
+  }
+
   // The end of the set: the band and your loop fade out over a bar from `at`, and stop.
   function endBand(at) {
     if (!ctx) return;
@@ -1050,7 +1058,7 @@ export function createAudio(storage) {
   }
 
   return {
-    start, now, warm, noteOn, noteOff, setRing, setInstrument, setPedal, startBand, editBand, setBeat, playWritten, tryBand, endBand, stopBand,
+    start, now, warm, noteOn, noteOff, setRing, setInstrument, setPedal, startBand, editBand, setBeat, playWritten, tryBand, previewBand, endBand, stopBand,
     stopLoop, countIn, setLayer, update, coin, clap, reportedLatency, heardAt,
     // the band's first 16th on the audio clock (null with no band): band time counts from it
     get bandStart() {

@@ -7,7 +7,7 @@
   <link rel="icon" href="icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Silkscreen&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&family=Silkscreen&display=swap" rel="stylesheet">
   <style>
     html, body { margin: 0; height: 100%; overflow: hidden; background: #121230; }
     body { display: grid; place-items: center; }
@@ -28,10 +28,54 @@
     .card label { display: flex; gap: 8px; align-items: center; }
     .card input[type=range] { flex: 1; }
     #log { margin: 0; padding-left: 20px; font-size: 10px; }
+    /* The map (atlasview.js): a view of SCREEN map pixels, scaled to fit the window, in Pixelify Sans
+       like the atlas it's drawn after. Its panels are dark green with a pale rim; the chosen place's
+       label is gold. */
+    #atlas { position: fixed; inset: 0; overflow: hidden; background: #1d3328; z-index: 1; }
+    #atlas[hidden], #atlas [hidden] { display: none !important; }
+    #atlas .stage { position: absolute; left: 50%; top: 50%; width: 1280px; height: 720px; overflow: hidden; transform: translate(-50%, -50%) scale(var(--s, 1)); font: 16px/1.2 'Pixelify Sans', monospace; color: #f3ead0; }
+    #atlas * { font-variant-ligatures: none; } /* Pixelify Sans joins "fi" into a shape that reads as "A" */
+    #atlas .world { position: absolute; left: 0; top: 0; }
+    #atlas .world img { position: absolute; image-rendering: pixelated; user-select: none; }
+    #atlas .world img.land { left: 0; top: 0; width: 100%; height: 100%; }
+    #atlas .world img.place { cursor: pointer; }
+    #atlas .cloud { opacity: 0.85; pointer-events: none; }
+    #atlas .cloud.shadow { filter: brightness(0); opacity: 0.12; }
+    #atlas .shade { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, #0a140e59 0%, #0a140e00 22%, #0a140e00 80%, #0a140e66 100%); }
+    #atlas .label { position: absolute; transform: translate(-50%, 0); display: grid; justify-items: center; gap: 2px; padding: 0; background: none; border: 0; font: inherit; color: inherit; cursor: pointer; }
+    #atlas .label .name { display: flex; align-items: center; gap: 8px; padding: 5px 10px 5px 8px; background: #1c2c22db; border: 2px solid #d6e2be47; font-size: 18px; white-space: nowrap; }
+    #atlas .label .dot { width: 6px; height: 6px; background: currentColor; }
+    #atlas .label .crowd { font-size: 12px; letter-spacing: 0.03em; text-shadow: 1px 1px 0 #10201a, -1px 1px 0 #10201a; }
+    #atlas .label.on .name { border-color: #fcd062; color: #fcd062; }
+    #atlas .label:focus-visible .name, #atlas .row:focus-visible { outline: 2px solid #fcd062; }
+    #atlas .pin { position: absolute; transform: translate(-50%, -100%); pointer-events: none; filter: drop-shadow(2px 2px 0 #10201a); }
+    #atlas .title { position: absolute; left: 26px; top: 40px; margin: 0; font-size: 44px; font-weight: 600; line-height: 1; text-shadow: 3px 3px 0 #10201a; }
+    #atlas .chip, #atlas .panel, #atlas .minimap { position: absolute; background: #1c2c22db; border: 2px solid #d6e2be47; }
+    #atlas .chip { right: 26px; top: 22px; display: flex; gap: 12px; align-items: center; padding: 9px 14px; }
+    #atlas .chip .music { font-size: 22px; color: #fcd062; }
+    #atlas .chip .big { font-size: 22px; font-weight: 600; line-height: 1; }
+    #atlas .chip .small { margin-top: 4px; font-size: 10px; color: #b9c2a6; }
+    #atlas .panel { right: 26px; top: 22px; width: 300px; display: grid; gap: 4px; padding: 14px 16px; }
+    #atlas .panel h2 { margin: 0 0 4px; font-size: 24px; font-weight: 600; }
+    #atlas .rows { display: grid; gap: 2px; }
+    #atlas .eyebrow, #atlas .foot, #atlas .hint, #atlas .compass, #atlas .minimap .cap, #atlas .row small, #atlas .chip .small { font-family: Silkscreen, monospace; letter-spacing: 0.12em; text-transform: uppercase; }
+    #atlas .eyebrow { margin-top: 6px; font-size: 10px; color: #b9c2a6; }
+    #atlas .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 5px 8px; background: none; border: 0; font: 17px 'Pixelify Sans', monospace; color: inherit; text-align: left; cursor: pointer; }
+    #atlas .row small { font-size: 10px; color: #b9c2a6; }
+    #atlas .row.on { background: #fcd0622e; outline: 2px solid #fcd062; color: #fcd062; }
+    #atlas .row.on small { color: #fcd062; }
+    #atlas .foot { margin-top: 8px; font-size: 10px; color: #b9c2a6; }
+    #atlas .minimap { left: 26px; bottom: 26px; padding: 4px; }
+    #atlas .minimap canvas { display: block; image-rendering: pixelated; }
+    #atlas .minimap .cap { display: flex; justify-content: space-between; margin-top: 3px; font-size: 9px; color: #b9c2a6; }
+    #atlas .compass { position: absolute; left: 30px; bottom: 160px; font-size: 12px; text-shadow: 1px 1px 0 #10201a; }
+    #atlas .hint { position: absolute; right: 26px; bottom: 24px; font-size: 10px; color: #b9c2a6; text-shadow: 1px 1px 0 #10201a; }
+    a.back { z-index: 2; }
   </style>
 </head>
 <body>
   <canvas id="game" aria-label="Open Case: a busking game played on the keyboard"></canvas>
+  <div id="atlas" hidden aria-label="A map of the city: choose where to busk, and what track to play"></div>
   <a class="back" href="../">← games</a>
   <form class="card" id="end" hidden onsubmit="return false">
     <h2>Set over</h2>

@@ -16,10 +16,15 @@ test('the sound check has a switch for every layer', () => {
   for (const id of ['keys', 'drums', 'bass', 'top']) assert.match(html, new RegExp(`data-layer="${id}"`));
 });
 
-test('the page loads the game as a module, with its icon and the Silkscreen font', () => {
+test('the page loads the game as a module, with its icon, the Silkscreen font and the map\'s Pixelify Sans', () => {
   assert.match(html, /<script type="module" src="\.\/src\/main\.js"><\/script>/);
   assert.match(html, /<link rel="icon" href="icon\.png">/);
   assert.match(html, /family=Silkscreen/);
+  assert.match(html, /family=Pixelify\+Sans/);
+});
+
+test('the map has its place on the page, hidden until the title card is gone', () => {
+  assert.match(html, /<div id="atlas" hidden[^>]*><\/div>/);
 });
 
 test('the sound check has a choice of beats', () => {
