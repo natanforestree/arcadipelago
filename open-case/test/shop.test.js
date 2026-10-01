@@ -11,7 +11,7 @@ test('the arrow keys move along the stock and wrap round it', () => {
   const shop = createShop();
   assert.equal(chosen(shop).id, 'overdrive', 'the rack comes first');
   move(shop, -1);
-  assert.equal(chosen(shop).id, 'studio', 'left from the first is the last: the groovebox on the counter');
+  assert.equal(chosen(shop).id, 'synth', 'left from the first is the last: the synth');
   move(shop, 1);
   move(shop, 1);
   assert.equal(chosen(shop).id, 'chorus');
@@ -110,18 +110,4 @@ test('choosing the loop pedal starts a loop to try it with, yours or not; moving
   assert.equal(shop.loop.layers.length, 0, 'back again, the loop starts empty');
   choose(shop, at('synth'));
   assert.equal(shop.loop, null, 'a click on something else throws it away too');
-});
-
-test("the studio's card: 150 coins, and once it's yours, where to find it", () => {
-  const gear = withSavings(149);
-  assert.deepEqual(card(shopOn('studio'), gear), {
-    name: 'Studio', price: '150 coins', about: 'Make your own beats to busk to.', says: 'Not enough coins yet (you have 149)', button: null,
-  });
-  gear.savings = 150;
-  assert.deepEqual(action(shopOn('studio'), gear), { act: 'buy', id: 'studio' });
-  buy(gear, 'studio');
-  assert.deepEqual(card(shopOn('studio'), gear), {
-    name: 'Studio', price: 'yours', about: 'Make your own beats to busk to.', says: 'After a set: Studio, on the end card', button: null,
-  });
-  assert.deepEqual(trying(shopOn('studio'), gear), { instrument: ACOUSTIC, on: [] }, 'trying it changes nothing you hear');
 });

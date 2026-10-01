@@ -6,17 +6,17 @@
 import { PLACE_IDS, STOPS } from './places.js';
 import { READY } from './beats.js';
 
-// The tracks to choose from: the five ready-made ones, free to everyone, then your own beats (studio.js
-// slots) once the studio is yours. Each: { key: { ready: id } | { slot: i }, name, bpm, mood }.
-export function trackList(beats, studio) {
+// The tracks to choose from: the five ready-made ones, then your own beats (studio.js slots). Each:
+// { key: { ready: id } | { slot: i }, name, bpm, mood }.
+export function trackList(beats) {
   const list = READY.map((b) => ({ key: { ready: b.id }, name: b.name, bpm: b.bpm, mood: b.mood }));
-  if (studio) beats.slots.forEach((b, i) => b && list.push({ key: { slot: i }, name: b.name, bpm: b.bpm, mood: b.mood }));
+  beats.slots.forEach((b, i) => b && list.push({ key: { slot: i }, name: b.name, bpm: b.bpm, mood: b.mood }));
   return list;
 }
 
 const sameKey = (a, b) => !!a && !!b && (a.ready ? a.ready === b.ready : a.slot === b.slot);
 
-// The map as it opens: place (a place to busk, never the shop) the one chosen last time, chosen the
+// The map as it opens: place (a place to busk, never the shop or home) the one chosen last time, chosen the
 // track chosen last time (studio.js beats.chosen; the first if it's gone). straightGo: the track is
 // already chosen (the studio's Busk to this), so Enter on a place goes straight there without the
 // panel. intro: the title is up over the map (the first map of a visit) until a key or a click
@@ -32,18 +32,19 @@ export function createAtlas({ place = 'park', tracks, chosen = null, straightGo 
   };
 }
 
-// The stop chosen: a place to busk, or 'shop'.
+// The stop chosen: a place to busk, 'shop' or 'home'.
 export const stopOf = (a) => STOPS[a.at];
 export const trackOf = (a) => a.tracks[a.track];
 
 // A key on the map, by its code. Returns what happened, for main.js: 'place' (another stop is chosen),
 // 'panel' (the tracks open), 'track' (another track is chosen), 'go' (busk at the chosen place, to the
-// chosen track), 'shop' (go into the music shop), 'back' (the panel closes), 'start' (the title was up
-// and is cleared), or null (the key does nothing here).
+// chosen track), 'shop' (go into the music shop), 'home' (go into the studio), 'back' (the panel
+// closes), 'start' (the title was up and is cleared), or null (the key does nothing here).
 //   With the title up, any key but Esc clears it and does nothing else; Esc leaves it up.
-//   Left and right step through the stops, round from the last (the shop) to the first; Enter or Space
-//   opens the tracks (or goes, with straightGo), or goes into the shop when that's chosen. With the
-//   tracks open, up and down choose one, Enter or Space goes, and Esc closes them.
+//   Left and right step through the stops, round from the last (home) to the first; Enter or Space
+//   opens the tracks (or goes, with straightGo), or goes into the shop or the studio when that's
+//   chosen, never opening the tracks. With the tracks open, up and down choose one, Enter or Space
+//   goes, and Esc closes them.
 export function atlasKey(a, code) {
   if (a.intro) return code === 'Escape' ? null : clickTitle(a);
   const enter = code === 'Enter' || code === 'NumpadEnter' || code === 'Space';
@@ -53,7 +54,7 @@ export function atlasKey(a, code) {
       a.at = (a.at + (code === 'ArrowRight' ? 1 : -1) + n) % n;
       return 'place';
     }
-    if (enter) return stopOf(a) === 'shop' ? 'shop' : openTracks(a);
+    if (enter) return stopOf(a) === 'shop' || stopOf(a) === 'home' ? stopOf(a) : openTracks(a);
     return null;
   }
   if (code === 'ArrowUp' || code === 'ArrowDown') {
@@ -84,8 +85,8 @@ export function clickTitle(a) {
 }
 
 // A click on a stop (its picture or its label): one not chosen is chosen; the chosen place opens the
-// tracks (or goes, with straightGo), and the chosen shop goes in. With the tracks open, a click on a
-// stop chooses it and closes them. Returns as atlasKey does.
+// tracks (or goes, with straightGo), and the chosen shop or home goes in. With the tracks open, a
+// click on a stop chooses it and closes them. Returns as atlasKey does.
 export function clickPlace(a, id) {
   if (a.intro) return clickTitle(a);
   const at = STOPS.indexOf(id);
@@ -99,7 +100,7 @@ export function clickPlace(a, id) {
     a.at = at;
     return 'place';
   }
-  return id === 'shop' ? 'shop' : openTracks(a);
+  return id === 'shop' || id === 'home' ? id : openTracks(a);
 }
 
 // A click on track i in the panel: chooses it, or on the one already chosen, goes.

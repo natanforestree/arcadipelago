@@ -8,7 +8,8 @@
 // The game opens on the map (atlas.js, atlasview.js), with the title over it: the sound starts on the
 // first key or click, which only clears the title. Before each set it asks where to busk and what
 // track to play, your last answers already chosen: the park, the station at rush hour or the night
-// market (places.js), each with its own crowd and scene; the music shop is a fourth stop on the map.
+// market (places.js), each with its own crowd and scene; the music shop is a fourth stop on the map, and your home a fifth, which opens the
+// studio.
 // Between sets, the end card leads back to it, or to the music shop: your coins are saved, and your
 // gear (gear.js) changes how your notes sound, wherever you play and while you try things in the shop.
 // Once the loop pedal is yours, R records your notes into a loop (looper.js) that plays on under you;
@@ -19,8 +20,8 @@
 // ?bot=lick (the bot plays the set, audibly); ?sky=N (the place as it is N bars into a set, until a set
 // starts); ?coins=N (your savings are N on this page, and nothing bought on it is kept); ?beat=lofi,
 // bossa, funk, reggae or ballad (every set plays that ready-made beat); ?place=park, station or market
-// (every set is there, with no map, and the place isn't kept); ?studio (the studio is yours on this
-// page, the first key opens it, and nothing made on it is kept). With any of them, window.__openCase
+// (every set is there, with no map, and the place isn't kept); ?studio (the first key opens the
+// studio, and nothing made on it is kept). With any of them, window.__openCase
 // exposes the game for browser checks.
 import { createAudio } from './audio.js';
 import { createInput } from './input.js';
@@ -107,12 +108,13 @@ function game(art, atlasView) {
   let set = null, scene = createScene(pageSeed, { place }), start = 0, seed = 0;
   let botMoments = null, botNext = 0, botFed = 0;
   const latency = { reported: null, measured: null };
-  // Your savings and gear. With ?coins=N your savings are N, with ?studio the studio is yours, and on
-  // either page nothing is kept.
+  // Your savings and gear. With ?coins=N your savings are N, and on that page and ?studio nothing is
+  // kept. A save that had bought the studio is paid its 150 coins back (loadGear), and saved at once so
+  // it's paid only once.
   const gear = loadGear(storage);
   if (debugSavings !== null) gear.savings = debugSavings;
-  if (tryStudio && !owns(gear, 'studio')) gear.owned = [...gear.owned, 'studio'];
   const keep = () => !keepsNothing && saveGear(storage, gear);
+  if (gear.refunded) keep();
   // The log is Nathan's own: a bot set, a ?coins page or a ?studio page never writes to it. Savings
   // still count up on such a page (earn, below); they're just never kept, same as keep() above.
   const logging = !bot && !keepsNothing;
@@ -307,7 +309,7 @@ function game(art, atlasView) {
     set = null;
     if (fixedPlace) return toPlace();
     atlas = createAtlas({
-      place, tracks: trackList(beats, owns(gear, 'studio')), chosen: fixedBeat ? { ready: fixedBeat.id } : beats.chosen,
+      place, tracks: trackList(beats), chosen: fixedBeat ? { ready: fixedBeat.id } : beats.chosen,
       straightGo: straightGo || !!fixedBeat, intro,
     });
     canvas.hidden = true;
@@ -329,13 +331,13 @@ function game(art, atlasView) {
   const beatOf = (key) => (key.ready ? readyBeat(key.ready) : beats.slots[key.slot]) ?? LOFI;
   // What happened on the map (atlas.js): the track you're on plays softly while the tracks are open;
   // going keeps the place and the track for next time and sets off to the place; 'shop' goes into the
-  // music shop, which isn't kept as the place. 'start' (the title cleared) needs nothing more: the
-  // sound's started already.
+  // music shop and 'home' into the studio, neither of which is kept as the place. 'start' (the title
+  // cleared) needs nothing more: the sound's started already.
   function atlasDid(what) {
     if (what === 'panel' || what === 'track') audio.previewBand(audio.now() + 0.1, beatOf(trackOf(atlas).key));
     else if (what === 'back') audio.stopBand();
     else if (what === 'go') {
-      place = stopOf(atlas); // a place to busk: 'go' never comes from the shop
+      place = stopOf(atlas); // a place to busk: 'go' never comes from the shop or home
       if (!keepsNothing) savePlace(storage, place);
       if (!fixedBeat) {
         beats.chosen = { ...trackOf(atlas).key };
@@ -352,6 +354,12 @@ function game(art, atlasView) {
       atlasView.hide();
       canvas.hidden = false;
       openShop();
+    } else if (what === 'home') {
+      audio.stopBand();
+      atlas = null;
+      atlasView.hide();
+      canvas.hidden = false;
+      openStudio();
     }
   }
   atlasOn.place = (id) => {
@@ -488,7 +496,7 @@ function game(art, atlasView) {
     document.getElementById('end-saved').textContent = `Saved: ${gear.savings} coin${gear.savings === 1 ? '' : 's'}.`;
     document.getElementById('end-saved').hidden = !!bot;
     document.getElementById('shop').hidden = !!bot;
-    document.getElementById('studio').hidden = !!bot || !owns(gear, 'studio');
+    document.getElementById('studio').hidden = !!bot;
     document.getElementById('end-stopped').textContent = `${s.stopped} ${s.stopped === 1 ? 'person' : 'people'} stopped to listen.`;
     document.getElementById('end-longest').textContent = s.longest
       ? `${personName(s.longest.kind, art.data.looks[s.longest.kind][s.longest.look])} stayed longest: ${Math.round(s.longest.seconds)} seconds.`
@@ -536,14 +544,16 @@ function game(art, atlasView) {
     openShop();
   });
 
-  // The studio: its beat plays round and round, every part at once, while you make it. Esc leaves for
-  // the map, ready for the next set, and so does Busk to this, once it has kept your choice (the map
-  // then only asks where).
+  // The studio, free to everyone: its beat plays round and round, every part at once, while you make
+  // it. You reach it from the end card's Studio button, or from Home on the map. Esc leaves for the
+  // map, ready for the next set, and so does Busk to this, once it has kept your choice (the map then
+  // only asks where).
   document.getElementById('studio').addEventListener('click', () => {
     if (logging) logChoice(storage, 'studio');
     openStudio();
   });
-  // Into the studio: from the end card's Studio button, or with ?studio, from the title card.
+  // Into the studio: from the end card's Studio button, from Home on the map, or with ?studio, from
+  // the title card.
   function openStudio() {
     letGoStudio();
     end.hidden = true;

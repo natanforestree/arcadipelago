@@ -260,4 +260,4 @@ On 2026-10-01, after it went live, Nathan asked for the game to open on the map 
 - New kinds of people, and sounds of a place (a station's announcements, a market's chatter).
 - Unlocking places, and dragging or zooming the map.
 - Moving trains, boats and smoke on the map.
-- The regulars, which are still their own spec.
+- The regulars, which are still their own spec. Also on 2026-10-01, Nathan asked for the player's home on the map, "like a house down in the bottom left of the map like its your house", and for the studio to be free ("yeah lets make it free"): home is now a fifth stop, a cottage at the west end of the street in the map's bottom left, with a ♪ and "your studio · make your own tracks" on its label, and Enter or a click on it while it's chosen goes straight into the studio with no track panel; the studio is no longer sold in the shop, so your own tracks always join the list, and a save that had bought it is paid its 150 coins back once.

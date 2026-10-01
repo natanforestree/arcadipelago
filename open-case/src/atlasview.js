@@ -1,14 +1,14 @@
 // The map on screen: atlas.js's state shown as page elements over the canvas, the way Nathan's
 // reference (his friend's atlas) shows its world. On it: the land and the pictures standing on it
-// (assets/map/ and map.json, made by art/open-case/map/), each stop's label (the music shop's has a ♪
-// and its own line) and the gold pin over the chosen one, two clouds drifting over with their
-// shadows; over it: the heading, the track you'll play (or the "What track?" panel) and the keys'
+// (assets/map/ and map.json, made by art/open-case/map/), each stop's label (the music shop's and
+// home's have a ♪ and their own lines) and the gold pin over the chosen one, two clouds drifting
+// over with their shadows; over it: the heading, the track you'll play (or the "What track?" panel) and the keys'
 // hint. The view is SCREEN map pixels, scaled to fit the window; it glides to each stop you choose. A
 // click on a stop, its label or a track calls on.place(id) or on.track(i), and a click on the game's
 // title (the first map of a visit has one over everything, dimming the map, its clouds still
 // drifting) calls on.title(), for main.js to hand to atlas.js. While the title is up the map's own words (heading, track, hint)
 // are hidden.
-import { STOPS, PLACE_WORDS, SHOP_WORDS } from './places.js';
+import { STOPS, PLACE_WORDS, STOP_WORDS } from './places.js';
 import { moodName } from './beats.js';
 import { stopOf, trackOf, viewAt } from './atlas.js';
 
@@ -60,13 +60,13 @@ export async function createAtlasView(root, on, base = new URL('../assets/map/',
   }
   const labels = {};
   for (const id of STOPS) {
-    const words = id === 'shop' ? { ...SHOP_WORDS, crowd: SHOP_WORDS.about } : PLACE_WORDS[id];
+    const words = STOP_WORDS[id] ? { ...STOP_WORDS[id], crowd: STOP_WORDS[id].about } : PLACE_WORDS[id];
     const [x, y] = map.places[id].label;
     const label = el('button', 'label', world);
     label.type = 'button';
     Object.assign(label.style, { left: `${x}px`, top: `${y}px` });
     const name = el('span', 'name', label);
-    if (id === 'shop') el('span', 'music', name, '♪');
+    if (STOP_WORDS[id]) el('span', 'music', name, '♪');
     else el('span', 'dot', name);
     name.append(words.name);
     el('span', 'crowd', label, words.crowd);
@@ -166,7 +166,7 @@ export async function createAtlasView(root, on, base = new URL('../assets/map/',
       }
       hint.hidden = a.intro;
       hint.textContent = a.panel ? '↑↓ choose a track · enter to busk · esc back'
-        : stop === 'shop' ? '← → choose a place · enter to go in'
+        : stop === 'shop' || stop === 'home' ? '← → choose a place · enter to go in'
         : `← → choose a place · enter ${a.straightGo ? 'to busk here' : 'to go'}`;
     },
     hide() {

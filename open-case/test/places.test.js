@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PLACE_IDS, STOPS, SHOP_WORDS, PLACE_WORDS, isPlace, loadPlace, savePlace } from '../src/places.js';
+import { PLACE_IDS, STOPS, STOP_WORDS, PLACE_WORDS, isPlace, loadPlace, savePlace } from '../src/places.js';
 import { PLACES, CROWD, TIPS } from '../src/tuning.js';
 import { safeStorage } from '../src/storage.js';
 
@@ -21,15 +21,17 @@ test('three places, each with its words for the map, the prompt and the end card
   assert.ok(isPlace('market') && !isPlace('pier') && !isPlace(null));
 });
 
-test('the map has a fourth stop, the shop, which is not a place to busk', () => {
-  assert.deepEqual(STOPS, ['park', 'station', 'market', 'shop']);
-  assert.equal(SHOP_WORDS.name, 'The Music Shop');
-  assert.equal(SHOP_WORDS.about, 'pedals · instruments · the studio');
-  assert.ok(!isPlace('shop'));
+test('the map has two more stops, the shop and home, which are not places to busk', () => {
+  assert.deepEqual(STOPS, ['park', 'station', 'market', 'shop', 'home']);
+  assert.deepEqual(STOP_WORDS.shop, { name: 'The Music Shop', about: 'pedals · instruments' });
+  assert.deepEqual(STOP_WORDS.home, { name: 'Home', about: 'your studio · make your own tracks' });
+  assert.ok(!isPlace('shop') && !isPlace('home'));
+  assert.equal(loadPlace(memory({ 'open-case-place': 'home' }).store), 'park', 'a stored home loads as the park');
   assert.equal(loadPlace(memory({ 'open-case-place': 'shop' }).store), 'park', 'a stored shop loads as the park');
   const { data, store } = memory();
   savePlace(store, 'shop');
-  assert.equal(data['open-case-place'], undefined, 'the shop is never kept');
+  savePlace(store, 'home');
+  assert.equal(data['open-case-place'], undefined, 'the shop and home are never kept');
 });
 
 test("the park's crowd is the crowd's own numbers, so a set there plays as it always has", () => {

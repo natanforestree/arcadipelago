@@ -155,7 +155,7 @@ end
 
 -- The music shop: the room, the counter (drawn over the shopkeeper), the shopkeeper breathing (0, 1)
 -- and nodding at a sale (2, 3), the stock as it stands and chosen, and the tags
-local STOCK = { "overdrive", "chorus", "tremolo", "delay", "reverb", "loop", "acoustic", "ukulele", "electric", "epiano", "synth", "studio" }
+local STOCK = { "overdrive", "chorus", "tremolo", "delay", "reverb", "loop", "acoustic", "ukulele", "electric", "epiano", "synth" }
 screen("shop-room", S.room)
 screen("shop-counter", S.counter)
 for f = 0, 3 do screen("keeper-" .. f, function(b) S.keeper(b, f) end) end

@@ -31,7 +31,7 @@ test('the sound check has a choice of beats', () => {
   assert.match(html, /<label>Beat <select id="sound-beat"><\/select><\/label>/);
 });
 
-test('the end card has a Studio button, hidden until the studio is yours', () => {
+test('the end card has a Studio button, hidden until a set ends', () => {
   assert.match(html, /<button id="studio" type="button" hidden>Studio<\/button>/);
 });
 

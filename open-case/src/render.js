@@ -566,7 +566,7 @@ export function createRenderer(g, art) {
   //   shop: the shop's state (shop.js) on the shop screen, studio: the studio's state (studio.js) on
   //   the studio screen, where t is the band time of the beat it plays, debug: null | { reported, measured },
   //   busking: null | the name of the beat your next set plays, said over the prompt on the 'ready'
-  //     screen (with the studio yours, or ?beat=; without, the prompt is alone),
+  //     screen (null leaves the prompt alone),
   //   teach: the 'ready' screen shows the key chart (the first set of the visit), not the short prompt }
   return function draw(view) {
     const { screen, set, scene, keys, t, time } = view;

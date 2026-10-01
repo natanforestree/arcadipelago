@@ -9,7 +9,7 @@ export const ACOUSTIC = 'acoustic';
 
 // Everything in the shop, in the order you move through it: the pedals on the rack (the loop pedal
 // last, since R and Backspace work it rather than a number key), then the instruments on their
-// stands, then the studio's groovebox on the counter. Each price and pedal key is from tuning.js.
+// stands. Each price and pedal key is from tuning.js.
 export const STOCK = [
   { id: 'overdrive', kind: 'pedal', name: 'Overdrive', about: 'Warm grit, more of it the harder you pick.' },
   { id: 'chorus', kind: 'pedal', name: 'Chorus', about: 'A slow shimmer, like two guitars at once.' },
@@ -22,8 +22,10 @@ export const STOCK = [
   { id: 'electric', kind: 'instrument', name: 'Electric guitar', about: 'A clean tone that sings, through a small amp.' },
   { id: 'epiano', kind: 'instrument', name: 'Electric piano', about: 'A bell-like tone. Space is its sustain pedal.' },
   { id: 'synth', kind: 'instrument', name: 'Synth', about: 'A soft saw-wave lead. Space holds its notes.' },
-  { id: 'studio', kind: 'studio', name: 'Studio', about: 'Make your own beats to busk to.' },
 ].map((item) => ({ price: 0, key: null, ...item, ...SHOP[item.id] }));
+
+// What the studio cost before it was free: paid back, once, to a save that had bought it.
+export const STUDIO_REFUND = 150;
 
 export const stockItem = (id) => STOCK.find((item) => item.id === id) ?? null;
 // The pedals in the order they chain, which is the order of their keys (not the loop pedal).
@@ -40,7 +42,9 @@ export function freshGear() {
 
 export const owns = (gear, id) => id === ACOUSTIC || gear.owned.includes(id);
 
-// Reads your savings and gear. Whatever is unreadable or makes no sense starts afresh.
+// Reads your savings and gear. A save that owned the studio, once sold here, gets its price back in
+// savings, and the gear has refunded: STUDIO_REFUND for main.js to save at once, so it's paid once.
+// Whatever is unreadable or makes no sense starts afresh.
 export function loadGear(storage) {
   const gear = freshGear();
   const savings = Number(storage.get(SAVINGS_KEY));
@@ -53,6 +57,10 @@ export function loadGear(storage) {
   }
   if (!saved || typeof saved !== 'object') return gear;
   const listed = (list) => (Array.isArray(list) ? list : []);
+  if (listed(saved.owned).includes('studio')) {
+    gear.savings += STUDIO_REFUND;
+    gear.refunded = STUDIO_REFUND;
+  }
   gear.owned = STOCK.filter((item) => item.id !== ACOUSTIC && listed(saved.owned).includes(item.id)).map((item) => item.id);
   if (INSTRUMENTS.includes(saved.instrument) && owns(gear, saved.instrument)) gear.instrument = saved.instrument;
   gear.on = PEDALS.filter((id) => owns(gear, id) && listed(saved.on).includes(id));

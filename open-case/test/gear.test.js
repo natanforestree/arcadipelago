@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { STOCK, PEDALS, INSTRUMENTS, ACOUSTIC, freshGear, loadGear, saveGear, earn, buy, play, stomp, owns } from '../src/gear.js';
+import { STOCK, PEDALS, INSTRUMENTS, ACOUSTIC, freshGear, STUDIO_REFUND, loadGear, saveGear, earn, buy, play, stomp, owns } from '../src/gear.js';
 import { SHOP } from '../src/tuning.js';
 
 function memoryStorage() {
@@ -9,15 +9,31 @@ function memoryStorage() {
 }
 const withSavings = (savings) => ({ ...freshGear(), savings });
 
-test('the stock: five pedals on keys 2 to 6 in chain order, the loop pedal, the instruments, then the studio, priced from tuning.js', () => {
-  assert.deepEqual(STOCK.map((s) => s.id), ['overdrive', 'chorus', 'tremolo', 'delay', 'reverb', 'loop', ACOUSTIC, 'ukulele', 'electric', 'epiano', 'synth', 'studio']);
+test('the stock: five pedals on keys 2 to 6 in chain order, the loop pedal, and the instruments, priced from tuning.js', () => {
+  assert.deepEqual(STOCK.map((s) => s.id), ['overdrive', 'chorus', 'tremolo', 'delay', 'reverb', 'loop', ACOUSTIC, 'ukulele', 'electric', 'epiano', 'synth']);
   assert.deepEqual(PEDALS, ['overdrive', 'chorus', 'tremolo', 'delay', 'reverb']);
   assert.deepEqual(PEDALS.map((id) => STOCK.find((s) => s.id === id).key), [2, 3, 4, 5, 6]);
   assert.deepEqual(INSTRUMENTS, [ACOUSTIC, 'ukulele', 'electric', 'epiano', 'synth']);
   for (const item of STOCK) if (item.id !== ACOUSTIC) assert.equal(item.price, SHOP[item.id].price, item.id);
-  assert.equal(STOCK.find((s) => s.id === 'studio').price, 150);
-  assert.equal(STOCK.reduce((sum, item) => sum + item.price, 0), 1200, 'the whole stock costs 1200 coins');
+  assert.ok(!STOCK.some((s) => s.id === 'studio') && !SHOP.studio, 'the studio is free, not sold');
+  assert.equal(STOCK.reduce((sum, item) => sum + item.price, 0), 1050, 'the whole stock costs 1050 coins');
   for (const item of STOCK) assert.ok(item.name && item.about.length <= 48, `${item.id}: a name, and a line that fits the card`);
+});
+
+test('an old save that bought the studio gets its 150 coins back, once', () => {
+  const s = memoryStorage();
+  s.set('open-case-savings', 20);
+  s.set('open-case-gear', JSON.stringify({ owned: ['delay', 'studio'], instrument: ACOUSTIC, on: [] }));
+  const gear = loadGear(s);
+  assert.equal(STUDIO_REFUND, 150);
+  assert.deepEqual([gear.savings, gear.owned, gear.refunded], [170, ['delay'], 150]);
+  saveGear(s, gear);
+  const again = loadGear(s);
+  assert.deepEqual([again.savings, again.owned, again.refunded], [170, ['delay'], undefined], 'saved, so nothing more is paid');
+  assert.equal(loadGear(memoryStorage()).refunded, undefined, 'no refund for a save without it');
+  const bare = memoryStorage();
+  bare.set('open-case-gear', JSON.stringify({ owned: ['studio'] }));
+  assert.equal(loadGear(bare).savings, 150, 'with no savings, the refund is the savings');
 });
 
 test('a fresh start: no savings, the acoustic guitar, no pedals', () => {
