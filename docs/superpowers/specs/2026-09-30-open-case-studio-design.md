@@ -74,13 +74,13 @@ The layout from the mockups, drawn in the game's flat style at 320×180. Each pa
   - the beat's name: click it to open the list of beats;
   - the tabs: **Drums**, **Bass**, **Chords** and **Mix**;
   - the song's settings: **tempo**, **key**, **swing** and **length**. Click one and drag up or down to change it, as Figure swipes.
-- **The rhythm wheel,** on the left:
-  - Each part has 16 rhythms, running from sparse to busy. Each is one bar long, and the ring shows its hits as long and short marks for long and short notes.
+- **The rhythm knob,** on the left (a vintage MIDI encoder, on a blue faceplate with four screws):
+  - Each part has 16 rhythms, running from sparse to busy. Each is one bar long, and the ring of 16 lights round the knob shows its hits: a lit light for each, bigger for a long note than a short one, and a dark one for a sixteenth with no note.
     - **Drums:** from a single hit on the one to steady 8ths, 16ths, offbeats and syncopations.
     - **Bass:** long held notes, a note a beat, pushes ahead of the beat, and busier lines.
     - **Chords:** long held chords, a chord a beat, offbeat stabs (the skank) and comping patterns like the bossa's.
-  - Scroll over the wheel, click its arrows, or press ↑ and ↓ to change the rhythm.
-- **The buttons** under the wheel:
+  - The knob turns a sixteenth of a round a rhythm, its pointer going clockwise from straight up (the rhythm's number is on its gold cap). Scroll over it, click the left half (◀) to go back or the right half (▶) to go on, or press ↑ and ↓ to change the rhythm.
+- **The buttons** under the knob, drawn as raised keys (the one that's on, Erase when lit, is pressed in):
   - **Sound:** steps through the part's sounds.
     - Drums: the lo-fi, brushes, funk and reggae kits, each with its own four sounds.
     - Bass: round, plucked and deep.
@@ -223,6 +223,7 @@ The plan's prototype settled what this spec left open, and changed two small thi
 - **The ready-made beats' loudness,** rendered offline in Chrome with every part playing: the lo-fi −24.8 dB, the reggae −25.7, the funk −26.6, the bossa nova −27.3 and the ballad −29.0, the gentler ones a little softer. None peaks above −4 dB. The Pump ducks by up to 70% and comes back over a quarter of a beat.
 - **The colours** come from the palette already there: the drums the sky's orange, the bass the speaker's blue, the chords the loop pedal's green. The art stays at 49 colours, and the groovebox adds two frames to the sheet.
 - **Two more files** than "How it's built" lists: `studioview.js` (the screen, and what a click lands on) and `studioinput.js` (the mouse and the keys). Your beats are stored under `open-case-beats`.
+- **The knob:** the rhythm wheel is now a knob (a MIDI encoder with a ring of lights) on a faceplate with screws, with ◀ and ▶ either side, and the buttons under it are raised keys. A click on its left half turns it back and on its right half on (it was the upper and lower halves). Nathan picked the MIDI encoder look from a mockup of two styles ("go with a").
 
 After Nathan's first go ("it doesnt do anything", of Busk to this), three more things, which he agreed:
 - **Save, in the list of beats,** between Busk to this and Close ("i almost feel the save should go in this dropdown"), and Cmd+S (Ctrl+S) from anywhere in the studio. It opens a name box in the list's place: type up to 12 letters, digits and spaces, Backspace deletes, and Enter (or its save) sets the name and goes back to the list, where "saved" shows for a moment on the busking line. Esc (or cancel) keeps the old name, and so does an empty one; spaces at either end are trimmed. While the box is open the keys only type, and the band plays on. Saving a ready-made beat makes your copy first, as a first change does, asking which slot to replace when all six are full. Your changes still keep themselves as you go; a new name is a change like any other, so it's kept, and Undo takes it back. Save again renames.

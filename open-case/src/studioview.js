@@ -1,5 +1,7 @@
 // The studio's screen at 320x180, laid out as Figure's is but wide: the beat's name, the tabs and the
-// song's settings across the top; the rhythm wheel and the buttons on the left; the big pad on the
+// song's settings across the top; on the left, on a blue faceplate with screws, the rhythm knob (a
+// vintage MIDI encoder: a knurled silver edge, a gold cap with the rhythm's number, a ring of lights
+// showing its hits, ◀ and ▶ to turn it) over the buttons, drawn as raised keys; the big pad on the
 // right (the Mix tab's faders in its place); and along the bottom, a picture of the loop, only to look
 // at: bar numbers, a lane for each part showing its notes, and the playhead. The list of beats, the
 // question of which slot to replace, and the name box (the list's Save) open over the pad. studioHit
@@ -15,6 +17,19 @@ export const TAB_BOXES = { drums: [66, 3, 32, 14], bass: [100, 3, 26, 14], chord
 export const SETTINGS = { bpm: [192, 1, 29, 17], mood: [221, 1, 32, 17], swing: [253, 1, 39, 17], bars: [292, 1, 28, 17] };
 const ARROWED = ['bpm', 'swing']; // the settings with ▲ and ▼
 export const WHEEL = [40, 50, 22]; // its middle and radius
+export const PANEL = [2, 21, 77, 61]; // the faceplate behind the knob (the part tabs)
+const KNOB_R = 16, CAP_R = 7, RING_R = 21; // the knob's, its gold cap's and the ring of lights' radii
+// The ◀ and ▶ either side of the knob, each [x, y, 3, 5], 29 pixels from its middle.
+export const KNOB_ARROWS = { left: [WHEEL[0] - 29, WHEEL[1] - 2, 3, 5], right: [WHEEL[0] + 27, WHEEL[1] - 2, 3, 5] };
+// The turn (radians, clockwise from straight up) of the knob's pointer and ridges at rhythm
+// index n (0-15): a sixteenth of a round a rhythm, so 16 comes back round to the first.
+export const knobAngle = (n) => (n / 16) * Math.PI * 2;
+// Light k of the ring's box [x, y, w, h], for a sixteenth with a note of length len (0: none): the
+// sixteenths from the top clockwise, a long note's light 3x3 and the others 2x2.
+export function ringLight(k, len) {
+  const th = (k / 16) * Math.PI * 2, size = len > 1 ? 3 : 2;
+  return [Math.round(WHEEL[0] + Math.sin(th) * RING_R - size / 2), Math.round(WHEEL[1] - Math.cos(th) * RING_R - size / 2), size, size];
+}
 // The octave (range, the bass only) is wider than Undo beside it, for its ▲ and ▼ (arrowsIn).
 export const BUTTONS = { sound: [4, 84, 74, 12], erase: [4, 98, 36, 12], clear: [42, 98, 36, 12], undo: [4, 112, 28, 12], range: [34, 112, 44, 12] };
 export const PAD = [82, 22, 234, 108];
@@ -45,7 +60,7 @@ export const LIST_BUTTONS = {
 export const NAME_FIELD = [PAD[0] + 57, PAD[1] + 36, 120, 16];
 export const NAME_BUTTONS = { save: [PAD[0] + 60, PAD[1] + 92, 50, 12], cancel: [PAD[0] + 124, PAD[1] + 92, 50, 12] };
 
-// Where a box's ▲ and ▼ are, each [x, y, 5, 3]: the rhythm wheel's little triangles, one over the
+// Where a box's ▲ and ▼ are, each [x, y, 5, 3]: little triangles, one over the
 // other at the box's right, ▲ just above its middle and ▼ just below, since a click on the box's
 // upper half steps up and on its lower half down.
 export function arrowsIn([x, y, w, h]) {
@@ -58,6 +73,7 @@ export function arrowsIn([x, y, w, h]) {
 //   'replace' { slot }, 'keep'                        while asking which slot to replace
 //   'open' { which }, 'new', 'busk', 'save', 'close'  in the list of beats
 //   'name', 'tab' { tab }, 'setting' { which }, 'wheel' { dir }, 'button' { which }
+//   (on the knob, dir is -1 on its left half, ◀, and 1 on its right, ▶)
 //   (on the tempo, the swing and the octave button, dir too: 1 on the upper half, the ▲, -1 below)
 //   'pad' { at }: { row, x } on the drums, { col, y } on the bass and chords
 //   'fader' { which, value } (a part's level, or 'pump'), 'mute' { part }, 'switch' { which }
@@ -82,7 +98,7 @@ export function studioHit(studio, x, y) {
     if (inside(box, x, y)) return ARROWED.includes(which) ? { hit: 'setting', which, dir: half(box, y) } : { hit: 'setting', which };
   }
   const [wx, wy, r] = WHEEL;
-  if ((x - wx) ** 2 + (y - wy) ** 2 <= (r + 8) ** 2) return { hit: 'wheel', dir: y < wy ? -1 : 1 };
+  if ((x - wx) ** 2 + (y - wy) ** 2 <= (r + 8) ** 2) return { hit: 'wheel', dir: x < wx ? -1 : 1 };
   for (const [which, box] of Object.entries(BUTTONS)) {
     if (!inside(box, x, y)) continue;
     if (which !== 'range') return { hit: 'button', which };
@@ -152,29 +168,68 @@ export function drawStudio(d, studio, t) {
   else if (studio.list || studio.asking) list(d, studio, t);
 }
 
-// The rhythm wheel: the part's rhythm as marks round a ring (long for a long note), its number in the
-// middle, and arrows to turn it.
-function wheel({ px, big, C }, studio, [base, shadow]) {
-  const [cx, cy, r] = WHEEL, rhythm = rhythmOf(studio);
-  for (let a = 0; a < 64; a++) {
-    const th = (a / 64) * Math.PI * 2;
-    px(cx + Math.sin(th) * r, cy - Math.cos(th) * r, 1, 1, C.charcoal);
+// A disc of pixels round the grid corner (cx, cy), radius r, a pixel row at a time. at(dx, dy, d, ang)
+// gives a pixel's colour (null: none) from its offset (dx, dy) from the middle, its distance d and its
+// angle ang (0 straight up, growing clockwise); a run of one colour is one px call.
+function disc(px, cx, cy, r, at) {
+  const n = Math.ceil(r);
+  for (let y = -n; y < n; y++) {
+    let run = null, from = -n;
+    for (let x = -n; x <= n; x++) {
+      const dx = x + 0.5, dy = y + 0.5, d = Math.hypot(dx, dy);
+      const c = x < n && d <= r ? at(dx, dy, d, (Math.atan2(dx, -dy) + Math.PI * 2) % (Math.PI * 2)) : null;
+      if (c === run) continue;
+      if (run) px(cx + from, cy + y, x - from, 1, run);
+      run = c;
+      from = x;
+    }
+  }
+}
+
+// The rhythm knob, a vintage MIDI encoder on its faceplate. The part's rhythm is a ring of 16 lights
+// (a hit in the part's colour, bigger for a long note; an unlit light dark). The knob has a knurled
+// silver edge (40 ridges, lit from the top left), a flat black top, and a small gold cap with the
+// rhythm's number on it; its pointer and ridges turn a sixteenth of a round a rhythm. ◀ and ▶ are
+// at its sides.
+function wheel({ px, text, C }, studio, [base, shadow]) {
+  const [cx, cy] = WHEEL, rhythm = rhythmOf(studio), n = studio.rhythm[studio.tab], turn = knobAngle(n);
+  px(...PANEL, C.dusk);
+  for (const [sx, sy] of [[4, 23], [74, 23], [4, 77], [74, 77]]) {
+    px(sx, sy, 3, 3, C.greyDark);
+    px(sx, sy + 1, 3, 1, C.ink); // the slot
+    px(sx + 1, sy, 1, 1, C.grey); // a glint
   }
   for (let k = 0; k < 16; k++) {
-    const len = rhythm.find(([s]) => s === k)?.[1] ?? 0, th = (k / 16) * Math.PI * 2, sx = Math.sin(th), cy2 = -Math.cos(th);
-    const reach = len > 1 ? 7 : len ? 4 : 1;
-    for (let i = 0; i < reach; i++) px(cx + sx * (r - 3 + i), cy + cy2 * (r - 3 + i), 2, 2, len ? (k % 4 === 0 ? base : shadow) : C.charcoal);
+    const len = rhythm.find(([s]) => s === k)?.[1] ?? 0;
+    px(...ringLight(k, len), len ? (k % 4 === 0 ? base : shadow) : C.night);
   }
-  big(String(studio.rhythm[studio.tab] + 1), cx, cy - 7, C.light);
-  for (const [dx, dy, dir] of [[0, -r - 7, -1], [0, r + 5, 1]]) {
-    for (let i = 0; i < 3; i++) px(cx + dx - i, cy + dy + (dir < 0 ? i : 2 - i), 1 + 2 * i, 1, C.grey);
+  disc(px, cx + 1, cy + 1, KNOB_R, () => C.ink); // its shadow on the panel
+  disc(px, cx, cy, KNOB_R, (dx, dy, d, ang) => {
+    const light = -(dx + dy) / (d * Math.SQRT2); // 1 toward the top left, -1 toward the bottom right
+    if (d > CAP_R + 0.5) {
+      const away = Math.abs(ang - turn), gap = Math.min(away, Math.PI * 2 - away);
+      if (gap * d < 0.75 && d < KNOB_R - 0.5) return C.light; // the pointer, from the cap to the rim
+      if (d > KNOB_R - 2.2) {
+        const ridge = Math.floor((((((ang - turn) / (Math.PI * 2)) * 40) % 40) + 40) % 40) % 2;
+        if (light > 0.45) return ridge ? C.light : C.grey;
+        if (light > -0.45) return ridge ? C.grey : C.greyDark;
+        return ridge ? C.greyDark : C.charcoal;
+      }
+      return d > KNOB_R - 3.5 && light > 0.3 ? C.charcoal : C.ink; // the flat top, its edge in the light
+    }
+    if (d > CAP_R - 1 && light > 0.5) return C.light;
+    return light < -0.3 && d > CAP_R - 2 ? C.goldDark : C.gold;
+  });
+  text(String(n + 1), cx + 1, cy - 3, C.ink, 'center');
+  for (const [x, y, w, h] of [KNOB_ARROWS.left, KNOB_ARROWS.right]) {
+    for (let i = 0; i < w; i++) px(x + (x < cx ? i : w - 1 - i), y + 2 - i, 1, 1 + 2 * i, C.grey);
   }
 }
 
 // Where to centre a text in a box from x to its arrows (arrowsIn), a pixel short of them.
 const textLeftOf = (x, arrows) => Math.round((x + arrows.up[0] - 1) / 2);
 
-// A box's ▲ and ▼ (arrowsIn), in the colours [up, down], drawn as the wheel's arrows are.
+// A box's ▲ and ▼ (arrowsIn), in the colours [up, down].
 function upDown(px, { up, down }, [upColour, downColour]) {
   for (let i = 0; i < 3; i++) {
     px(up[0] + 2 - i, up[1] + i, 1 + 2 * i, 1, upColour);
@@ -188,11 +243,16 @@ function buttons({ px, text, C }, studio) {
     const [x, y, w, h] = box;
     const off = (id === 'range' && studio.tab !== 'bass') || (id !== 'undo' && studio.tab === 'mix' && id !== 'sound');
     const faded = off || (id === 'sound' && studio.tab === 'mix') || (id === 'undo' && !studio.undo.length);
+    // a raised key: a lighter top edge and a dark bottom one; when it's on, pressed in (the edges
+    // swap and its word sits a pixel lower)
+    const pressed = lit[id] ? 1 : 0;
     px(x, y, w, h, lit[id] ? C.red : C.charcoal);
+    px(x, y, w, 1, pressed ? C.ink : C.greyDark);
+    px(x, y + h - 1, w, 1, pressed ? C.greyDark : C.ink);
     const sound = PARTS.includes(studio.tab) ? SOUNDS[studio.tab][studio.beat.sounds[studio.tab]].name : 'sound';
     const word = id === 'range' ? `oct ${studio.range > 0 ? '+1' : studio.range < 0 ? '-1' : '0'}` : id === 'sound' ? sound : id;
     const arrows = id === 'range' && arrowsIn(box); // the octave's ▲ and ▼, dimmed at its ends
-    text(word, arrows ? textLeftOf(x, arrows) : x + w / 2, y + 2, faded ? C.greyDark : C.light, 'center');
+    text(word, arrows ? textLeftOf(x, arrows) : x + w / 2, y + 2 + pressed, faded ? C.greyDark : C.light, 'center');
     if (arrows) upDown(px, arrows, [studio.range < 1, studio.range > -1].map((can) => (can && !off ? C.grey : C.greyDark)));
   }
 }

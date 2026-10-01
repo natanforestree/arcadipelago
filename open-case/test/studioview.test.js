@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  studioHit, padAt, faderValue, moodShort, arrowsIn, NAME, TAB_BOXES, SETTINGS, WHEEL, BUTTONS, PAD, STRIP, LIST_BUTTONS, NAME_BUTTONS, NAME_FIELD,
+  studioHit, padAt, faderValue, moodShort, arrowsIn, NAME, TAB_BOXES, SETTINGS, WHEEL, PANEL, KNOB_ARROWS, knobAngle, ringLight, BUTTONS, PAD, STRIP, LIST_BUTTONS, NAME_BUTTONS, NAME_FIELD,
 } from '../src/studioview.js';
 import { createStudio, newBeat, setTab, startNaming, DRUMS } from '../src/studio.js';
 import { STUDIO } from '../src/tuning.js';
@@ -10,6 +10,7 @@ const empty = () => ({ slots: Array(STUDIO.slots).fill(null), chosen: null });
 const mid = ([x, y, w, h]) => [x + w / 2, y + h / 2];
 const inScreen = ([x, y, w, h]) => x >= 0 && y >= 0 && x + w <= 320 && y + h <= 180;
 const inPad = ([x, y, w, h]) => x >= PAD[0] && y >= PAD[1] && x + w <= PAD[0] + PAD[2] && y + h <= PAD[1] + PAD[3];
+const inPanel = ([x, y, w, h]) => x >= PANEL[0] && y >= PANEL[1] && x + w <= PANEL[0] + PANEL[2] && y + h <= PANEL[1] + PANEL[3];
 const overlap = ([ax, ay, aw, ah], [bx, by, bw, bh]) => ax < bx + bw && bx < ax + aw && ay < by + bh && by < ay + ah;
 
 test('everything on the studio screen is inside it, and the pad, the wheel, the strip and the top bar keep apart', () => {
@@ -21,14 +22,48 @@ test('everything on the studio screen is inside it, and the pad, the wheel, the 
   assert.ok(Object.values(TAB_BOXES).every(([x, , w]) => x >= NAME[0] + NAME[2] && x + w <= SETTINGS.bpm[0]), 'the tabs between the name and the settings');
 });
 
-test('a click lands on the name, a tab, a setting, the wheel (up or down) or a button', () => {
+test('the knob panel sits under the top bar, left of the pad, above the buttons, and holds the knob, its ring and its arrows', () => {
+  const [px, py, pw, ph] = PANEL, [wx, wy, r] = WHEEL;
+  assert.ok(py >= NAME[1] + NAME[3] && py >= 19, 'under the top bar');
+  assert.ok(px >= 0 && px + pw <= PAD[0], 'left of the pad');
+  for (const box of Object.values(BUTTONS)) assert.ok(py + ph <= box[1], 'above the buttons');
+  assert.ok(inPanel([wx - r, wy - r, 2 * r, 2 * r]), 'the knob (and its hit circle up to its radius)');
+  assert.ok(inPanel(KNOB_ARROWS.left) && inPanel(KNOB_ARROWS.right), 'the arrows');
+  for (let k = 0; k < 16; k++) assert.ok(inPanel(ringLight(k, k % 3)), `light ${k}`);
+  assert.ok(KNOB_ARROWS.left[0] + KNOB_ARROWS.left[2] <= wx - 16 && KNOB_ARROWS.right[0] >= wx + 16, 'the arrows clear of the knob');
+});
+
+test('the ring: sixteen lights from the top round clockwise, clear of the knob, a long note a bigger light', () => {
+  const [wx, wy] = WHEEL, centre = ([x, y, w, h]) => [x + w / 2 - wx, y + h / 2 - wy];
+  const lights = Array.from({ length: 16 }, (_, k) => ringLight(k, 1));
+  assert.equal(new Set(lights.map(String)).size, 16, 'sixteen places');
+  const [x0, y0] = centre(lights[0]);
+  assert.ok(Math.abs(x0) <= 0.5 && y0 < -15, 'the first at the top');
+  assert.ok(centre(lights[4])[0] > 15 && centre(lights[8])[1] > 15 && centre(lights[12])[0] < -15, 'a quarter on, to the right; half way, below; three quarters, left');
+  for (const box of lights) assert.ok(Math.hypot(...centre(box)) > 16 + 1, 'outside the knob');
+  assert.deepEqual(ringLight(0, 0).slice(2), [2, 2], 'unlit: 2x2');
+  assert.deepEqual(ringLight(0, 1).slice(2), [2, 2], 'a short note: 2x2');
+  assert.deepEqual(ringLight(0, 2).slice(2), [3, 3], 'a long one: 3x3');
+  for (const box of lights) assert.ok(!overlap(box, KNOB_ARROWS.left) && !overlap(box, KNOB_ARROWS.right), 'clear of the arrows');
+});
+
+test('the knob turns a sixteenth of a round a rhythm, clockwise from straight up', () => {
+  assert.equal(knobAngle(0), 0, 'rhythm 1 points up');
+  assert.ok(Math.abs(knobAngle(4) - Math.PI / 2) < 1e-9, 'rhythm 5 points right');
+  assert.ok(Math.abs(knobAngle(8) - Math.PI) < 1e-9, 'rhythm 9 points down');
+  assert.ok(Math.abs(knobAngle(16) - Math.PI * 2) < 1e-9, 'a whole round is back to rhythm 1');
+});
+
+test('a click lands on the name, a tab, a setting, the wheel (left or right) or a button', () => {
   const studio = createStudio(empty());
   assert.deepEqual(studioHit(studio, ...mid(NAME)), { hit: 'name' });
   for (const tab of ['drums', 'bass', 'chords', 'mix']) assert.deepEqual(studioHit(studio, ...mid(TAB_BOXES[tab])), { hit: 'tab', tab });
   for (const which of ['mood', 'bars']) assert.deepEqual(studioHit(studio, ...mid(SETTINGS[which])), { hit: 'setting', which });
   for (const which of ['bpm', 'swing']) assert.equal(studioHit(studio, ...mid(SETTINGS[which])).which, which, 'the tempo and the swing say which half, too (below)');
-  assert.deepEqual(studioHit(studio, WHEEL[0], WHEEL[1] - 10), { hit: 'wheel', dir: -1 });
-  assert.deepEqual(studioHit(studio, WHEEL[0], WHEEL[1] + 10), { hit: 'wheel', dir: 1 });
+  assert.deepEqual(studioHit(studio, WHEEL[0] - 10, WHEEL[1]), { hit: 'wheel', dir: -1 });
+  assert.deepEqual(studioHit(studio, WHEEL[0] + 10, WHEEL[1]), { hit: 'wheel', dir: 1 });
+  assert.deepEqual(studioHit(studio, WHEEL[0] - 10, WHEEL[1] - 8), { hit: 'wheel', dir: -1 }, 'above the middle, too: the halves are left and right');
+  assert.deepEqual(studioHit(studio, WHEEL[0] + 10, WHEEL[1] + 8), { hit: 'wheel', dir: 1 });
   for (const which of ['sound', 'erase', 'clear', 'undo']) assert.deepEqual(studioHit(studio, ...mid(BUTTONS[which])), { hit: 'button', which });
   assert.equal(studioHit(studio, ...mid(BUTTONS.range)), null, 'Range is only for the bass');
   setTab(studio, 'bass');
