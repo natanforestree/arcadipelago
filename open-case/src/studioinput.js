@@ -88,8 +88,8 @@ export function keyUp(studio, held, e) {
 }
 
 // The mouse goes down at (x, y), at band time t and at `now` on the page's clock (seconds since the
-// page opened; tick and scroll are given the same clock). Returns 'busk' after Busk to this, or
-// null. `drag` is the controls' state for what the mouse holds until it comes up.
+// page opened; tick and scroll are given the same clock). Returns 'busk' after Busk to this, 'leave'
+// on the map key, or null. `drag` is the controls' state for what the mouse holds until it comes up.
 export function mouseDown(studio, drag, x, y, t, now = 0) {
   const target = studioHit(studio, x, y);
   drag.what = null;
@@ -112,6 +112,8 @@ export function mouseDown(studio, drag, x, y, t, now = 0) {
       buskTo(studio);
       studio.list = false;
       return 'busk';
+    case 'map':
+      return 'leave'; // a name being typed is dropped with the studio, as Esc twice would
     case 'save':
       startNaming(studio);
       break;

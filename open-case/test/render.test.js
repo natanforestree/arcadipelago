@@ -14,7 +14,7 @@ import { createShop, choose, CARD, BUTTON } from '../src/shop.js';
 import { createLoop, record, step, loopLength } from '../src/looper.js';
 import { stoodAt } from './helpers.js';
 import { createStudio, rhythmOf, setTab, newBeat, startNaming, typeName, saveName } from '../src/studio.js';
-import { STRIP, PAD, NAME_FIELD, SETTINGS, WHEEL, BUTTONS, arrowsIn, ringLight } from '../src/studioview.js';
+import { STRIP, PAD, NAME_FIELD, SETTINGS, WHEEL, BUTTONS, MAP_KEY, arrowsIn, ringLight } from '../src/studioview.js';
 const { bar: BAR, beat: BEAT } = LOFI_CLOCK;
 const LOOP_LENGTH = loopLength(createLoop());
 
@@ -839,6 +839,22 @@ test("the studio's strip: every part's notes in its own lane and colour, the cho
   const playhead = inStrip.filter(([, , rw, rh, c]) => rw === 1 && rh > 30 && c === C.light);
   assert.equal(playhead.length, 1);
   assert.equal(playhead[0][0], x0 + Math.round((4.5 / 12) * 64 * (w / 64)), 'a bar and a half in: 1.5 of the 4 bars');
+});
+
+test('the studio draws a raised map key in its bottom left corner: a pixel arrow, "map" and "esc"', () => {
+  const studio = createStudio({ slots: Array(6).fill(null), chosen: null });
+  const g = fakeContext();
+  createRenderer(g, art)(view({ screen: 'studio', studio, t: 0 }));
+  const C = data.colors, [x, y, w, h] = MAP_KEY;
+  const inKey = (p) => p.x >= x && p.x < x + w && p.y >= y && p.y < y + h;
+  const word = g.positions.find((p) => p.s === 'map' && inKey(p)), esc = g.positions.find((p) => p.s === 'esc' && inKey(p));
+  assert.ok(word && esc, '"map" and "esc" inside the key');
+  assert.equal(word.color, C.light);
+  assert.equal(esc.color, C.grey);
+  assert.ok(esc.y > word.y, 'esc under map');
+  assert.ok(g.rects.some((r) => r[0] === x && r[1] === y && r[2] === w && r[3] === h && r[4] === C.charcoal), 'a charcoal key');
+  const arrow = g.rects.filter(([rx, ry, rw, rh, c]) => c === C.grey && rx >= x && rx < word.x && ry >= y && ry + rh <= y + h - 1 && rw === 1);
+  assert.equal(arrow.length, 3, 'the ◀ is three columns');
 });
 
 test('the list of beats, and the question when your slots are full, over the pad', () => {

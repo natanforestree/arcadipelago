@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  studioHit, padAt, faderValue, moodShort, arrowsIn, NAME, TAB_BOXES, SETTINGS, WHEEL, PANEL, KNOB_ARROWS, knobAngle, ringLight, BUTTONS, PAD, STRIP, SWITCHES, LIST_BUTTONS, NAME_BUTTONS, NAME_FIELD,
+  studioHit, padAt, faderValue, moodShort, arrowsIn, NAME, TAB_BOXES, SETTINGS, WHEEL, PANEL, KNOB_ARROWS, knobAngle, ringLight, BUTTONS, MAP_KEY, PAD, STRIP, SWITCHES, LIST_BUTTONS, NAME_BUTTONS, NAME_FIELD,
 } from '../src/studioview.js';
 import { createStudio, newBeat, setTab, startNaming, DRUMS } from '../src/studio.js';
 import { STUDIO } from '../src/tuning.js';
@@ -209,6 +209,25 @@ test('asking which slot to replace: a click on a slot replaces it, anywhere off 
   assert.deepEqual(studioHit(studio, ...mid(TAB_BOXES.bass)), { hit: 'keep' });
 });
 
+test("the map key sits in the free corner left of the picture of the loop, under the buttons, and a click on it says 'map'", () => {
+  assert.ok(inScreen(MAP_KEY), `${MAP_KEY}`);
+  assert.ok(MAP_KEY[0] + MAP_KEY[2] < STRIP[0], 'left of the strip, with a gap');
+  assert.ok(!overlap(MAP_KEY, STRIP) && !overlap(MAP_KEY, PAD));
+  for (const box of Object.values(BUTTONS)) assert.ok(MAP_KEY[1] >= box[1] + box[3], 'under the buttons');
+  assert.ok(STRIP[0] + STRIP[2] === 316 && PAD[1] + PAD[3] <= STRIP[1], 'the strip keeps its right edge, under the pad');
+  const studio = createStudio(empty());
+  assert.deepEqual(studioHit(studio, ...mid(MAP_KEY)), { hit: 'map' });
+  newBeat(studio);
+  studio.list = true;
+  assert.deepEqual(studioHit(studio, ...mid(MAP_KEY)), { hit: 'map' }, 'with the list open');
+  studio.list = false;
+  studio.asking = { make: 'copy' };
+  assert.deepEqual(studioHit(studio, ...mid(MAP_KEY)), { hit: 'map' }, 'with the replace question up');
+  studio.asking = null;
+  startNaming(studio);
+  assert.deepEqual(studioHit(studio, ...mid(MAP_KEY)), { hit: 'map' }, 'while naming');
+});
+
 test('the keys are named short, to fit the top bar', () => {
   assert.deepEqual(['C', 'D', 'E', 'F', 'G', 'A'].map(moodShort), ['C maj', 'D dor', 'E phr', 'F lyd', 'G mix', 'A min']);
 });
@@ -235,5 +254,5 @@ test('the name box: its save and cancel buttons are all there is to click', () =
   assert.deepEqual(studioHit(studio, ...mid(NAME_BUTTONS.cancel)), { hit: 'naming', which: 'cancel' });
   const hits = new Set();
   for (let x = 0; x < 320; x += 2) for (let y = 0; y < 180; y += 2) hits.add(JSON.stringify(studioHit(studio, x, y)));
-  assert.deepEqual([...hits].sort(), ['null', '{"hit":"naming","which":"cancel"}', '{"hit":"naming","which":"save"}'], 'the name, the tabs and the pad wait');
+  assert.deepEqual([...hits].sort(), ['null', '{"hit":"map"}', '{"hit":"naming","which":"cancel"}', '{"hit":"naming","which":"save"}'], 'the name, the tabs and the pad wait; the map key does not');
 });

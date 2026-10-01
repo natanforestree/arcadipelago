@@ -607,7 +607,9 @@ function game(art, atlasView) {
   canvas.addEventListener('mousedown', (e) => {
     if (screen !== 'studio' || e.button !== 0) return;
     e.preventDefault();
-    if (mouseDown(studio, studioDrag, ...scenePoint(e), bandTime(), pageTime()) === 'busk') leaveStudio(true); // it keeps your beats
+    const what = mouseDown(studio, studioDrag, ...scenePoint(e), bandTime(), pageTime());
+    if (what === 'busk') leaveStudio(true); // it keeps your beats
+    else if (what === 'leave') leaveStudio();
   });
   addEventListener('mousemove', (e) => {
     if (screen !== 'studio') return;

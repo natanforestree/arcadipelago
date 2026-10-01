@@ -36,8 +36,10 @@ export function ringLight(k, len) {
 }
 // The octave (range, the bass only) is wider than Undo beside it, for its ▲ and ▼ (arrowsIn).
 export const BUTTONS = { sound: [4, 84, 74, 12], erase: [4, 98, 36, 12], clear: [42, 98, 36, 12], undo: [4, 112, 28, 12], range: [34, 112, 44, 12] };
+// The map key, in the free corner left of the picture of the loop: it leaves the studio for the map.
+export const MAP_KEY = [4, 138, 40, 24];
 export const PAD = [82, 22, 234, 108];
-export const STRIP = [16, 134, 300, 44]; // the picture of the loop: its numbers row, then the lanes
+export const STRIP = [48, 134, 268, 44]; // the picture of the loop: its numbers row, then the lanes
 const MIX_FADERS = { drums: 104, bass: 144, chords: 184, pump: 244 }; // each fader's x, 14 wide
 const FADER = [38, 62]; // the faders' top and height
 const MUTE_Y = 106;
@@ -74,6 +76,7 @@ export function arrowsIn([x, y, w, h]) {
 }
 
 // What a click (or a press) at scene point (x, y) lands on, as { hit, ... }, or null:
+//   'map'                                             the map key, whatever is open over the pad
 //   'naming' { which: 'save' | 'cancel' }             while the name box is open (nothing else is)
 //   'replace' { slot }, 'keep'                        while asking which slot to replace
 //   'open' { which }, 'new', 'busk', 'save', 'close'  in the list of beats
@@ -83,6 +86,7 @@ export function arrowsIn([x, y, w, h]) {
 //   'pad' { at }: { row, x } on the drums, { col, y } on the bass and chords
 //   'fader' { which, value } (a part's level, or 'pump'), 'mute' { part }, 'switch' { which }
 export function studioHit(studio, x, y) {
+  if (inside(MAP_KEY, x, y)) return { hit: 'map' };
   if (studio.naming) {
     for (const [which, box] of Object.entries(NAME_BUTTONS)) if (inside(box, x, y)) return { hit: 'naming', which };
     return null;
@@ -166,6 +170,7 @@ export function drawStudio(d, studio, t) {
   }
   if (PARTS.includes(part)) wheel(d, studio, tone[part]);
   buttons(d, studio);
+  mapKey(d);
   if (part === 'mix') mix(d, studio, tone);
   else pad(d, studio, tone[part]);
   strip(d, studio, t, tone);
@@ -272,6 +277,16 @@ function buttons({ px, text, C }, studio) {
     text(word, arrows ? textLeftOf(x, arrows) : x + w / 2, y + 2 + pressed, faded ? C.greyDark : C.light, 'center');
     if (arrows) upDown(px, arrows, [studio.range < 1, studio.range > -1].map((can) => (can && !off ? C.grey : C.greyDark)));
   }
+}
+
+// The map key: a raised key with a little ◀ (3 wide, 5 tall, as the knob's) and "map" on its top row,
+// and "esc" in grey under them, as Esc does the same.
+function mapKey({ px, text, C }) {
+  const [x, y, w] = MAP_KEY;
+  raisedKey(px, C, MAP_KEY, C.charcoal, false);
+  for (let i = 0; i < 3; i++) px(x + 6 + i, y + 6 - i, 1, 1 + 2 * i, C.grey);
+  text('map', x + 12, y + 4, C.light);
+  text('esc', x + w / 2, y + 14, C.grey, 'center');
 }
 
 // The pad: four strips for the drums, eight columns for the bass (the key's notes) and the chords (its

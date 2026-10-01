@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { keyDown, keyUp, mouseDown, mouseMove, mouseUp, scroll, tick } from '../src/studioinput.js';
 import { createStudio, newBeat, advance, setTab, setTempo, setSwing, openBeat, startNaming } from '../src/studio.js';
-import { NAME, TAB_BOXES, SETTINGS, WHEEL, BUTTONS, PAD, LIST_BUTTONS, NAME_BUTTONS } from '../src/studioview.js';
+import { NAME, TAB_BOXES, SETTINGS, WHEEL, BUTTONS, MAP_KEY, PAD, LIST_BUTTONS, NAME_BUTTONS } from '../src/studioview.js';
 import { clockOf, blankBeat, LOFI, readyBeat } from '../src/beats.js';
 import { STUDIO } from '../src/tuning.js';
 
@@ -623,4 +623,15 @@ test("a click on the list's Save opens the name box, and its save and cancel but
   assert.equal(mouseDown(studio, drag, ...mid(LIST_BUTTONS.busk), 0), 'busk');
   assert.deepEqual(studio.beats.chosen, { ready: 'bossa' });
   assert.equal(readyBeat('bossa').name, 'Bossa nova');
+});
+
+test("a mousedown on the map key says 'leave', whatever is open, and a name being typed is left as it was", () => {
+  const studio = blank(), drag = { what: null };
+  assert.equal(mouseDown(studio, drag, ...mid(MAP_KEY), 0), 'leave');
+  studio.list = true;
+  assert.equal(mouseDown(studio, drag, ...mid(MAP_KEY), 0), 'leave', 'with the list open');
+  assert.equal(drag.what, null, 'it holds nothing');
+  studio.list = false;
+  startNaming(studio);
+  assert.equal(mouseDown(studio, drag, ...mid(MAP_KEY), 0), 'leave', 'while naming');
 });
