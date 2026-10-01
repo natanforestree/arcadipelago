@@ -5,18 +5,21 @@
 // the audio is suspended, so the set's clock stops with it. Notes reach the set the moment they're
 // played, timed in seconds since the first note.
 //
-// Between sets, the end card leads to the music shop: your coins are saved, and your gear (gear.js)
-// changes how your notes sound, in the park and while you try things in the shop. Once the loop
-// pedal is yours, R records your notes into a loop (looper.js) that plays on under you; the crowd
-// only ever hears the notes you play live.
+// Before each set, the map (atlas.js, atlasview.js) asks where to busk and what track to play, your
+// last answers already chosen: the park, the station at rush hour or the night market (places.js),
+// each with its own crowd and scene. Between sets, the end card leads back to it, or to the music
+// shop: your coins are saved, and your gear (gear.js) changes how your notes sound, wherever you
+// play and while you try things in the shop. Once the loop pedal is yours, R records your notes into a
+// loop (looper.js) that plays on under you; the crowd only ever hears the notes you play live.
 //
 // URL options: ?sound (the sound check); ?debug (interest bars, the corner panel, and Run the bots on
 // the end card); ?seed=N (fixes the passers-by, and the park's windows, train and birds); ?bot=random or
-// ?bot=lick (the bot plays the set, audibly); ?sky=N (the park as it is N bars into a set, until a set
+// ?bot=lick (the bot plays the set, audibly); ?sky=N (the place as it is N bars into a set, until a set
 // starts); ?coins=N (your savings are N on this page, and nothing bought on it is kept); ?beat=lofi,
-// bossa, funk, reggae or ballad (every set plays that ready-made beat); ?studio (the studio is yours on
-// this page, the first key opens it, and nothing made on it is kept). With any of them,
-// window.__openCase exposes the game for browser checks.
+// bossa, funk, reggae or ballad (every set plays that ready-made beat); ?place=park, station or market
+// (every set is there, with no map, and the place isn't kept); ?studio (the studio is yours on this
+// page, the first key opens it, and nothing made on it is kept). With any of them, window.__openCase
+// exposes the game for browser checks.
 import { createAudio } from './audio.js';
 import { createInput } from './input.js';
 import { layoutPitches, shopKey } from './keys.js';
@@ -33,6 +36,9 @@ import { PEDALS, loadGear, saveGear, earn, buy, play, stomp, stockItem, owns } f
 import { createShop, choose, move, action, trying, hit } from './shop.js';
 import { createLoop, record, note, release, ring, step, undo, due, countBeats } from './looper.js';
 import { LOFI, clockOf, readyBeat } from './beats.js';
+import { PLACE_WORDS, isPlace, loadPlace, savePlace } from './places.js';
+import { createAtlas, atlasKey, clickPlace, clickTrack, trackList, placeOf, trackOf } from './atlas.js';
+import { createAtlasView } from './atlasview.js';
 import { createStudio, loadBeats, saveBeats, chosenBeat, advance, letGo, setErase } from './studio.js';
 import { keyDown, keyUp, mouseDown, mouseMove, mouseUp, scroll, tick } from './studioinput.js';
 import { studioHit } from './studioview.js';
@@ -53,26 +59,29 @@ const skyBar = params.has('sky') ? Math.max(0, Number.parseFloat(params.get('sky
 const debugSavings = params.has('coins') ? Math.max(0, Number.parseInt(params.get('coins'), 10) || 0) : null;
 const fixedBeat = readyBeat(params.get('beat'));
 const tryStudio = params.has('studio');
-const anyDebug = debug || !!bot || fixedSeed !== null || params.has('sound') || params.has('sky') || debugSavings !== null || !!fixedBeat || tryStudio;
+const fixedPlace = isPlace(params.get('place')) ? params.get('place') : null;
+const anyDebug = debug || !!bot || fixedSeed !== null || params.has('sound') || params.has('sky') || debugSavings !== null || !!fixedBeat || tryStudio || !!fixedPlace;
 // This page keeps nothing (?coins=N or ?studio): no gear, beats or log is written to storage.
 const keepsNothing = debugSavings !== null || tryStudio;
 
 const storage = safeStorage();
 const audio = createAudio(storage);
+const atlasOn = {}; // what a click on the map does (game() sets it up): { place(id), track(i) }
 const touchOnly = matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches;
 
 if (touchOnly) document.getElementById('phone').hidden = false;
 else if (params.has('sound')) soundCheck(audio, { debug: anyDebug });
 else {
-  // The art loads before the title card shows; if it can't, or the game can't start, say something
-  // went wrong.
-  loadArt().then(game).catch((err) => {
+  // The art and the map load before the title card shows; if they can't, or the game can't start, say
+  // something went wrong.
+  const atlasRoot = document.getElementById('atlas');
+  Promise.all([loadArt(), createAtlasView(atlasRoot, { place: (id) => atlasOn.place(id), track: (i) => atlasOn.track(i) })]).then(([art, atlasView]) => game(art, atlasView)).catch((err) => {
     console.error(err);
     document.getElementById('message').hidden = false;
   });
 }
 
-function game(art) {
+function game(art, atlasView) {
   const canvas = document.getElementById('game');
   const out = canvas.getContext('2d', { alpha: false });
   const off = document.createElement('canvas');
@@ -86,8 +95,11 @@ function game(art) {
   const t0 = performance.now();
   const pageTime = () => (performance.now() - t0) / 1000; // seconds since the page opened
 
-  let screen = 'title'; // 'ready' (waiting for your first note), 'playing', 'paused', 'over', 'shop', 'studio', 'thanks'
-  let set = null, scene = createScene(pageSeed), start = 0, seed = 0;
+  let screen = 'title'; // 'map', 'ready' (waiting for your first note), 'playing', 'paused', 'over', 'shop', 'studio', 'thanks'
+  // Where you busk: ?place='s, or the place you chose last time on the map (kept unless the page keeps
+  // nothing). The map's state while it's up (atlas.js).
+  let place = fixedPlace ?? loadPlace(storage), atlas = null;
+  let set = null, scene = createScene(pageSeed, { place }), start = 0, seed = 0;
   let botMoments = null, botNext = 0, botFed = 0;
   const latency = { reported: null, measured: null };
   // Your savings and gear. With ?coins=N your savings are N, with ?studio the studio is yours, and on
@@ -107,8 +119,8 @@ function game(art) {
   const keepBeats = () => !keepsNothing && saveBeats(storage, beats);
   let studio = null, studioSeen = -1, studioSaved = true;
   const studioHeld = { key: null }, studioDrag = { what: null }, studioWheel = {};
-  // The beat your sets play: ?beat='s, or with the studio yours, the one you chose there; else the lo-fi.
-  const setBeat = () => fixedBeat ?? (owns(gear, 'studio') ? chosenBeat(beats) : LOFI);
+  // The beat your sets play: ?beat='s, or the one you chose on the map (or with Busk to this).
+  const setBeat = () => fixedBeat ?? chosenBeat(beats);
   let stomped = null; // the last pedal stomped: { id, on, time } (its name shows over the gear strip)
   let setPedals = new Set(); // every pedal that's been on during this set, for the log
   // The loop pedal's loop in a set, empty at each set's start (in the shop, the one you try it with
@@ -137,8 +149,8 @@ function game(art) {
   // A new set begins with a note at audio time `at` (your first note, or the bot's start).
   function begin(at) {
     seed = fixedSeed ?? Date.now() % 2147483647;
-    set = createSet(seed, setBeat());
-    scene = createScene(seed, { bar: set.clock.bar, parkBar: endTime(set) / PARK.bars });
+    set = createSet(seed, setBeat(), place);
+    scene = createScene(seed, { bar: set.clock.bar, parkBar: endTime(set) / PARK.bars, place });
     start = at;
     audio.startBand(at, set.beat);
     for (const { id, min } of LAYERS) audio.setLayer(id, min === 0, at);
@@ -255,8 +267,8 @@ function game(art) {
   // Any key at all dismisses the title card and starts the sound (browsers only allow sound after a
   // key press or a click). It's heard before the keys are read, and it plays no note. Esc and a lone
   // modifier don't count as user activation in every browser, so an AudioContext started from one
-  // would stay suspended: leave them alone, doing nothing, on the title card. With ?studio, it opens
-  // the studio instead of the park.
+  // would stay suspended: leave them alone, doing nothing, on the title card. It opens the map (with
+  // ?studio, the studio; with a bot, the bot's set).
   addEventListener('keydown', (e) => {
     if (screen !== 'title' || e.metaKey || e.ctrlKey || e.altKey) return;
     if (NON_ACTIVATING_KEYS.has(e.key)) return;
@@ -266,7 +278,55 @@ function game(art) {
     warmLayout();
     if (bot) startBot();
     else if (tryStudio) openStudio();
-    else screen = 'ready';
+    else openMap();
+  });
+
+  // The map, before each set: where to busk and what track to play, your last answers already chosen.
+  // straightGo: the track's chosen already (the studio's Busk to this, or ?beat=), so Enter on a place
+  // goes straight there. With ?place= there's no map: straight to the place.
+  function openMap({ straightGo = false } = {}) {
+    audio.stopBand();
+    set = null;
+    if (fixedPlace) return toPlace();
+    atlas = createAtlas({
+      place, tracks: trackList(beats, owns(gear, 'studio')), chosen: fixedBeat ? { ready: fixedBeat.id } : beats.chosen,
+      straightGo: straightGo || !!fixedBeat,
+    });
+    canvas.hidden = true;
+    screen = 'map';
+  }
+  // At the place chosen, its scene waits for your first note.
+  function toPlace() {
+    scene = createScene(pageSeed, { place });
+    screen = 'ready';
+  }
+  const beatOf = (key) => (key.ready ? readyBeat(key.ready) : beats.slots[key.slot]) ?? LOFI;
+  // What happened on the map (atlas.js): the track you're on plays softly while the tracks are open;
+  // going keeps the place and the track for next time and sets off to the place.
+  function atlasDid(what) {
+    if (what === 'panel' || what === 'track') audio.previewBand(audio.now() + 0.1, beatOf(trackOf(atlas).key));
+    else if (what === 'back') audio.stopBand();
+    else if (what === 'go') {
+      place = placeOf(atlas);
+      if (!keepsNothing) savePlace(storage, place);
+      if (!fixedBeat) {
+        beats.chosen = { ...trackOf(atlas).key };
+        keepBeats();
+      }
+      audio.stopBand();
+      atlas = null;
+      atlasView.hide();
+      canvas.hidden = false;
+      toPlace();
+    }
+  }
+  atlasOn.place = (id) => screen === 'map' && atlasDid(clickPlace(atlas, id));
+  atlasOn.track = (i) => screen === 'map' && atlasDid(clickTrack(atlas, i));
+  addEventListener('keydown', (e) => {
+    if (screen !== 'map' || e.metaKey || e.ctrlKey || e.altKey) return;
+    const what = atlasKey(atlas, e.code);
+    if (what || e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault(); // no scrolling
+    if (what) atlasDid(what);
   });
 
   const input = createInput(window, {
@@ -371,10 +431,10 @@ function game(art) {
     // The log is Nathan's own too, and also skips a ?coins page: see `logging` above.
     if (logging) {
       const pedals = PEDALS.filter((id) => setPedals.has(id));
-      logSet(storage, { date: new Date().toISOString(), coins: s.coins, stopped: s.stopped, instrument: gear.instrument, pedals, layers: setLayers, beat: set.beat.name });
+      logSet(storage, { date: new Date().toISOString(), coins: s.coins, stopped: s.stopped, instrument: gear.instrument, pedals, layers: setLayers, beat: set.beat.name, place: set.place });
     }
     loop = createLoop(); // the loop belongs to the set, and it's over
-    document.getElementById('end-coins').textContent = `${s.coins} coin${s.coins === 1 ? '' : 's'} in the case.`;
+    document.getElementById('end-coins').textContent = `${s.coins} coin${s.coins === 1 ? '' : 's'} in the case ${PLACE_WORDS[set.place].at}.`;
     document.getElementById('end-saved').textContent = `Saved: ${gear.savings} coin${gear.savings === 1 ? '' : 's'}.`;
     document.getElementById('end-saved').hidden = !!bot;
     document.getElementById('shop').hidden = !!bot;
@@ -395,7 +455,7 @@ function game(art) {
     const sets = readLog(storage).map((e) => ({
       date: e.date,
       text: `${e.coins} coins, ${e.stopped} stopped, ${[e.instrument ?? 'acoustic', ...(e.pedals ?? [])].join(' + ')}, `
-        + `${e.layers ? `${e.layers} loop layer${e.layers === 1 ? '' : 's'}, ` : ''}${e.beat ? `${e.beat}, ` : ''}${e.choice ?? 'no choice yet'}`,
+        + `${e.layers ? `${e.layers} loop layer${e.layers === 1 ? '' : 's'}, ` : ''}${e.beat ? `${e.beat}, ` : ''}${e.place ? `${e.place}, ` : ''}${e.choice ?? 'no choice yet'}`,
     }));
     const buys = readBuys(storage).map((e) => ({ date: e.date, text: `bought the ${stockItem(e.id)?.name.toLowerCase() ?? e.id} for ${e.price}` }));
     document.getElementById('log').replaceChildren(...[...sets, ...buys].sort((a, b) => b.date.localeCompare(a.date)).map((e) => {
@@ -409,10 +469,8 @@ function game(art) {
     if (logging) logChoice(storage, 'another');
     end.hidden = true;
     audio.stopBand();
-    set = null;
-    scene = createScene(pageSeed);
     if (bot) startBot();
-    else screen = 'ready';
+    else openMap();
   });
   document.getElementById('stop').addEventListener('click', () => {
     if (logging) logChoice(storage, 'stop');
@@ -426,14 +484,14 @@ function game(art) {
     end.hidden = true;
     audio.stopBand();
     set = null;
-    scene = createScene(pageSeed);
     shop = createShop(clockOf(setBeat()));
     screen = 'shop';
     sound();
   });
 
   // The studio: its beat plays round and round, every part at once, while you make it. Esc leaves for
-  // the park, ready for the next set, and so does Busk to this, once it has kept your choice.
+  // the map, ready for the next set, and so does Busk to this, once it has kept your choice (the map
+  // then only asks where).
   document.getElementById('studio').addEventListener('click', () => {
     if (logging) logChoice(storage, 'studio');
     openStudio();
@@ -444,7 +502,6 @@ function game(art) {
     end.hidden = true;
     audio.stopBand();
     set = null;
-    scene = createScene(pageSeed);
     studio = createStudio(beats);
     studioSeen = studio.version;
     const at = audio.now() + 0.1;
@@ -463,13 +520,12 @@ function game(art) {
     studioHeld.key = null;
     studioDrag.what = null;
   }
-  function leaveStudio() {
+  function leaveStudio(busked = false) {
     keepBeats();
     letGoStudio();
     studio = null;
-    audio.stopBand();
-    screen = 'ready';
     canvas.style.cursor = '';
+    openMap({ straightGo: busked });
   }
   const bandTime = () => audio.now() - audio.bandStart;
   // The browser's own uses of the studio's keys are kept off: Cmd+S would save the page, and while
@@ -494,7 +550,7 @@ function game(art) {
   canvas.addEventListener('mousedown', (e) => {
     if (screen !== 'studio' || e.button !== 0) return;
     e.preventDefault();
-    if (mouseDown(studio, studioDrag, ...scenePoint(e), bandTime(), pageTime()) === 'busk') leaveStudio(); // it keeps your beats
+    if (mouseDown(studio, studioDrag, ...scenePoint(e), bandTime(), pageTime()) === 'busk') leaveStudio(true); // it keeps your beats
   });
   addEventListener('mousemove', (e) => {
     if (screen !== 'studio') return;
@@ -519,12 +575,12 @@ function game(art) {
   }, { passive: false });
 
   // The shop: the arrow keys choose, Enter buys (or plays an instrument you own), Esc or the door
-  // leaves for the park, ready for the next set.
+  // leaves for the map, ready for the next set.
   function leaveShop() {
     shop = null;
-    screen = 'ready';
     canvas.style.cursor = '';
     sound();
+    openMap();
   }
   function shopDo(what) {
     if (what === 'left' || what === 'right') move(shop, what === 'left' ? -1 : 1);
@@ -566,7 +622,7 @@ function game(art) {
 
   document.getElementById('bots').addEventListener('click', () => {
     // On the beat your set played, so the bots and you are compared on the same beat.
-    const r = runSet(seed, randomBot(seed, set.beat), set.beat).coins, l = runSet(seed, lickBot(seed, set.beat), set.beat).coins;
+    const r = runSet(seed, randomBot(seed, set.beat), set.beat, set.place).coins, l = runSet(seed, lickBot(seed, set.beat), set.beat, set.place).coins;
     document.getElementById('bots-result').textContent = `Random bot: ${r}. Lick bot: ${l}. You: ${set.coins}.`;
   });
 
@@ -577,14 +633,19 @@ function game(art) {
       get scene() { return scene; },
       get shop() { return shop; },
       get studio() { return studio; },
+      get atlas() { return atlas; },
+      get place() { return place; },
       beats,
       get loop() { return heardLoop(); },
       audio, input, latency, art, flocks, gear,
     };
   }
 
+  let lastTime = 0; // the page's clock at the last frame, for the map's glide
   const frame = (now) => {
     try {
+      const time = (now - t0) / 1000, dt = Math.max(0, time - lastTime);
+      lastTime = time;
       if (set && screen === 'playing') {
         if (bot) feedBot();
         const target = audio.now() - start;
@@ -628,13 +689,18 @@ function game(art) {
       const played = audio.update((from, to) => (l ? due(l, from, to) : []));
       if (set) for (const n of played) sceneLoopNote(scene, n.pitch, n.at - start);
       latency.reported = audio.reportedLatency();
+      if (screen === 'map') {
+        atlasView.show(atlas, { time, dt, still: reducedMotion.matches });
+        requestAnimationFrame(frame);
+        return;
+      }
       draw({
         screen: screen === 'thanks' || screen === 'over' ? 'playing' : screen,
         set, scene, keys: input.keys, t: set ? set.t : studio ? bandTime() : shop?.loop ? audio.now() - start : 0,
         bars: set ? set.t / (endTime(set) / PARK.bars) : skyBar, studio,
         time: (now - t0) / 1000, still: reducedMotion.matches, flocks, gear, stomp: stomped, shop,
         loop: shop ? shop.loop : set ? loop : null, loopSaid,
-        busking: fixedBeat || owns(gear, 'studio') ? setBeat().name : null,
+        busking: setBeat().name,
         debug: debug ? latency : null,
       });
       out.drawImage(off, 0, 0, canvas.width, canvas.height);

@@ -57,3 +57,9 @@ test('each set logs how many loop layers were recorded in it', () => {
   logChoice(s, 'another');
   assert.deepEqual(readLog(s), [{ date: '2026-09-30T20:00:00Z', coins: 25, stopped: 4, instrument: 'electric', pedals: [], layers: 3, choice: 'another' }]);
 });
+
+test('each set logs where it was played', () => {
+  const s = memoryStorage();
+  logSet(s, { date: '2026-10-01T18:00:00Z', coins: 14, stopped: 4, beat: 'Funk', place: 'station' });
+  assert.equal(readLog(s)[0].place, 'station');
+});

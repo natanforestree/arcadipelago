@@ -483,7 +483,7 @@ export function createRenderer(g, art) {
     const S = data.shop;
     sprite('shop-room', 0, 0);
     text('back to', S.sign[0], S.sign[1], C.ink, 'center');
-    text('the park', S.sign[0], S.sign[1] + 8, C.ink, 'center');
+    text('the map', S.sign[0], S.sign[1] + 8, C.ink, 'center');
     text('saved', S.board[0], S.board[1], C.grey, 'center');
     text(`${gear.savings} coin${gear.savings === 1 ? '' : 's'}`, S.board[0], S.board[1] + 11, C.light, 'center');
     const since = time - shop.soldAt;
@@ -513,7 +513,7 @@ export function createRenderer(g, art) {
     text(words.price, CARD[0] + CARD[2] - 6, CARD[1] + 3, words.price === 'yours' ? C.go : C.gold, 'right');
     text(words.about, CARD[0] + 6, CARD[1] + 12, C.grey);
     text(words.says, CARD[0] + 6, CARD[1] + 21, words.button ? C.gold : C.light);
-    const keys = STOCK[shop.at].kind === 'loop' ? 'R record   backspace undo   esc back' : 'arrows choose   esc back to the park';
+    const keys = STOCK[shop.at].kind === 'loop' ? 'R record   backspace undo   esc back' : 'arrows choose   esc back to the map';
     text(keys, CARD[0] + 6, CARD[1] + 30, C.greyDark);
     if (words.button) {
       px(BUTTON[0], BUTTON[1], BUTTON[2], BUTTON[3], C.gold);
@@ -584,6 +584,12 @@ export function createRenderer(g, art) {
     if (keys && screen !== 'title') hud(view, screen === 'ready' ? null : set);
     if (screen === 'title') title();
     else if (screen === 'ready') {
+      // on a dark backing, so it reads over the station's lamps and board, or the market's lanterns
+      const lines = [view.busking && `busking to ${view.busking}`, 'play a note to start the set'].filter(Boolean);
+      const w = Math.ceil(Math.max(...lines.map(measure))) + 12, top = view.busking ? 47 : 57;
+      g.globalAlpha = BACKING;
+      px(Math.round(W / 2 - w / 2), top, w, 70 - top, C.ink);
+      g.globalAlpha = 1;
       if (view.busking) text(`busking to ${view.busking}`, W / 2, 50, C.gold, 'center');
       text('play a note to start the set', W / 2, 60, C.light, 'center');
     } else if (screen === 'paused') { // dimmed, under the pause card (index.html)

@@ -246,6 +246,11 @@ test("waiting for the first note, the park names the beat your set will play whe
   const plain = draw({ screen: 'ready' });
   assert.deepEqual(plain.positions.map((p) => [p.s, p.x, p.y]), draw({ screen: 'ready', busking: null }).positions.map((p) => [p.s, p.x, p.y]));
   assert.ok(!plain.texts.some((s) => s.startsWith('busking')), 'without the studio, the prompt alone, as today');
+  // Both lines on a dark backing, which reads over the station's lamps and the market's lanterns.
+  for (const [over, top] of [[{ busking: 'Funk 2' }, 47], [{}, 57]]) {
+    const backing = draw({ screen: 'ready', ...over }).rects.find(([, y, , h, c]) => y === top && y + h === 70 && c === data.colors.ink);
+    assert.ok(backing && backing[0] < W / 2 - 80 && backing[0] + backing[2] > W / 2 + 80, `a backing from ${top}`);
+  }
   assert.ok(plain.texts.includes('play a note to start the set'));
   assert.ok(!draw({ busking: 'Funk 2', set: createSet(1) }).texts.some((s) => s.startsWith('busking')), 'not once the set is playing');
 });
@@ -364,7 +369,7 @@ test('the shop: the room, the stock with its tags, the chosen item lifted, the s
   assert.deepEqual(drawn(g, 'item-').filter((s) => s.name.endsWith('-1')).map((s) => s.name), ['item-chorus-1'], 'only the chosen one lifted');
   assert.equal(drawn(g, 'tag-yours').length, 2, 'the overdrive and the acoustic are yours');
   assert.equal(drawn(g, 'tag-price').length, STOCK.length - 2);
-  for (const s of ['back to', 'the park', 'saved', '5 coins', 'Chorus', '50 coins', 'Not enough coins yet (you have 5)']) {
+  for (const s of ['back to', 'the map', 'saved', '5 coins', 'Chorus', '50 coins', 'Not enough coins yet (you have 5)']) {
     assert.ok(g.texts.includes(s), s);
   }
   assert.equal(drawn(g, 'ground').length, 0, 'not the park');
@@ -656,18 +661,17 @@ test("in the shop, the loop pedal's light shows the loop you're trying, and its 
   assert.ok(g.texts.includes('R record   backspace undo   esc back'));
 });
 
-test("the loop pedal's key line is no longer than another item's, so it never runs under the Buy button", () => {
+test("every item's key line ends before the Buy button, the loop pedal's longest one too", () => {
   const gear = { ...freshGear(), savings: 1000 };
-  const keysFor = (id) => {
+  for (const item of STOCK) {
     const shop = createShop();
-    choose(shop, STOCK.findIndex((s) => s.id === id));
+    choose(shop, STOCK.indexOf(item));
     const g = fakeContext();
     createRenderer(g, art)(view({ screen: 'shop', shop, gear, t: 0, time: 5 }));
-    return g.texts.find((s) => s.includes('esc back'));
-  };
-  const loopKeys = keysFor('loop');
-  const otherKeys = keysFor(STOCK.find((s) => s.kind !== 'loop').id);
-  assert.ok(loopKeys.length <= otherKeys.length, `${loopKeys} (${loopKeys.length}) vs ${otherKeys} (${otherKeys.length})`);
+    const keys = g.positions.find((p) => p.s.includes('esc back'));
+    // 6 px a letter (the stand-in's measure, a little wider than Silkscreen's)
+    assert.ok(keys.x + keys.s.length * 6 <= BUTTON[0] - 2, `${item.id}: "${keys.s}" ends at ${keys.x + keys.s.length * 6}`);
+  }
 });
 
 test("with another beat, the bar counter counts that set's bars, and listeners nod on its beats", () => {

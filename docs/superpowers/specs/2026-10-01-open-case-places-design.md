@@ -1,7 +1,7 @@
 # Open Case: places to busk (design spec)
 
 **Date:** 2026-10-01
-**Status:** Nathan agreed the design in chat and on a mockup page (claude.ai/artifact/9pVRougZNC138ZQ9yVUJEx), the map after several rounds ("yeah that looks much better, the only think i would change is make the station a little smaller"). Awaiting his review of this spec.
+**Status:** Nathan agreed the design in chat and on a mockup page (claude.ai/artifact/9pVRougZNC138ZQ9yVUJEx), the map after several rounds ("yeah that looks much better, the only think i would change is make the station a little smaller"), then asked for the plan ("go ahead and write the plan and then pause"). Built from `docs/superpowers/plans/2026-10-01-open-case-places.md`.
 
 It started with Nathan: "can we now add some new places to busk?" Every set so far is in the park at sunset. Now there are three places, each with its own scene and its own crowd. You choose the place and the track on a map of the city before each set.
 
@@ -234,6 +234,21 @@ Nathan opens the game, sees the city, picks the station and a track, and busks t
 - **The track list** opens in a panel over the map, replacing the first mockup's choice between two screens and one.
 - **Over the map:** the clock chip, the title icon and the line above the title were removed.
 - **The scenes:** the station's platform became pale stone and the market's street warm brick. The market's cat became black and white so it shows on the brick.
+
+## What the build settled
+
+- **The station's trains** come every 32–38 s, with someone every 16–22 s between them (the table started at 28–34 and 14–20). With those, over seeds 1–10 the honest set earns 629 in the park, 722 at the station and 674 at the market; random playing earns 5, 11 and 7; the lick bot nothing anywhere.
+- **The trains come from the crowd:** the crowd works out each set's train timetable from its own stream, and the scene reads it, so a train always stands with its doors open as its passengers step off.
+- **On the map:**
+  - left and right go round, from the market back to the park;
+  - Space works as Enter;
+  - the track you're on plays every part of it, softly (`audio.previewBand`), not just the chords as in the shop;
+  - the tempo and key are in Silkscreen capitals, since Pixelify's small "C" reads as a 0, and its "fi" ligature is turned off ("Lo-fi" read "Lo-A");
+  - the minimap says "the city" and which place of the three you're on.
+- **`?place=`** skips the map: every set on that page is at that place.
+- **Dark backings:** besides the bottom line's words and the gear strip (leaving the pigeons and the cat beside them clear), the waiting prompt has one too, so it reads over the station's lamps and the market's lanterns.
+- **The shop** says "back to the map" on its sign and card, since that's where Esc and the door now go.
+- **The art:** six colours join the palette for the station's stone and the market's brick, 55 in all, and the sheet has 583 frames (under 100 KB). The map's files come to 445 KB, its land alone 313 KB.
 
 ## Not in this change
 
