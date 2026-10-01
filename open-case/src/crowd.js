@@ -7,16 +7,39 @@
 //   reaction: { rule, t } | null, done }
 // state: 'passing' (walking by, maybe listening), 'joining' (hooked, walking to a spot), 'stopped',
 // 'leaving'. The crowd is everyone joining or stopped.
-import { CROWD, INTEREST, TIPS, RULES } from './tuning.js';
+import { CROWD, INTEREST, RULES, PLACES } from './tuning.js';
 import { createRng, nextRandom, randomBetween } from './rng.js';
 
 export const KINDS = ['jogger', 'elder', 'student', 'commuter'];
 export const LOOKS = 6; // each kind's people, three women and three men (art/open-case/figures.lua)
 const LOOK_SEED = 0x9e3779b9; // mixed into the set's seed for the looks' own stream
+const WAVE_SEED = 0x2545f491; // and for a station's trains
+const WAVE_HORIZON = 600; // seconds of trains worked out at the start: longer than any set
+const WAVE_LATE = 4; // seconds a train's passenger waits for room on screen before going another way
 export const PATH_Y = 146; // where passers-by walk
 
-export function createCrowd(seed) {
+// The trains of a station (place.waves) over the set, from their own stream so they never move the
+// crowd's draws: [{ t, people: [times each steps off] }], t when it stands with its doors open.
+function timetable(seed, waves) {
+  if (!waves) return [];
+  const rng = createRng((seed ^ WAVE_SEED) >>> 0), trains = [];
+  for (let t = randomBetween(rng, ...waves.first); t < WAVE_HORIZON; t += randomBetween(rng, ...waves.every)) {
+    const n = waves.people[0] + Math.floor(nextRandom(rng) * (waves.people[1] - waves.people[0] + 1));
+    const people = [];
+    for (let k = 0, at = t; k < n; k++, at += randomBetween(rng, ...waves.gap)) people.push(at);
+    trains.push({ t, people });
+  }
+  return trains;
+}
+
+// place: a key of tuning.js PLACES ('park' if none): who comes by and how.
+export function createCrowd(seed, place = 'park') {
+  const p = PLACES[place];
+  const trains = timetable(seed, p.waves);
   return {
+    place: p,
+    trains,
+    waveQueue: trains.flatMap((tr) => tr.people), // when each train's passengers come along the platform
     rng: createRng(seed),
     // Looks are dealt from a stream of their own, so they never move the draws above: a set's kinds,
     // sides, budgets and arrival times are as they were before people had looks.
@@ -68,11 +91,23 @@ export function dealLook(c, kind) {
   return look;
 }
 
+// A kind drawn by the place's weights (in KINDS order): with the park's, all equal, exactly the old
+// pick of one of the four.
+function pickKind(r, weights) {
+  const target = r * weights.reduce((a, b) => a + b, 0);
+  let sum = 0;
+  for (let i = 0; i < KINDS.length; i++) {
+    sum += weights[i];
+    if (target < sum) return KINDS[i];
+  }
+  return KINDS[weights.findLastIndex((w) => w > 0)];
+}
+
 function arrive(c, t) {
   // Always the same draws in the same order, so the k-th arrival is the same person whatever you play.
-  const kind = KINDS[Math.floor(nextRandom(c.rng) * KINDS.length)];
+  const kind = pickKind(nextRandom(c.rng), c.place.kinds);
   const dir = nextRandom(c.rng) < 0.5 ? 1 : -1;
-  const budget = randomBetween(c.rng, CROWD.budgetMin, CROWD.budgetMax);
+  const budget = randomBetween(c.rng, c.place.stay[0], c.place.stay[1]);
   c.people.push({
     id: c.nextId++, kind, look: dealLook(c, kind), dir, x: dir > 0 ? -CROWD.edge : CROWD.width + CROWD.edge, y: PATH_Y,
     state: 'passing', listening: false, heard: 0, walkedOn: false,
@@ -111,7 +146,7 @@ export function hear(c, e, t) {
         break;
       case 'callback':
         nudge(p, 'callback', INTEREST.callback, t);
-        if (inCrowd(p)) c.out.push({ type: 'coin', person: p, coins: TIPS.callback, why: 'callback' });
+        if (inCrowd(p)) c.out.push({ type: 'coin', person: p, coins: c.place.tips.callback, why: 'callback' });
         break;
       default: // repeat, offKey, recognised, random, silence
         nudge(p, e.rule, INTEREST[e.rule], t);
@@ -130,17 +165,26 @@ function freeSpot(c, x) {
 
 function leave(c, p, happy) {
   p.state = 'leaving';
-  if (happy) c.out.push({ type: 'coin', person: p, coins: p.kind === 'elder' ? TIPS.happyElder : TIPS.happy, why: 'happy' });
+  if (happy) c.out.push({ type: 'coin', person: p, coins: p.kind === 'elder' ? c.place.tips.happyElder : c.place.tips.happy, why: 'happy' });
   c.out.push({ type: 'left', person: p, happy });
 }
 
 export function stepCrowd(c, dt, t) {
-  if (c.open && t >= c.nextArrival && c.people.length < CROWD.onScreen) {
+  const P = c.place;
+  if (c.open && t >= c.nextArrival && c.people.length < P.onScreen) {
     arrive(c, t);
-    c.nextArrival = t + randomBetween(c.rng, CROWD.arriveMin, CROWD.arriveMax);
+    c.nextArrival = t + randomBetween(c.rng, P.arrive[0], P.arrive[1]);
+  }
+  // A train's passengers come along the platform as they step off, while there's room; one kept waiting
+  // too long goes another way.
+  while (c.waveQueue.length && c.waveQueue[0] < t - WAVE_LATE) c.waveQueue.shift();
+  while (c.open && c.waveQueue.length && c.waveQueue[0] <= t && c.people.length < P.onScreen) {
+    c.waveQueue.shift();
+    arrive(c, t);
   }
   for (const p of c.people) {
-    const kind = CROWD.kinds[p.kind];
+    const base = CROWD.kinds[p.kind];
+    const kind = { speed: base.speed * P.pace, patience: base.patience * P.patience };
     if (hearing(p)) p.interest = Math.max(0, p.interest - INTEREST.fade * dt);
     if (p.state === 'passing') {
       const near = Math.abs(p.x - CROWD.playerX) <= CROWD.earshot;
@@ -186,5 +230,5 @@ export function stepCrowd(c, dt, t) {
 
 // The set is over: each listener still here tips once.
 export function endTips(c) {
-  for (const p of c.people) if (inCrowd(p)) c.out.push({ type: 'coin', person: p, coins: TIPS.end, why: 'end' });
+  for (const p of c.people) if (inCrowd(p)) c.out.push({ type: 'coin', person: p, coins: c.place.tips.end, why: 'end' });
 }

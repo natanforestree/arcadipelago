@@ -115,3 +115,15 @@ test("a bot plays over another beat in that beat's time: the bossa's 16ths, with
   }
   assert.ok(runSet(3, goodSet(3, bossa), bossa).phase === 'over');
 });
+
+test('every place pays an honest set about what the park does, within a fifth, and random playing almost nothing', () => {
+  const at = (bot, place) => SEEDS.map((seed) => runSet(seed, bot(seed), LOFI, place).coins);
+  const park = sum(at(goodSet, 'park'));
+  for (const place of ['station', 'market']) {
+    const good = at(goodSet, place), random = sum(at(randomBot, place)), lick = sum(at(lickBot, place));
+    assert.ok(Math.abs(sum(good) - park) <= park * 0.2, `${place}: honest ${sum(good)}, park ${park}`);
+    assert.ok(good.every((c) => c >= 1), `${place}: honest set ${good}`);
+    assert.ok(sum(good) >= 10 * random, `${place}: honest ${sum(good)}, random bot ${random}`);
+    assert.ok(sum(good) >= 10 * lick, `${place}: honest ${sum(good)}, lick bot ${lick}`);
+  }
+});

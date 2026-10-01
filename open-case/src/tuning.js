@@ -97,6 +97,33 @@ export const CROWD = {
 
 export const TIPS = { callback: 1, happy: 2, happyElder: 3, end: 1 };
 
+// The places to busk (places.js): who comes by at each, and how. What each kind of person likes is the
+// same everywhere (crowd.js). A place sets:
+//   kinds     how likely each kind is, in KINDS order (jogger, elder, student, commuter)
+//   arrive    seconds between one arrival and the next: from, to
+//   waves     null, or a station's trains: the first pulls in `first` seconds into the set and then one
+//             every `every`, and `people` step off each, `gap` seconds apart (each [from, to])
+//   onScreen  at most this many people at once
+//   pace, patience  shares of each kind's own walking speed and patience (crowd's kinds)
+//   stay      seconds a listener stays: from, to
+//   tips      as TIPS
+// The park's are CROWD's and TIPS's own, so a set there plays exactly as it always has.
+export const PLACES = {
+  park: {
+    kinds: [1, 1, 1, 1], arrive: [CROWD.arriveMin, CROWD.arriveMax], waves: null, onScreen: CROWD.onScreen,
+    pace: 1, patience: 1, stay: [CROWD.budgetMin, CROWD.budgetMax], tips: TIPS,
+  },
+  station: {
+    kinds: [0, 0.15, 0.25, 0.6], arrive: [16, 22], onScreen: 8, pace: 1.15, patience: 0.7, stay: [40, 100],
+    waves: { first: [6, 10], every: [32, 38], people: [3, 5], gap: [0.6, 1] },
+    tips: { callback: 1, happy: 3, happyElder: 4, end: 1 },
+  },
+  market: {
+    kinds: [0, 0.4, 0.4, 0.2], arrive: [4, 7], waves: null, onScreen: 6, pace: 0.7, patience: 1.5, stay: [90, 240],
+    tips: { callback: 1, happy: 1, happyElder: 2, end: 1 },
+  },
+};
+
 // The band's layers, and how many listeners each needs. A layer drops out only after the crowd has
 // stayed below its number for LAYER_HOLD whole bars.
 export const LAYERS = [

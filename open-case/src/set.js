@@ -14,19 +14,20 @@ import { createCrowd, hear, stepCrowd, crowdSize, endTips } from './crowd.js';
 import { LOFI, clockOf, setBars } from './beats.js';
 import { GROOVE, LAYERS, LAYER_HOLD, DT } from './tuning.js';
 
-// A set of `beat` (beats.js): the band plays it, and its tempo sets the set's 16ths, beats and bars
-// (clock) and how many bars the set lasts (bars).
-export function createSet(seed, beat = LOFI) {
+// A set of `beat` (beats.js) at `place` (places.js): the band plays the beat, and its tempo sets the
+// set's 16ths, beats and bars (clock) and how many bars the set lasts (bars); the place sets the crowd.
+export function createSet(seed, beat = LOFI, place = 'park') {
   const clock = clockOf(beat);
   return {
     seed,
     beat,
+    place,
     clock,
     bars: setBars(beat),
     t: 0,
     phase: 'playing', // then 'ending' (the fade and the applause), then 'over'
     listen: createListener(clock),
-    crowd: createCrowd(seed),
+    crowd: createCrowd(seed, place),
     coins: 0,
     layers: Object.fromEntries(LAYERS.map((l) => [l.id, l.min === 0])),
     below: Object.fromEntries(LAYERS.map((l) => [l.id, 0])), // whole bars the crowd has stayed below each layer's number
@@ -122,8 +123,8 @@ export function momentsOf(notes) {
 }
 
 // Plays a whole set without sound or screen, as the tests and the end card's "Run the bots" do.
-export function runSet(seed, notes, beat = LOFI) {
-  const set = createSet(seed, beat);
+export function runSet(seed, notes, beat = LOFI, place = 'park') {
+  const set = createSet(seed, beat, place);
   const moments = momentsOf(notes);
   let i = 0;
   while (set.phase !== 'over') {

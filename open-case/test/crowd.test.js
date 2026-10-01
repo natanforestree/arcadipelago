@@ -1,14 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createCrowd, hear, crowdSize, endTips, dealLook, personName, KINDS, LOOKS } from '../src/crowd.js';
-import { CROWD, INTEREST, TIPS, DT } from '../src/tuning.js';
+import { CROWD, INTEREST, TIPS, DT, PLACES } from '../src/tuning.js';
 import { runCrowd, stoodAt } from './helpers.js';
 
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) <= eps;
 
 // Everyone who came by in the first `seconds`, in order: kind, look, side, budget and arrival time.
-function arrivals(seed, seconds = 120, each) {
-  const c = createCrowd(seed), seen = new Map();
+function arrivals(seed, seconds = 120, each, place = 'park') {
+  const c = createCrowd(seed, place), seen = new Map();
   runCrowd(c, 0, seconds, (t) => {
     each?.(c, t);
     for (const p of c.people) if (!seen.has(p.id)) seen.set(p.id, { kind: p.kind, look: p.look, dir: p.dir, budget: p.budget, at: p.arrivedAt });
@@ -241,4 +241,105 @@ test('interest fades a little every second for everyone listening', () => {
   const p = stoodAt(c, 'student', 0, { interest: 0.9 });
   runCrowd(c, 0, 10);
   assert.ok(near(p.interest, 0.8, 0.001));
+});
+
+// Every place's arrivals over a long run, everyone walking straight through (nobody is listening).
+function placeArrivals(place, seeds = [1, 2, 3, 4, 5], seconds = 300) {
+  return seeds.flatMap((seed) => arrivals(seed, seconds, (c) => { for (const p of c.people) p.walkedOn = true; }, place));
+}
+
+test('each place draws its own kinds: no joggers at the station or the market, mostly commuters at the station', () => {
+  const share = (list, kind) => list.filter((p) => p.kind === kind).length / list.length;
+  const station = placeArrivals('station'), market = placeArrivals('market');
+  assert.equal(share(station, 'jogger'), 0);
+  assert.equal(share(market, 'jogger'), 0);
+  assert.ok(share(station, 'commuter') > 0.45, `commuters at the station: ${share(station, 'commuter')}`);
+  assert.ok(share(market, 'commuter') < 0.35, `commuters at the market: ${share(market, 'commuter')}`);
+  assert.ok(share(market, 'elder') + share(market, 'student') > 0.65);
+});
+
+test("the station's trains are the same from a seed, and bring their passengers in waves as the doors open", () => {
+  const w = PLACES.station.waves;
+  const a = createCrowd(3, 'station'), b = createCrowd(3, 'station');
+  assert.deepEqual(a.trains, b.trains);
+  assert.notDeepEqual(a.trains, createCrowd(4, 'station').trains);
+  assert.ok(a.trains[0].t >= w.first[0] && a.trains[0].t <= w.first[1]);
+  for (let i = 1; i < a.trains.length; i++) {
+    const gap = a.trains[i].t - a.trains[i - 1].t;
+    assert.ok(gap >= w.every[0] && gap <= w.every[1], `train gap ${gap}`);
+  }
+  for (const tr of a.trains) assert.ok(tr.people.length >= w.people[0] && tr.people.length <= w.people[1]);
+  assert.deepEqual(createCrowd(3, 'park').trains, [], 'no trains in the park');
+  // Most arrivals come within a few seconds of a train's doors opening.
+  for (const seed of [1, 2, 3, 4, 5]) {
+    const trains = createCrowd(seed, 'station').trains;
+    const list = arrivals(seed, 300, (c) => { for (const p of c.people) p.walkedOn = true; }, 'station');
+    const inWave = list.filter((p) => trains.some((tr) => p.at >= tr.t - DT && p.at <= tr.t + 6)).length;
+    assert.ok(inWave / list.length >= 0.6, `seed ${seed}: ${inWave} of ${list.length} came with a train`);
+  }
+});
+
+test("the market's browsers come steadily, one every 4 to 7 seconds while there's room", () => {
+  const list = arrivals(5, 120, (c) => { for (const p of c.people) p.walkedOn = true; }, 'market');
+  assert.ok(near(list[0].at, 2, DT * 1.5), 'the first comes 2 seconds in');
+  for (let i = 1; i < list.length; i++) {
+    const gap = list[i].at - list[i - 1].at;
+    assert.ok(gap >= 4 - DT, `gap ${gap}`);
+  }
+  assert.ok(list.length >= 120 / 7 - 2, `${list.length} came`);
+});
+
+test('a place sets how long listeners stay, how fast they walk and how long they listen before deciding', () => {
+  for (const place of ['station', 'market']) {
+    const P = PLACES[place];
+    for (const p of placeArrivals(place, [1, 2])) assert.ok(p.budget >= P.stay[0] && p.budget <= P.stay[1], `${place} ${p.budget}`);
+    // A commuter walking by, out of earshot: their pace is the place's share of a commuter's.
+    const c = createCrowd(1, place);
+    c.nextArrival = Infinity;
+    c.waveQueue = [];
+    const p = stoodAt(c, 'commuter', 0, { state: 'passing', x: -10, y: 146, interest: 0.3 });
+    hear(c, { rule: 'bar', count: 0, rest: 16, off: 0 }, 0);
+    const x0 = p.x;
+    runCrowd(c, 0, 0.5);
+    assert.ok(near(p.x - x0, CROWD.kinds.commuter.speed * P.pace * 0.5, 0.01), `${place}: walked ${p.x - x0}`);
+    // In earshot, a listener with nothing to like walks on after the place's share of their patience.
+    const d = createCrowd(1, place);
+    d.nextArrival = Infinity;
+    d.waveQueue = [];
+    const q = stoodAt(d, 'commuter', 0, { state: 'passing', x: CROWD.playerX, y: 146, interest: 0.4, dir: 0 });
+    q.walkedOn = false;
+    let left = null;
+    runCrowd(d, 0, 20, (t) => { if (left === null && q.walkedOn) left = t; });
+    const patience = CROWD.kinds.commuter.patience * P.patience;
+    assert.ok(left !== null && Math.abs(left - patience) <= 0.05, `${place}: walked on after ${left}, patience ${patience}`);
+  }
+});
+
+test("a place sets the tips: the station's happy listeners give more, the market's less, and the end of a set the same", () => {
+  for (const [place, happy] of [['park', TIPS.happy], ['station', PLACES.station.tips.happy], ['market', PLACES.market.tips.happy]]) {
+    const c = createCrowd(1, place);
+    stoodAt(c, 'student', 0, { budget: 0.01, interest: 0.9 });
+    runCrowd(c, 0, 0.05);
+    const coin = c.out.find((e) => e.type === 'coin');
+    assert.equal(coin.coins, happy, place);
+    const d = createCrowd(1, place);
+    stoodAt(d, 'student', 0);
+    endTips(d);
+    assert.equal(d.out[0].coins, 1, `${place}: one coin at the end`);
+  }
+  assert.ok(PLACES.station.tips.happy > TIPS.happy && PLACES.market.tips.happy < TIPS.happy);
+});
+
+test("a train's passengers who find the platform full wait a few seconds, then go another way, never all at once later", () => {
+  const c = createCrowd(2, 'station'), first = c.trains[0];
+  c.nextArrival = Infinity; // only the train's passengers
+  for (let i = 0; i < PLACES.station.onScreen; i++) stoodAt(c, 'commuter', i % 6, { budget: 999 });
+  const after = first.people.at(-1) + 5; // its last passenger has waited 5 seconds
+  runCrowd(c, 0, after);
+  assert.equal(c.people.length, PLACES.station.onScreen, 'nobody squeezed in');
+  assert.ok(!c.waveQueue.some((at) => first.people.includes(at)), "the first train's passengers have gone another way");
+  c.people.length = 0; // room again
+  const before = c.nextId;
+  runCrowd(c, after, 0.5);
+  assert.ok(c.nextId - before <= 1, `${c.nextId - before} arrived at once`);
 });
