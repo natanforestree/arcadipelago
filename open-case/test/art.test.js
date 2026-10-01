@@ -214,3 +214,11 @@ test("the shop's stock stands apart, above the card, and the door and its sign a
   rack.forEach(([x], i) => i > 0 && assert.ok(x >= rack[i - 1][0] + rack[i - 1][2] + 5, 'room for a price tag between pedals, clear of the next'));
   assert.ok(rack.at(-1)[2] > rack[0][2], 'the loop pedal is the wider one');
 });
+
+test("the shop window's view stays inside its frame: the wall beside it is plain wall", () => {
+  // The window's glass runs from x 60 (art/open-case/shop.lua S.WINDOW) and its frame from x 58; the
+  // two columns of wall left of the frame match the wall further left, all the way down.
+  for (let y = 16; y <= 60; y++) {
+    for (const x of [56, 57]) assert.equal(colourAt('shop-room', x, y), colourAt('shop-room', 54, y), `wall at ${x},${y}`);
+  }
+});

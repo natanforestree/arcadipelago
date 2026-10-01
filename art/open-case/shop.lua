@@ -77,7 +77,12 @@ function S.room(b)
   for _, r in ipairs({ { 0, 8, 46 }, { 9, 20, 40 }, { 21, 33, 48 }, { 34, 44, 43 } }) do
     rect(b, w[1] + r[1], r[3], w[1] + r[2], w[4], sky[3])
   end
-  D.oval(b, w[1] + 4, w[2] + 22, 8, 9, C.leaf[1])
+  -- the tree's crown, only where it's seen through the glass: the frame and the wall hide the rest
+  for y = w[2], w[4] do
+    for x = w[1], w[3] do
+      if D.inOval(x, y, w[1] + 4, w[2] + 22, 8, 9) then L.set(b, x, y, C.leaf[1]) end
+    end
+  end
   rect(b, w[1] + 3, w[2] + 30, w[1] + 5, w[4], C.leaf[1])
   rect(b, w[1] - 2, w[2] - 2, w[3] + 2, w[2] - 1, C.wood[1]) -- the frame and its cross
   rect(b, w[1] - 2, w[4] + 1, w[3] + 2, w[4] + 3, C.wood[1])
