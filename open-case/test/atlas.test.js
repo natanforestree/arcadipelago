@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { trackList, createAtlas, placeOf, trackOf, atlasKey, clickPlace, clickTrack, clickTitle, viewAt } from '../src/atlas.js';
+import { trackList, createAtlas, stopOf, trackOf, atlasKey, clickPlace, clickTrack, clickTitle, viewAt } from '../src/atlas.js';
+import { STOPS } from '../src/places.js';
 import { READY, blankBeat } from '../src/beats.js';
 
 const map = JSON.parse(readFileSync(new URL('../assets/map/map.json', import.meta.url), 'utf8'));
@@ -25,25 +26,64 @@ test('the tracks: the five ready-made ones for everyone, then your own once the 
 test('the map opens on the place and the track chosen last time, or the park and the first track', () => {
   const tracks = trackList(beats(), true);
   const fresh = createAtlas({ tracks });
-  assert.deepEqual([placeOf(fresh), trackOf(fresh).name, fresh.panel], ['park', 'Lo-fi', false]);
+  assert.deepEqual([stopOf(fresh), trackOf(fresh).name, fresh.panel], ['park', 'Lo-fi', false]);
   const back = createAtlas({ place: 'market', tracks, chosen: { slot: 4 } });
-  assert.deepEqual([placeOf(back), trackOf(back).name], ['market', 'Sunday']);
+  assert.deepEqual([stopOf(back), trackOf(back).name], ['market', 'Sunday']);
   assert.equal(trackOf(createAtlas({ tracks, chosen: { ready: 'funk' } })).name, 'Funk');
   assert.equal(trackOf(createAtlas({ tracks: trackList(beats(), false), chosen: { slot: 4 } })).name, 'Lo-fi', 'your beat, without the studio: the first');
-  assert.equal(placeOf(createAtlas({ place: 'pier', tracks })), 'park');
+  assert.equal(stopOf(createAtlas({ place: 'pier', tracks })), 'park');
 });
 
-test('left and right step through the places, round from the last to the first', () => {
+test('left and right step through the stops, round from the last to the first', () => {
   const a = createAtlas({ tracks: trackList(beats(), false) });
   assert.deepEqual(keys(a, 'ArrowRight'), ['place']);
-  assert.equal(placeOf(a), 'station');
+  assert.equal(stopOf(a), 'station');
   keys(a, 'ArrowRight');
-  assert.equal(placeOf(a), 'market');
-  keys(a, 'ArrowRight');
-  assert.equal(placeOf(a), 'park');
-  keys(a, 'ArrowLeft');
-  assert.equal(placeOf(a), 'market');
+  assert.equal(stopOf(a), 'market');
+  keys(a, 'ArrowRight', 'ArrowRight');
+  assert.equal(stopOf(a), 'park', 'past the shop, round to the park');
+  keys(a, 'ArrowLeft', 'ArrowLeft');
+  assert.equal(stopOf(a), 'market');
   assert.deepEqual(keys(a, 'ArrowUp', 'ArrowDown', 'Escape', 'KeyA'), [null, null, null, null], 'nothing else does anything with the tracks shut');
+});
+
+test('the shop is the fourth stop: right goes park, station, market, shop, park, and left from the park to the shop', () => {
+  const a = createAtlas({ tracks: trackList(beats(), false) });
+  const seen = [];
+  for (let i = 0; i < 4; i++) { keys(a, 'ArrowRight'); seen.push(stopOf(a)); }
+  assert.deepEqual(seen, ['station', 'market', 'shop', 'park']);
+  keys(a, 'ArrowLeft');
+  assert.equal(stopOf(a), 'shop');
+});
+
+test('with the shop chosen, Enter and Space go into it, the tracks stay shut, also with straightGo', () => {
+  for (const straightGo of [false, true]) {
+    for (const code of ['Enter', 'NumpadEnter', 'Space']) {
+      const a = createAtlas({ place: 'market', tracks: trackList(beats(), false), straightGo });
+      keys(a, 'ArrowRight');
+      assert.equal(stopOf(a), 'shop');
+      assert.equal(atlasKey(a, code), 'shop', `${code}, straightGo ${straightGo}`);
+      assert.ok(!a.panel);
+    }
+  }
+});
+
+test('the shop opens on the park when asked for as the place: it is never a place to busk', () => {
+  const a = createAtlas({ place: 'shop', tracks: trackList(beats(), false) });
+  assert.equal(stopOf(a), 'park');
+});
+
+test('clicking the shop chooses it, clicking it again goes in, and with the tracks open it closes them', () => {
+  const a = createAtlas({ tracks: trackList(beats(), false) });
+  assert.equal(clickPlace(a, 'shop'), 'place');
+  assert.equal(stopOf(a), 'shop');
+  assert.equal(clickPlace(a, 'shop'), 'shop');
+  assert.ok(!a.panel);
+  const open = createAtlas({ tracks: trackList(beats(), false) });
+  keys(open, 'Enter');
+  assert.ok(open.panel);
+  assert.equal(clickPlace(open, 'shop'), 'back');
+  assert.deepEqual([stopOf(open), open.panel], ['shop', false]);
 });
 
 test('Enter opens the tracks; up and down choose one, Enter goes, Esc shuts them again', () => {
@@ -58,7 +98,7 @@ test('Enter opens the tracks; up and down choose one, Enter goes, Esc shuts them
   assert.ok(!a.panel);
   assert.equal(trackOf(a).name, 'Funk', 'the track chosen stays chosen');
   assert.deepEqual(keys(a, 'Space', 'Space'), ['panel', 'go'], 'Space works as Enter');
-  assert.equal(placeOf(a), 'station');
+  assert.equal(stopOf(a), 'station');
   const end = createAtlas({ tracks: trackList(beats(), false) });
   keys(end, 'Enter', 'ArrowDown', 'ArrowDown', 'ArrowDown', 'ArrowDown');
   assert.deepEqual(keys(end, 'ArrowDown'), [null], 'already at the bottom');
@@ -67,7 +107,7 @@ test('Enter opens the tracks; up and down choose one, Enter goes, Esc shuts them
 test("after the studio's Busk to this, Enter on a place goes straight there", () => {
   const a = createAtlas({ place: 'park', tracks: trackList(beats(), true), chosen: { slot: 1 }, straightGo: true });
   assert.deepEqual(keys(a, 'ArrowRight', 'Enter'), ['place', 'go']);
-  assert.equal(placeOf(a), 'station');
+  assert.equal(stopOf(a), 'station');
   assert.equal(trackOf(a).name, 'Rainy bus');
   assert.ok(!a.panel);
 });
@@ -75,14 +115,14 @@ test("after the studio's Busk to this, Enter on a place goes straight there", ()
 test('clicks: a place chooses it, the chosen place opens the tracks, a track chooses it, the chosen track goes', () => {
   const a = createAtlas({ tracks: trackList(beats(), false) });
   assert.equal(clickPlace(a, 'market'), 'place');
-  assert.equal(placeOf(a), 'market');
+  assert.equal(stopOf(a), 'market');
   assert.equal(clickPlace(a, 'market'), 'panel');
   assert.equal(clickTrack(a, 3), 'track');
   assert.equal(trackOf(a).name, 'Reggae');
   assert.equal(clickTrack(a, 3), 'go');
   assert.equal(clickTrack(a, 9), null);
   assert.equal(clickPlace(a, 'park'), 'back', 'a place while the tracks are open: chosen, and they shut');
-  assert.deepEqual([placeOf(a), a.panel], ['park', false]);
+  assert.deepEqual([stopOf(a), a.panel], ['park', false]);
   assert.equal(clickTrack(a, 1), null, 'no tracks to click while they are shut');
   assert.equal(clickPlace(a, 'pier'), null);
   const straight = createAtlas({ tracks: trackList(beats(), false), straightGo: true });
@@ -91,8 +131,9 @@ test('clicks: a place chooses it, the chosen place opens the tracks, a track cho
 
 test('the view centres on the chosen place, kept inside the map', () => {
   const screen = [1280, 720];
-  for (const place of ['park', 'station', 'market']) {
-    const a = createAtlas({ place, tracks: trackList(beats(), false) });
+  for (const place of STOPS) {
+    const a = createAtlas({ tracks: trackList(beats(), false) });
+    a.at = STOPS.indexOf(place);
     const { x, y } = viewAt(a, map, screen), [cx, cy] = map.places[place].view;
     assert.ok(x >= 0 && y >= 0 && x + screen[0] <= map.size[0] && y + screen[1] <= map.size[1], `${place}: ${x}, ${y}`);
     assert.ok(x === 0 || x === map.size[0] - screen[0] || Math.abs(x + screen[0] / 2 - cx) <= 1, `${place} centred across`);

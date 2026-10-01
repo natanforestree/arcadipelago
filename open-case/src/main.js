@@ -8,7 +8,7 @@
 // The game opens on the map (atlas.js, atlasview.js), with the title over it: the sound starts on the
 // first key or click, which only clears the title. Before each set it asks where to busk and what
 // track to play, your last answers already chosen: the park, the station at rush hour or the night
-// market (places.js), each with its own crowd and scene.
+// market (places.js), each with its own crowd and scene; the music shop is a fourth stop on the map.
 // Between sets, the end card leads back to it, or to the music shop: your coins are saved, and your
 // gear (gear.js) changes how your notes sound, wherever you play and while you try things in the shop.
 // Once the loop pedal is yours, R records your notes into a loop (looper.js) that plays on under you;
@@ -39,7 +39,7 @@ import { createShop, choose, move, action, trying, hit } from './shop.js';
 import { createLoop, record, note, release, ring, step, undo, due, countBeats } from './looper.js';
 import { LOFI, clockOf, readyBeat } from './beats.js';
 import { PLACE_WORDS, isPlace, loadPlace, savePlace } from './places.js';
-import { createAtlas, atlasKey, clickPlace, clickTrack, clickTitle, trackList, placeOf, trackOf } from './atlas.js';
+import { createAtlas, atlasKey, clickPlace, clickTrack, clickTitle, trackList, stopOf, trackOf } from './atlas.js';
 import { createAtlasView } from './atlasview.js';
 import { createStudio, loadBeats, saveBeats, chosenBeat, advance, letGo, setErase } from './studio.js';
 import { keyDown, keyUp, mouseDown, mouseMove, mouseUp, scroll, tick } from './studioinput.js';
@@ -318,15 +318,24 @@ function game(art, atlasView) {
     scene = createScene(pageSeed, { place });
     screen = 'ready';
   }
+  // Into the music shop, from the end card or from the map (its fourth stop). Leaving it opens the
+  // map again, on the last place you busked at.
+  function openShop() {
+    set = null;
+    shop = createShop(clockOf(setBeat()));
+    screen = 'shop';
+    sound();
+  }
   const beatOf = (key) => (key.ready ? readyBeat(key.ready) : beats.slots[key.slot]) ?? LOFI;
   // What happened on the map (atlas.js): the track you're on plays softly while the tracks are open;
-  // going keeps the place and the track for next time and sets off to the place. 'start' (the title
-  // cleared) needs nothing more: the sound's started already.
+  // going keeps the place and the track for next time and sets off to the place; 'shop' goes into the
+  // music shop, which isn't kept as the place. 'start' (the title cleared) needs nothing more: the
+  // sound's started already.
   function atlasDid(what) {
     if (what === 'panel' || what === 'track') audio.previewBand(audio.now() + 0.1, beatOf(trackOf(atlas).key));
     else if (what === 'back') audio.stopBand();
     else if (what === 'go') {
-      place = placeOf(atlas);
+      place = stopOf(atlas); // a place to busk: 'go' never comes from the shop
       if (!keepsNothing) savePlace(storage, place);
       if (!fixedBeat) {
         beats.chosen = { ...trackOf(atlas).key };
@@ -337,6 +346,12 @@ function game(art, atlasView) {
       atlasView.hide();
       canvas.hidden = false;
       toPlace();
+    } else if (what === 'shop') {
+      audio.stopBand();
+      atlas = null;
+      atlasView.hide();
+      canvas.hidden = false;
+      openShop();
     }
   }
   atlasOn.place = (id) => {
@@ -518,10 +533,7 @@ function game(art, atlasView) {
     if (logging) logChoice(storage, 'shop');
     end.hidden = true;
     audio.stopBand();
-    set = null;
-    shop = createShop(clockOf(setBeat()));
-    screen = 'shop';
-    sound();
+    openShop();
   });
 
   // The studio: its beat plays round and round, every part at once, while you make it. Esc leaves for

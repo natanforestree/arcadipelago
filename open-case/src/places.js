@@ -3,6 +3,13 @@
 // chooses one before each set, and the choice is kept for next time.
 export const PLACE_IDS = ['park', 'station', 'market'];
 
+// The map's stops, in its order: the places to busk, then the music shop (not a place to busk, so
+// it's never kept as the place, and isPlace('shop') is false).
+export const STOPS = [...PLACE_IDS, 'shop'];
+
+// What the map calls the shop, and its line in place of a crowd.
+export const SHOP_WORDS = { name: 'The Music Shop', about: 'pedals · instruments · the studio' };
+
 // What the map, the prompt and the end card call each place, and the map's line about its crowd.
 export const PLACE_WORDS = {
   park: { name: 'The Park', at: 'in the park', crowd: 'A bit of everyone · sunset' },

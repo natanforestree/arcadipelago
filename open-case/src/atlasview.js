@@ -1,15 +1,15 @@
 // The map on screen: atlas.js's state shown as page elements over the canvas, the way Nathan's
 // reference (his friend's atlas) shows its world. On it: the land and the pictures standing on it
-// (assets/map/ and map.json, made by art/open-case/map/), each place's label and the gold pin over the
-// chosen one, two clouds drifting over with their shadows; over it: the heading, the track you'll
-// play (or the "What track?" panel) and the keys' hint. The view is SCREEN map pixels, scaled to fit
-// the window; it glides to each place you choose. A click on a place, its label or a track calls
-// on.place(id) or on.track(i), and a click on the game's title (the first map of a visit has one over
-// everything, dimming the map, its clouds still drifting) calls on.title(), for main.js to hand to
-// atlas.js. While the title is up the map's own words (heading, track, hint) are hidden.
-import { PLACE_IDS, PLACE_WORDS } from './places.js';
+// (assets/map/ and map.json, made by art/open-case/map/), each stop's label (the music shop's has a ♪
+// and its own line) and the gold pin over the chosen one, two clouds drifting over with their
+// shadows; over it: the heading, the track you'll play (or the "What track?" panel) and the keys'
+// hint. The view is SCREEN map pixels, scaled to fit the window; it glides to each stop you choose. A
+// click on a stop, its label or a track calls on.place(id) or on.track(i), and a click on the game's
+// title (the first map of a visit has one over everything, dimming the map, its clouds still
+// drifting) calls on.title(), for main.js to hand to atlas.js. While the title is up the map's own words (heading, track, hint) are hidden.
+import { STOPS, PLACE_WORDS, SHOP_WORDS } from './places.js';
 import { moodName } from './beats.js';
-import { placeOf, trackOf, viewAt } from './atlas.js';
+import { stopOf, trackOf, viewAt } from './atlas.js';
 
 export const SCREEN = [1280, 720]; // the view of the map, in map pixels, before it's scaled to the window
 const GLIDE = 6; // how fast the view glides to a place: about this share of the way each second
@@ -51,22 +51,24 @@ export async function createAtlasView(root, on, base = new URL('../assets/map/',
     const img = await loadImage(new URL(`${p.name}.png`, base));
     Object.assign(img.style, { left: `${p.x}px`, top: `${p.y}px` });
     img.alt = '';
-    if (PLACE_IDS.includes(p.name)) {
+    if (STOPS.includes(p.name)) {
       img.classList.add('place');
       img.addEventListener('click', () => on.place(p.name));
     }
     world.append(img);
   }
   const labels = {};
-  for (const id of PLACE_IDS) {
+  for (const id of STOPS) {
+    const words = id === 'shop' ? { ...SHOP_WORDS, crowd: SHOP_WORDS.about } : PLACE_WORDS[id];
     const [x, y] = map.places[id].label;
     const label = el('button', 'label', world);
     label.type = 'button';
     Object.assign(label.style, { left: `${x}px`, top: `${y}px` });
     const name = el('span', 'name', label);
-    el('span', 'dot', name);
-    name.append(PLACE_WORDS[id].name);
-    el('span', 'crowd', label, PLACE_WORDS[id].crowd);
+    if (id === 'shop') el('span', 'note', name, '♪');
+    else el('span', 'dot', name);
+    name.append(words.name);
+    el('span', 'crowd', label, words.crowd);
     label.addEventListener('click', () => on.place(id));
     labels[id] = label;
   }
@@ -138,9 +140,9 @@ export async function createAtlasView(root, on, base = new URL('../assets/map/',
         view.y += (target.y - view.y) * k;
       }
       world.style.transform = `translate(${-Math.round(view.x)}px, ${-Math.round(view.y)}px)`;
-      const place = placeOf(a);
-      for (const id of PLACE_IDS) labels[id].classList.toggle('on', id === place);
-      const [px, py] = map.places[place].pin;
+      const stop = stopOf(a);
+      for (const id of STOPS) labels[id].classList.toggle('on', id === stop);
+      const [px, py] = map.places[stop].pin;
       const bob = still ? 0 : Math.round(((Math.sin(time * 3) + 1) / 2) * BOB);
       Object.assign(pin.style, { left: `${px}px`, top: `${py - bob}px` });
       for (const c of clouds) {
@@ -163,6 +165,7 @@ export async function createAtlasView(root, on, base = new URL('../assets/map/',
       }
       hint.hidden = a.intro;
       hint.textContent = a.panel ? '↑↓ choose a track · enter to busk · esc back'
+        : stop === 'shop' ? '← → choose a place · enter to go in'
         : `← → choose a place · enter ${a.straightGo ? 'to busk here' : 'to go'}`;
     },
     hide() {
