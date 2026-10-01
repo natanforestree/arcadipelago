@@ -1,7 +1,8 @@
 // The map you choose where to busk on, and what track to play (the start screens): whether the title
 // is up over it, which place is chosen, whether the "What track?" panel is open and which track it's
-// on, what a key or a click does, and where the view of the map is centred. Pure, so it's tested in Node; atlasview.js shows it as page
-// elements over the canvas, and main.js wires it to the keys, the mouse and the band.
+// on, what a key or a click does, and where the view of the map is centred. Pure, so it's tested in
+// Node; atlasview.js shows it as page elements over the canvas, and main.js wires it to the keys, the
+// mouse and the band.
 import { PLACE_IDS } from './places.js';
 import { READY } from './beats.js';
 

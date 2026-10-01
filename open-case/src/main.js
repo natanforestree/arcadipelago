@@ -6,9 +6,9 @@
 // played, timed in seconds since the first note.
 //
 // The game opens on the map (atlas.js, atlasview.js), with the title over it: the sound starts on the
-// first key or click, which only clears the title.
-// Before each set it asks where to busk and what track to play, your last answers already chosen: the
-// park, the station at rush hour or the night market (places.js), each with its own crowd and scene.
+// first key or click, which only clears the title. Before each set it asks where to busk and what
+// track to play, your last answers already chosen: the park, the station at rush hour or the night
+// market (places.js), each with its own crowd and scene.
 // Between sets, the end card leads back to it, or to the music shop: your coins are saved, and your
 // gear (gear.js) changes how your notes sound, wherever you play and while you try things in the shop.
 // Once the loop pedal is yours, R records your notes into a loop (looper.js) that plays on under you;

@@ -1,9 +1,9 @@
 // The map on screen: atlas.js's state shown as page elements over the canvas, the way Nathan's
 // reference (his friend's atlas) shows its world. On it: the land and the pictures standing on it
 // (assets/map/ and map.json, made by art/open-case/map/), each place's label and the gold pin over the
-// chosen one, two clouds drifting over with their shadows; over it: the title, the track you'll play
-// (or the "What track?" panel) and the keys' hint. The view is SCREEN map pixels, scaled to
-// fit the window; it glides to each place you choose. A click on a place, its label or a track calls
+// chosen one, two clouds drifting over with their shadows; over it: the heading, the track you'll
+// play (or the "What track?" panel) and the keys' hint. The view is SCREEN map pixels, scaled to fit
+// the window; it glides to each place you choose. A click on a place, its label or a track calls
 // on.place(id) or on.track(i), and a click on the game's title (the first map of a visit has one over
 // everything, dimming the map, its clouds still drifting) calls on.title(), for main.js to hand to
 // atlas.js. While the title is up the map's own words (heading, track, hint) are hidden.
@@ -95,10 +95,10 @@ export async function createAtlasView(root, on, base = new URL('../assets/map/',
   el('div', 'foot', panel, '↑↓ choose · enter busk here · esc back');
   const hint = el('div', 'hint', stage);
   const intro = el('div', 'intro', stage);
-  const card = el('div', 'card', intro);
-  el('div', 'name', card, 'Open Case');
-  el('div', 'blurb', card, 'Busk for a crowd');
-  el('div', 'go', card, 'press any key or click to start');
+  const box = el('div', 'box', intro);
+  el('div', 'name', box, 'Open Case');
+  el('div', 'blurb', box, 'Busk for a crowd');
+  el('div', 'go', box, 'press any key or click to start');
   intro.addEventListener('click', () => on.title());
 
   const fit = () => stage.style.setProperty('--s', String(Math.min(innerWidth / SCREEN[0], innerHeight / SCREEN[1])));
