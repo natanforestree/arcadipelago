@@ -696,7 +696,7 @@ test("the studio screen: the top bar, the wheel, the buttons and each tab's pad"
   for (const s of ['Lo-fi', 'drums', 'bass', 'chords', 'mix', '80', 'C maj', '58%', '4', 'kick', 'snare', 'hats', 'perc', 'lo-fi kit', 'erase', 'clear', 'undo']) {
     assert.ok(drums.texts.includes(s), s);
   }
-  assert.ok(drums.positions.some((p) => p.s === '4' && !p.font.startsWith('16px') && Math.abs(p.x - WHEEL[0]) <= 2 && p.y > WHEEL[1] - 8 && p.y < WHEEL[1]), "the knob's rhythm number, in the 8px font, on its cap");
+  assert.ok(drums.positions.some((p) => p.s === '4' && !p.font.startsWith('16px') && p.align === 'left' && Math.abs(p.x + 3 - WHEEL[0]) <= 2 && p.y > WHEEL[1] - 8 && p.y < WHEEL[1]), "the knob's rhythm number, in the 8px font, on its cap");
   assert.ok(drums.sprites.length === 0, 'no park behind it');
   const bass = drawOn('bass');
   for (const s of ['C', 'D', 'E', 'F', 'G', 'A', 'B', 'round bass', 'oct 0']) assert.ok(bass.texts.includes(s), s);

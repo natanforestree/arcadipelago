@@ -194,7 +194,7 @@ function disc(px, cx, cy, r, at) {
 // note; an unlit light dark). The knob has a knurled silver edge (40 ridges, lit from the top left),
 // a flat black top, and a small gold cap with the rhythm's number on it; its pointer and ridges turn
 // a sixteenth of a round a rhythm. ◀ and ▶ are at its sides.
-function wheel({ px, text, C }, studio, [base]) {
+function wheel({ px, text, measure, C }, studio, [base]) {
   const [cx, cy] = WHEEL, rhythm = rhythmOf(studio), n = studio.rhythm[studio.tab], turn = knobAngle(n);
   px(...PANEL, C.dusk);
   for (const [sx, sy] of [[4, 23], [74, 23], [4, 77], [74, 77]]) {
@@ -225,7 +225,9 @@ function wheel({ px, text, C }, studio, [base]) {
     if (d > CAP_R - 1 && light > 0.5) return C.light;
     return light < -0.3 && d > CAP_R - 2 ? C.goldDark : C.gold;
   });
-  text(String(n + 1), cx, cy - 3, C.ink, 'center');
+  // the number from a whole pixel, as centring an odd width would blur the font on a half pixel
+  const number = String(n + 1);
+  text(number, Math.round(cx - measure(number) / 2), cy - 3, C.ink);
   for (const [x, y, w, h] of [KNOB_ARROWS.left, KNOB_ARROWS.right]) {
     for (let i = 0; i < w; i++) px(x + (x < cx ? i : w - 1 - i), y + 2 - i, 1, 1 + 2 * i, C.grey);
   }
