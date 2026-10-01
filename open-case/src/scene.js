@@ -5,7 +5,7 @@
 // set's clock, except the birds' and the pigeons' pecking, which run on the page's clock (`time`).
 import { createRng, nextRandom, randomBetween } from './rng.js';
 import { LOFI_CLOCK } from './beats.js';
-import { PARK, RULES } from './tuning.js';
+import { PARK, STATION, MARKET, RULES } from './tuning.js';
 
 export const GUITAR = [152, 128]; // where notes float up from
 // Where your loop's notes float up from (art/open-case/gear.lua G.LOOP_PEDAL).
@@ -13,6 +13,11 @@ export const LOOP_PEDAL = [133, 152];
 export const CASE = [161, 160]; // where coins land
 // Where the pigeons peck: their feet, clear of the gear strip's loop slot (render.js).
 export const PIGEONS = [[222, 172], [235, 176], [248, 170]];
+// Where the night market's cat sleeps: its feet, where the pigeons would be.
+export const CAT = [236, 174];
+// The station's train: four cars (art/open-case/station.lua), `car` pixels apart, its first car's
+// left edge at `stop` while it stands at the platform.
+export const TRAIN = { cars: 4, car: 112, stop: 24 };
 const TRAIL_LIFE = 6; // seconds a note's glyph lasts (2 bars)
 const LOOP_TRAIL_LIFE = 3; // seconds a looped note's glyph lasts
 const FLIGHT = 0.7; // seconds a coin takes to reach the case
@@ -27,16 +32,21 @@ const FLAP = 0.12; // seconds a bird's wingbeat frame lasts
 const PIGEON_FLY = 2.5; // seconds scattered pigeons take to fly off screen
 const PIGEON_WALK = 4; // seconds they take to walk back in
 const PIGEON_CYCLE = 6; // seconds: each pigeon pecks, then shuffles a few pixels, then pecks again
+const CAT_RUN = 1.5; // seconds a woken cat takes to run off the screen
+const CAT_WALK = PIGEON_WALK; // seconds it takes to stroll back (as long as the pigeons take, so a loud
+// note while it's on its way sends it off from where it is, as they do: scene.flyFrom)
+const CAT_BREATH = 1.4; // seconds each of a sleeping cat's two breaths shows
 // Which of n frames a counter is on, for counters that may be negative (the page's clock can start a
 // hair below zero).
 export const frameOf = (count, n) => ((Math.floor(count) % n) + n) % n;
 
 // bar: seconds in a bar of the set's beat (the pigeons stay away PARK.pigeonsAway of them); parkBar:
-// seconds in one of the park's bars (the set's length over PARK.bars), which the train's time counts.
-export function createScene(seed = 1, { bar = LOFI_CLOCK.bar, parkBar = bar } = {}) {
+// seconds in one of the park's bars (the set's length over PARK.bars), which the train's time counts;
+// place: where the set is (places.js), whose scene render.js draws.
+export function createScene(seed = 1, { bar = LOFI_CLOCK.bar, parkBar = bar, place = 'park' } = {}) {
   const rng = createRng((seed ^ PARK_SEED) >>> 0);
   return {
-    bar, parkBar,
+    bar, parkBar, place,
     trail: [], flights: [], caseCoins: 0, gold: null, clapFrom: -1,
     // your loop's notes, { pitch, t }, in time order (t may be a moment ahead: scheduled that way)
     loopTrail: [],
@@ -50,7 +60,7 @@ export function createScene(seed = 1, { bar = LOFI_CLOCK.bar, parkBar = bar } = 
 }
 
 // A note you played: index is its place in the ears' note list (for its echo). A loud one scatters
-// the pigeons, if they're there.
+// the pigeons, if they're there (or wakes the night market's cat).
 export function sceneNote(scene, pitch, index, t, strength = 0) {
   scene.trail.push({ pitch, index, t });
   scene.lastNote = t;
@@ -224,4 +234,72 @@ export function pigeonsAt(scene, t, time) {
   return out;
 }
 
-export { TRAIL_LIFE, LOOP_TRAIL_LIFE, FLIGHT, GOLD, TRAIN_LENGTH, PIGEON_FLY, PIGEON_WALK };
+// The station. Its clock at `bars` (park bars into the set, a fraction is fine): { hour, minute },
+// from half past five as a set starts to half past six as it ends.
+export function stationClock(bars) {
+  const k = Math.min(1, Math.max(0, bars / PARK.bars));
+  const minutes = Math.floor(STATION.clockFrom + (STATION.clockTo - STATION.clockFrom) * k);
+  return { hour: 5 + Math.floor(minutes / 60), minute: minutes % 60 };
+}
+
+// The train at the platform at set time t, from the crowd's trains ([{ t }], t when its doors open):
+// null between trains, or { x, doors }: x is its first car's left edge. It slows to a stop pulling in
+// from the right, stands with its doors open, and speeds up pulling out to the left.
+export function trainAt(trains, t) {
+  const length = TRAIN.cars * TRAIN.car;
+  for (const tr of trains) {
+    const k = t - tr.t;
+    if (k < -STATION.pullIn || k > STATION.stand + STATION.pullOut) continue;
+    if (k < 0) {
+      const left = -k / STATION.pullIn; // 1 as it appears, 0 as it stops
+      return { x: Math.round(TRAIN.stop + (320 - TRAIN.stop) * left * left), doors: false };
+    }
+    if (k <= STATION.stand) return { x: TRAIN.stop, doors: true };
+    const gone = (k - STATION.stand) / STATION.pullOut;
+    return { x: Math.round(TRAIN.stop - (TRAIN.stop + length) * gone * gone), doors: false };
+  }
+  return null;
+}
+
+// The departure board lists the trains still to go: the first of them at set time t (an index into
+// trains). A train leaves the board as it pulls out.
+export function boardFirst(trains, t) {
+  const i = trains.findIndex((tr) => t < tr.t + STATION.stand);
+  return i < 0 ? trains.length : i;
+}
+
+// The night market. Its sky's stage for each band, from the park's (skyStages): it starts at blue hour
+// and darkens to night with it.
+export const marketStages = (bar) => skyStages(bar).map((s) => Math.min(4, s + MARKET.skyFrom));
+
+// How many of its n lanterns are lit at `bar`: they light one by one, in order along the strings.
+export function lanternsLit(bar, n) {
+  let lit = 0;
+  for (let i = 0; i < n; i++) {
+    const at = MARKET.lanternsFrom + ((MARKET.lanternsTo - MARKET.lanternsFrom) * i) / Math.max(1, n - 1);
+    if (bar >= at) lit++;
+  }
+  return lit;
+}
+
+// The noodle stall's steam: which of its two frames shows at page time `time`.
+export const steamFrame = (time, still) => (still ? 0 : frameOf(time / MARKET.steam, 2));
+
+// The cat at set time t and page time `time`: asleep by your case ({ pose: 'sleep', frame }), until a
+// loud note (the pigeons' scaredAt) wakes it and it runs off to the right, from wherever it was;
+// PARK.pigeonsAway bars later it strolls back in from the right. null while it's away. Each: { pose,
+// frame, x, y, dir }.
+export function catAt(scene, t, time) {
+  const [hx, hy] = CAT;
+  const since = scene.scaredAt === null ? Infinity : Math.max(0, t - scene.scaredAt);
+  if (since < CAT_RUN) {
+    const from = 340 + (hx - 340) * scene.flyFrom; // where it was: home, or on its way back
+    return { pose: 'run', frame: frameOf(since * 10, 2), x: Math.round(from + (340 - from) * (since / CAT_RUN) ** 1.5), y: hy, dir: 1 };
+  }
+  const back = since - PARK.pigeonsAway * scene.bar;
+  if (back < 0) return null;
+  if (back < CAT_WALK) return { pose: 'walk', frame: frameOf(time * 4, 2), x: Math.round(340 + (hx - 340) * (back / CAT_WALK)), y: hy, dir: -1 };
+  return { pose: 'sleep', frame: frameOf(time / CAT_BREATH, 2), x: hx, y: hy, dir: -1 };
+}
+
+export { TRAIL_LIFE, LOOP_TRAIL_LIFE, FLIGHT, GOLD, TRAIN_LENGTH, PIGEON_FLY, PIGEON_WALK, CAT_RUN, CAT_WALK };

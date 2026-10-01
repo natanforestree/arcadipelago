@@ -5,9 +5,11 @@ import {
   TRAIL_LIFE, LOOP_TRAIL_LIFE, FLIGHT, GOLD,
   skyStages, sunDrop, windowLit, lampState, starsOut, trainX, cloudX, createFlocks, birdsAt, pigeonsAt, frameOf,
   PIGEONS, TRAIN_LENGTH, PIGEON_FLY, PIGEON_WALK,
+  stationClock, trainAt, boardFirst, marketStages, lanternsLit, steamFrame, catAt, CAT, TRAIN, CAT_RUN, CAT_WALK,
 } from '../src/scene.js';
+import { createCrowd } from '../src/crowd.js';
 import { LOFI_CLOCK } from '../src/beats.js';
-import { PARK } from '../src/tuning.js';
+import { PARK, STATION, MARKET } from '../src/tuning.js';
 const { bar: BAR } = LOFI_CLOCK;
 
 test('each note leaves a glyph that floats up from the guitar, higher notes higher, and fades over 2 bars', () => {
@@ -220,4 +222,96 @@ test("the park keeps its own bars over a set of any beat: the train by the park'
   sceneNote(scene, 60, 0, 10, 4); // loud: the pigeons fly
   assert.ok(pigeonsAt(scene, 10 + PARK.pigeonsAway * bar - 0.01, 0).every((p) => p.pose !== 'walk'), 'still away');
   assert.ok(pigeonsAt(scene, 10 + PARK.pigeonsAway * bar + 0.1, 0).every((p) => p.pose === 'walk'), 'back after 4 of the beat\'s bars');
+});
+
+test('a scene knows its place, the park unless it says', () => {
+  assert.equal(createScene(1).place, 'park');
+  assert.equal(createScene(1, { place: 'market' }).place, 'market');
+});
+
+test("the station's clock runs from half past five as a set starts to half past six as it ends", () => {
+  assert.deepEqual(stationClock(0), { hour: 5, minute: 30 });
+  assert.deepEqual(stationClock(PARK.bars / 2), { hour: 6, minute: 0 });
+  assert.deepEqual(stationClock(PARK.bars), { hour: 6, minute: 30 });
+  assert.deepEqual(stationClock(PARK.bars * 2), { hour: 6, minute: 30 }, 'and stays there');
+  assert.deepEqual(stationClock(PARK.bars / 4 + 0.5), { hour: 5, minute: 45 });
+});
+
+test("each of the crowd's trains pulls in, stands with its doors open as its passengers step off, and pulls out", () => {
+  const trains = createCrowd(2, 'station').trains, first = trains[0];
+  assert.equal(trainAt(trains, first.t - STATION.pullIn - 0.1), null, 'not yet');
+  const coming = trainAt(trains, first.t - STATION.pullIn / 2);
+  assert.ok(coming.x > TRAIN.stop && coming.x < 320 && !coming.doors, 'pulling in from the right');
+  for (const at of first.people) assert.deepEqual(trainAt(trains, at), { x: TRAIN.stop, doors: true }, 'standing as each steps off');
+  const going = trainAt(trains, first.t + STATION.stand + STATION.pullOut / 2);
+  assert.ok(going.x < TRAIN.stop && !going.doors, 'pulling out to the left');
+  assert.equal(trainAt(trains, first.t + STATION.stand + STATION.pullOut + 0.1), null, 'gone');
+  assert.ok(trainAt(trains, first.t + STATION.stand + STATION.pullOut).x <= -TRAIN.cars * TRAIN.car + 1, 'all of it off the screen');
+  assert.equal(trainAt([], 10), null);
+});
+
+test('the departure board loses its top train as that train pulls out', () => {
+  const trains = createCrowd(2, 'station').trains;
+  assert.equal(boardFirst(trains, 0), 0);
+  assert.equal(boardFirst(trains, trains[0].t + STATION.stand - 0.01), 0);
+  assert.equal(boardFirst(trains, trains[0].t + STATION.stand), 1);
+  assert.equal(boardFirst(trains, trains[2].t + STATION.stand), 3);
+});
+
+test("the night market's sky starts at blue hour and darkens to night with the park's", () => {
+  assert.deepEqual(marketStages(0), skyStages(0).map((s) => s + MARKET.skyFrom));
+  assert.ok(marketStages(PARK.bars).every((s) => s === 4));
+  for (let bar = 0; bar <= PARK.bars; bar++) {
+    marketStages(bar).forEach((s, band) => assert.ok(s >= marketStages(Math.max(0, bar - 1))[band], 'never lightens'));
+  }
+});
+
+test('the lanterns light one by one, in order, from bar 2 to bar 40', () => {
+  const n = 30;
+  assert.equal(lanternsLit(0, n), 0);
+  assert.equal(lanternsLit(MARKET.lanternsFrom, n), 1);
+  assert.equal(lanternsLit(MARKET.lanternsTo, n), n);
+  assert.equal(lanternsLit(PARK.bars, n), n);
+  let last = 0;
+  for (let bar = 0; bar <= MARKET.lanternsTo; bar += 0.5) {
+    const lit = lanternsLit(bar, n);
+    assert.ok(lit >= last && lit - last <= 1, `bar ${bar}`);
+    last = lit;
+  }
+});
+
+test('the steam puffs between its two frames, and holds still with reduced motion', () => {
+  assert.equal(steamFrame(0.1, false), 0);
+  assert.equal(steamFrame(MARKET.steam + 0.1, false), 1);
+  assert.equal(steamFrame(MARKET.steam + 0.1, true), 0);
+});
+
+test('the cat sleeps by your case until a loud note wakes it; it runs off and strolls back 4 bars later', () => {
+  const scene = createScene(1, { place: 'market' });
+  const asleep = catAt(scene, 5, 0);
+  assert.deepEqual([asleep.pose, asleep.x, asleep.y], ['sleep', CAT[0], CAT[1]]);
+  assert.notEqual(catAt(scene, 5, 0).frame, catAt(scene, 5, 1.5).frame, 'breathing');
+  sceneNote(scene, 60, 0, 10, 3);
+  assert.equal(catAt(scene, 10.5, 0).pose, 'sleep', 'a quiet note leaves it be');
+  sceneNote(scene, 60, 1, 10, 4);
+  const run = catAt(scene, 10.5, 0);
+  assert.ok(run.pose === 'run' && run.x > CAT[0] && run.dir === 1, 'off to the right');
+  assert.equal(catAt(scene, 10 + CAT_RUN + 0.1, 0), null, 'away');
+  const back = 10 + PARK.pigeonsAway * BAR;
+  assert.equal(catAt(scene, back - 0.1, 0), null);
+  const walk = catAt(scene, back + CAT_WALK / 2, 0);
+  assert.ok(walk.pose === 'walk' && walk.x > CAT[0] && walk.x < 340 && walk.dir === -1, 'strolling back');
+  assert.equal(catAt(scene, back + CAT_WALK + 0.1, 0).pose, 'sleep', 'and back to sleep');
+});
+
+test('woken again while strolling back, the cat runs off from where it is, not from home', () => {
+  const scene = createScene(1, { place: 'market' });
+  sceneNote(scene, 60, 0, 10, 4);
+  const back = 10 + PARK.pigeonsAway * BAR, mid = back + CAT_WALK / 2;
+  const there = catAt(scene, mid, 0).x;
+  assert.ok(there > CAT[0] + 10, 'on its way back');
+  sceneNote(scene, 60, 1, mid, 4);
+  const run = catAt(scene, mid + 0.01, 0);
+  assert.equal(run.pose, 'run');
+  assert.ok(Math.abs(run.x - there) <= 2, `runs from ${run.x}, where it was (${there})`);
 });

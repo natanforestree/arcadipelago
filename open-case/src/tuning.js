@@ -164,6 +164,27 @@ export const PARK = {
   pigeonsAway: 4, // bars the pigeons stay away after a loud note scatters them
 };
 
+// The station's life (scene.js and render.js), over the same PARK.bars as the park's evening: the
+// clock runs through the evening rush, and each of the crowd's trains (PLACES.station.waves) pulls in,
+// stands with its doors open as its passengers step off, and pulls out. Its sky, through the glass
+// roof and the arches, darkens as the park's does.
+export const STATION = {
+  clockFrom: 30, // minutes past five on the clock as a set starts...
+  clockTo: 90, // ...and as it ends: half past six
+  pullIn: 3, // seconds a train takes to pull in, before its doors open
+  stand: 8, // seconds it stands with its doors open
+  pullOut: 4, // seconds it takes to pull out
+};
+
+// The night market's life: from blue hour into night, its lanterns light one by one, and steam rises
+// from the noodle stall. A cat sleeps by your case, and a loud note sends it off for the pigeons' 4 bars.
+export const MARKET = {
+  skyFrom: 2, // its sky starts at this stage of the park's (blue hour) and darkens with it to night
+  lanternsFrom: 2, // the lanterns light one by one, the first at this bar...
+  lanternsTo: 40, // ...the last at this one (of PARK.bars)
+  steam: 0.5, // seconds each of the steam's two frames shows
+};
+
 // The music shop (gear.js): what each thing costs in coins, and the key that stomps each pedal. The
 // pedals are listed in the order they chain, overdrive first, which is also the order of their keys.
 // The loop pedal is worked with R and Backspace instead.
