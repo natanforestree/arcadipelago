@@ -18,9 +18,10 @@ export const SETTINGS = { bpm: [192, 1, 29, 17], mood: [221, 1, 32, 17], swing: 
 const ARROWED = ['bpm', 'swing']; // the settings with ▲ and ▼
 export const WHEEL = [40, 50, 22]; // its middle and radius
 export const PANEL = [2, 21, 77, 61]; // the faceplate behind the knob (the part tabs)
-const KNOB_R = 16, CAP_R = 7, RING_R = 21; // the knob's, its gold cap's and the ring of lights' radii
-// The ◀ and ▶ either side of the knob, each [x, y, 3, 5], 29 pixels from its middle.
-export const KNOB_ARROWS = { left: [WHEEL[0] - 29, WHEEL[1] - 2, 3, 5], right: [WHEEL[0] + 27, WHEEL[1] - 2, 3, 5] };
+const KNOB_R = 16, CAP_R = 8, RING_R = 21; // the knob's, its gold cap's and the ring of lights' radii
+// The ◀ and ▶ either side of the knob, each [x, y, 3, 5], their outer edges 29 pixels from its
+// middle, one the mirror of the other.
+export const KNOB_ARROWS = { left: [WHEEL[0] - 29, WHEEL[1] - 2, 3, 5], right: [WHEEL[0] + 26, WHEEL[1] - 2, 3, 5] };
 // The turn (radians, clockwise from straight up) of the knob's pointer and ridges at rhythm
 // index n (0-15): a sixteenth of a round a rhythm, so 16 comes back round to the first.
 export const knobAngle = (n) => (n / 16) * Math.PI * 2;
@@ -28,7 +29,9 @@ export const knobAngle = (n) => (n / 16) * Math.PI * 2;
 // sixteenths from the top clockwise, a long note's light 3x3 and the others 2x2.
 export function ringLight(k, len) {
   const th = (k / 16) * Math.PI * 2, size = len > 1 ? 3 : 2;
-  return [Math.round(WHEEL[0] + Math.sin(th) * RING_R - size / 2), Math.round(WHEEL[1] - Math.cos(th) * RING_R - size / 2), size, size];
+  // rounded away from the middle on a half, so the lights at 3 and 9 o'clock (6 and 12) mirror
+  const round = (v) => Math.sign(v) * Math.round(Math.abs(v));
+  return [WHEEL[0] + round(Math.sin(th) * RING_R - size / 2), WHEEL[1] + round(-Math.cos(th) * RING_R - size / 2), size, size];
 }
 // The octave (range, the bass only) is wider than Undo beside it, for its ▲ and ▼ (arrowsIn).
 export const BUTTONS = { sound: [4, 84, 74, 12], erase: [4, 98, 36, 12], clear: [42, 98, 36, 12], undo: [4, 112, 28, 12], range: [34, 112, 44, 12] };
@@ -187,11 +190,11 @@ function disc(px, cx, cy, r, at) {
 }
 
 // The rhythm knob, a vintage MIDI encoder on its faceplate. The part's rhythm is a ring of 16 lights
-// (a hit in the part's colour, bigger for a long note; an unlit light dark). The knob has a knurled
-// silver edge (40 ridges, lit from the top left), a flat black top, and a small gold cap with the
-// rhythm's number on it; its pointer and ridges turn a sixteenth of a round a rhythm. ◀ and ▶ are
-// at its sides.
-function wheel({ px, text, C }, studio, [base, shadow]) {
+// (a hit in the part's colour, with a light glint at its top left like a lit LED, bigger for a long
+// note; an unlit light dark). The knob has a knurled silver edge (40 ridges, lit from the top left),
+// a flat black top, and a small gold cap with the rhythm's number on it; its pointer and ridges turn
+// a sixteenth of a round a rhythm. ◀ and ▶ are at its sides.
+function wheel({ px, text, C }, studio, [base]) {
   const [cx, cy] = WHEEL, rhythm = rhythmOf(studio), n = studio.rhythm[studio.tab], turn = knobAngle(n);
   px(...PANEL, C.dusk);
   for (const [sx, sy] of [[4, 23], [74, 23], [4, 77], [74, 77]]) {
@@ -201,7 +204,9 @@ function wheel({ px, text, C }, studio, [base, shadow]) {
   }
   for (let k = 0; k < 16; k++) {
     const len = rhythm.find(([s]) => s === k)?.[1] ?? 0;
-    px(...ringLight(k, len), len ? (k % 4 === 0 ? base : shadow) : C.night);
+    const light = ringLight(k, len);
+    px(...light, len ? base : C.night);
+    if (len) px(light[0], light[1], 1, 1, C.light);
   }
   disc(px, cx + 1, cy + 1, KNOB_R, () => C.ink); // its shadow on the panel
   disc(px, cx, cy, KNOB_R, (dx, dy, d, ang) => {
@@ -220,7 +225,7 @@ function wheel({ px, text, C }, studio, [base, shadow]) {
     if (d > CAP_R - 1 && light > 0.5) return C.light;
     return light < -0.3 && d > CAP_R - 2 ? C.goldDark : C.gold;
   });
-  text(String(n + 1), cx + 1, cy - 3, C.ink, 'center');
+  text(String(n + 1), cx, cy - 3, C.ink, 'center');
   for (const [x, y, w, h] of [KNOB_ARROWS.left, KNOB_ARROWS.right]) {
     for (let i = 0; i < w; i++) px(x + (x < cx ? i : w - 1 - i), y + 2 - i, 1, 1 + 2 * i, C.grey);
   }

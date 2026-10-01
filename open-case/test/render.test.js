@@ -13,8 +13,8 @@ import { STOCK, PEDALS, INSTRUMENTS, freshGear, buy, stomp } from '../src/gear.j
 import { createShop, choose, CARD, BUTTON } from '../src/shop.js';
 import { createLoop, record, step, loopLength } from '../src/looper.js';
 import { stoodAt } from './helpers.js';
-import { createStudio, setTab, newBeat, startNaming, typeName, saveName } from '../src/studio.js';
-import { STRIP, PAD, NAME_FIELD, SETTINGS, WHEEL, BUTTONS, arrowsIn } from '../src/studioview.js';
+import { createStudio, rhythmOf, setTab, newBeat, startNaming, typeName, saveName } from '../src/studio.js';
+import { STRIP, PAD, NAME_FIELD, SETTINGS, WHEEL, BUTTONS, arrowsIn, ringLight } from '../src/studioview.js';
 const { bar: BAR, beat: BEAT } = LOFI_CLOCK;
 const LOOP_LENGTH = loopLength(createLoop());
 
@@ -704,6 +704,27 @@ test("the studio screen: the top bar, the wheel, the buttons and each tab's pad"
   for (const s of ['Dm', 'Em', 'F', 'Am', 'Bdim', 'electric piano']) assert.ok(chords.texts.includes(s), s);
   const mix = drawOn('mix');
   for (const s of ['pump', 'pad', 'vinyl', 'm']) assert.ok(mix.texts.includes(s), s);
+});
+
+test("the knob's ring: every part's hits lit in its own colour with a glint at the top left, the rest dark", () => {
+  const studio = createStudio({ slots: Array(6).fill(null), chosen: null }), C = data.colors;
+  const base = { drums: C.drums, bass: C.bass, chords: C.chords };
+  for (const part of ['drums', 'bass', 'chords']) {
+    setTab(studio, part);
+    const g = fakeContext();
+    createRenderer(g, art)(view({ screen: 'studio', studio, t: 0 }));
+    const hits = rhythmOf(studio, part);
+    for (let k = 0; k < 16; k++) {
+      const len = hits.find(([s]) => s === k)?.[1] ?? 0, [x, y, w, h] = ringLight(k, len);
+      const here = g.rects.filter(([rx, ry, rw, rh]) => rx >= x && ry >= y && rx + rw <= x + w && ry + rh <= y + h);
+      if (!len) {
+        assert.ok(here.some((r) => r[4] === C.night && r[2] === w && r[3] === h), `${part} ${k}: dark`);
+        continue;
+      }
+      assert.ok(here.some((r) => r[4] === base[part] && r[2] === w && r[3] === h), `${part} ${k}: its colour, on and off the beat alike`);
+      assert.ok(here.some((r) => r[4] === C.light && r[0] === x && r[1] === y && r[2] === 1 && r[3] === 1), `${part} ${k}: a glint at the top left`);
+    }
+  }
 });
 
 // The rectangles drawn inside box [x, y, w, h].

@@ -433,7 +433,7 @@ test('tabs, the name, the wheel, the buttons and the scroll wheel', () => {
   const studio = blank(), drag = { what: null };
   mouseDown(studio, drag, ...mid(TAB_BOXES.chords), 0);
   assert.equal(studio.tab, 'chords');
-  mouseDown(studio, drag, WHEEL[0] + 12, WHEEL[1], 0);
+  mouseDown(studio, drag, WHEEL[0] + 12, WHEEL[1] - 6, 0); // upper right: the old upper half was -1
   assert.equal(studio.rhythm.chords, 6);
   scroll(studio, WHEEL[0], WHEEL[1], -40);
   assert.equal(studio.rhythm.chords, 5);

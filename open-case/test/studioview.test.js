@@ -10,6 +10,7 @@ const empty = () => ({ slots: Array(STUDIO.slots).fill(null), chosen: null });
 const mid = ([x, y, w, h]) => [x + w / 2, y + h / 2];
 const inScreen = ([x, y, w, h]) => x >= 0 && y >= 0 && x + w <= 320 && y + h <= 180;
 const inPad = ([x, y, w, h]) => x >= PAD[0] && y >= PAD[1] && x + w <= PAD[0] + PAD[2] && y + h <= PAD[1] + PAD[3];
+const TOP_BAR = 19; // the top bar's height (the name box ends above it, the tabs a little over)
 const inPanel = ([x, y, w, h]) => x >= PANEL[0] && y >= PANEL[1] && x + w <= PANEL[0] + PANEL[2] && y + h <= PANEL[1] + PANEL[3];
 const overlap = ([ax, ay, aw, ah], [bx, by, bw, bh]) => ax < bx + bw && bx < ax + aw && ay < by + bh && by < ay + ah;
 
@@ -23,11 +24,11 @@ test('everything on the studio screen is inside it, and the pad, the wheel, the 
 });
 
 test('the knob panel sits under the top bar, left of the pad, above the buttons, and holds the knob, its ring and its arrows', () => {
-  const [px, py, pw, ph] = PANEL, [wx, wy, r] = WHEEL;
-  assert.ok(py >= NAME[1] + NAME[3] && py >= 19, 'under the top bar');
+  const [px, py, pw, ph] = PANEL, [wx, wy] = WHEEL;
+  assert.ok(py >= TOP_BAR, 'under the top bar');
   assert.ok(px >= 0 && px + pw <= PAD[0], 'left of the pad');
   for (const box of Object.values(BUTTONS)) assert.ok(py + ph <= box[1], 'above the buttons');
-  assert.ok(inPanel([wx - r, wy - r, 2 * r, 2 * r]), 'the knob (and its hit circle up to its radius)');
+  assert.ok(inPanel([wx - 16, wy - 16, 32, 32]), 'the knob: its box, 16 pixels each way from the middle');
   assert.ok(inPanel(KNOB_ARROWS.left) && inPanel(KNOB_ARROWS.right), 'the arrows');
   for (let k = 0; k < 16; k++) assert.ok(inPanel(ringLight(k, k % 3)), `light ${k}`);
   assert.ok(KNOB_ARROWS.left[0] + KNOB_ARROWS.left[2] <= wx - 16 && KNOB_ARROWS.right[0] >= wx + 16, 'the arrows clear of the knob');
@@ -45,6 +46,19 @@ test('the ring: sixteen lights from the top round clockwise, clear of the knob, 
   assert.deepEqual(ringLight(0, 1).slice(2), [2, 2], 'a short note: 2x2');
   assert.deepEqual(ringLight(0, 2).slice(2), [3, 3], 'a long one: 3x3');
   for (const box of lights) assert.ok(!overlap(box, KNOB_ARROWS.left) && !overlap(box, KNOB_ARROWS.right), 'clear of the arrows');
+});
+
+test('the arrows and the lights mirror each other about the knob, left to right and top to bottom', () => {
+  const [wx, wy] = WHEEL, { left, right } = KNOB_ARROWS;
+  assert.equal(left[0] - wx, wx - (right[0] + right[2]), 'the arrows the same distance out');
+  assert.deepEqual([left[1], left[2], left[3]], [right[1], right[2], right[3]]);
+  for (const len of [1, 2]) for (let k = 0; k < 16; k++) {
+    const [x, y, w, h] = ringLight(k, len), mx = ringLight((16 - k) % 16, len)[0], my = ringLight((8 - k + 16) % 16, len)[1];
+    // (a 3-wide light can't be centred on the middle's pixel line: the one at 12 and 6 o'clock is a
+    // pixel off to one side, and the one at 3 and 9 a pixel off up or down)
+    if (len === 1 || k % 8) assert.equal(x - wx, wx - (mx + w), `light ${k}, len ${len}: left to right`);
+    if (len === 1 || k % 8 !== 4) assert.equal(y - wy, wy - (my + h), `light ${k}, len ${len}: top to bottom`);
+  }
 });
 
 test('the knob turns a sixteenth of a round a rhythm, clockwise from straight up', () => {
