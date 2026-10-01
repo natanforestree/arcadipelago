@@ -1,14 +1,15 @@
 // Draws the scene at 320x180 into a 2D context (main.js scales it up by a whole number), in the flat
-// style, from the sprite sheet art/open-case/sprites.lua makes (assets.js loads it): the park and its
-// sunset, you on your crate with your instrument, your pedals and the loop pedal, the open case and
-// the band's speaker, the passers-by, their reactions, the pigeons and birds, the note trail (and
-// your loop's), the memory strip, the gear strip, the music shop, and the title, pause and ?debug
-// overlays. The end card is HTML (index.html).
+// style, from the sprite sheet art/open-case/sprites.lua makes (assets.js loads it): the place you
+// busk in (the park and its sunset, the station and its trains, the night market and its lanterns),
+// you on your crate with your instrument, your pedals and the loop pedal, the open case and the band's
+// speaker, the passers-by, their reactions, the pigeons and birds (or the market's cat), the note
+// trail (and your loop's), the memory strip, the gear strip, the music shop, and the title, pause and
+// ?debug overlays. The end card and the map are HTML (index.html, atlasview.js).
 import { CROWD, PLAY, LAYERS, INTEREST, LOOP } from './tuning.js';
 import { LOFI_CLOCK } from './beats.js';
 import {
   GUITAR, coinAt, glyphAt, loopGlyphAt, GOLD, skyStages, sunDrop, windowLit, lampState, starsOut, trainX, cloudX,
-  birdsAt, pigeonsAt, frameOf,
+  birdsAt, pigeonsAt, frameOf, stationClock, trainAt, boardFirst, marketStages, lanternsLit, steamFrame, catAt, TRAIN,
 } from './scene.js';
 import { STOCK, PEDALS, owns, stockItem } from './gear.js';
 import { card, trying, CARD, BUTTON } from './shop.js';
@@ -44,6 +45,9 @@ const CUE_LEFT_MIN = 177; // keeps "rec" clear of the case sprite's rim, whose r
 const BEATS_PER_BAR = 4; // every beat's 4/4 meter: always 4, unlike LOOP.bars (how many bars a loop take is)
 const NOD_SHOW = 1.2; // seconds the shopkeeper nods after a sale...
 const NOD_FPS = 4; // ...this many nods a second
+const BOARD_ROWS = 4; // trains on the station's departure board
+const BACKING = 0.55; // how dark the backing behind the bottom line's words and the gear strip is...
+const BACKING_TOP = 168, BACKING_H = 11; // ...and where it runs (the line's text sits at y 170)
 
 // Your last notes tagged by shape: notes completing the same shape share a letter; '-' completes none.
 export function shapeTags(shapes) {
@@ -161,14 +165,19 @@ export function createRenderer(g, art) {
   };
   const bandOf = (y) => data.bands.findLastIndex((b) => b <= y);
 
-  // Back to front: the sky and what's in it, the rooftops, the trees, the hedge and path, the lamp.
-  function park({ bars, t, time, still, set, scene, flocks }) {
-    const bar = Math.floor(bars);
-    const stages = skyStages(bar);
+  // The sky's bands, each in its stage's colour (stages: one for each band, top down).
+  function sky(stages) {
     data.bands.forEach((top, i) => {
       const bottom = data.bands[i + 1] ?? data.skyBottom + 1;
       px(0, top, W, bottom - top, data.sky[stages[i]][i]);
     });
+  }
+
+  // Back to front: the sky and what's in it, the rooftops, the trees, the hedge and path, the lamp.
+  function park({ bars, t, time, still, set, scene, flocks }) {
+    const bar = Math.floor(bars);
+    const stages = skyStages(bar);
+    sky(stages);
     data.stars.slice(0, starsOut(bar)).forEach(([x, y], i) => {
       const bright = still || Math.sin(time * 0.9 + i * 2.3) > -0.3;
       px(x, y, 1, 1, bright ? C.light : C.grey);
@@ -192,9 +201,58 @@ export function createRenderer(g, art) {
     sprite(`lamp-${lamp}`, 0, 0);
   }
 
+  // The station at rush hour, back to front: the sky through the glass roof and the arches (darkening as
+  // the park's does), the far city, the hall, the train while one is in (its doors open as its
+  // passengers step off), and in front of it the pillars, the lamps, the board, the clock and the
+  // platform. The board lists the trains still to go, the next one brightest; the clock's hands run
+  // from half past five to half past six.
+  function station({ bars, t, set }) {
+    const stages = skyStages(Math.floor(bars));
+    sky(stages);
+    sprite(`station-city-${stages[6]}`, 0, 0);
+    sprite('station-hall', 0, 0);
+    const trains = set ? set.crowd.trains : [];
+    const train = trainAt(trains, t);
+    if (train) for (let k = 0; k < TRAIN.cars; k++) sprite(`station-car-${train.doors ? 1 : 0}`, train.x + k * TRAIN.car, 0);
+    sprite('station-front', 0, 0);
+    const [x0, y0, x1] = data.station.board, first = boardFirst(trains, t);
+    for (let r = 0; r < BOARD_ROWS; r++) {
+      const n = first + r, y = y0 + 3 + r * 5, c = r === 0 ? C.gold : C.goldDark;
+      px(x0 + 3, y, 10, 3, c); // its time
+      for (let k = 0; k < 6; k++) { // and where it's going, a word or two
+        const len = 3 + ((n * 7 + k * 13 + 3) % 5), wx = x0 + 16 + k * 8;
+        if (wx + len < x1 - 3 && (n + k) % 4 !== 3) px(wx, y, len, 3, c);
+      }
+    }
+    const [cx, cy, radius] = data.station.clock, { hour, minute } = stationClock(bars);
+    const hand = (turn, len) => {
+      for (let d = 0; d <= len * 2; d++) {
+        px(cx + Math.round((Math.sin(turn * Math.PI * 2) * d) / 2), cy - Math.round((Math.cos(turn * Math.PI * 2) * d) / 2), 1, 1, C.ink);
+      }
+    };
+    hand(((hour % 12) + minute / 60) / 12, radius - 4);
+    hand(minute / 60, radius - 2);
+    px(cx, cy, 1, 1, C.red);
+  }
+
+  // The night market, back to front: the sky from blue hour to night, its stars, the far skyline, the
+  // stalls and the noodle pot's steam, the strings with their lanterns (lighting one by one), and the
+  // brick street.
+  function market({ bars, time, still }) {
+    sky(marketStages(Math.floor(bars)));
+    data.market.stars.forEach(([x, y], i) => px(x, y, 1, 1, still || Math.sin(time * 0.9 + i * 2.3) > -0.3 ? C.light : C.grey));
+    sprite('market-skyline', 0, 0);
+    sprite('market-stalls', 0, 0);
+    sprite(`market-steam-${steamFrame(time, still)}`, 0, 0);
+    sprite('market-strings', 0, 0);
+    const lit = lanternsLit(bars, data.market.lanterns.length);
+    data.market.lanterns.forEach(([x, y, c], i) => sprite(i < lit ? `lantern-${c}` : 'lantern-off', x, y));
+    sprite('market-street', 0, 0);
+  }
+
   // Everyone and everything standing on the path, nearest last: the listeners, you, your pedals, the
-  // loop pedal and the amp, the speaker, the case and its coins, and the pigeons on the ground.
-  // Returns the pigeons in the air, drawn later.
+  // loop pedal and the amp, the speaker, the case and its coins, and the pigeons on the ground (at the
+  // night market, the cat). Returns the pigeons in the air, drawn later.
   function figures({ set, scene, t, time, gear, loop }) {
     const things = [
       { y: data.feet.you, draw: () => sprite(youFrame(scene, t, time, gear.instrument), 0, 0) },
@@ -217,7 +275,9 @@ export function createRenderer(g, art) {
     if (owns(gear, 'loop')) things.push({ y: data.feet.loop, draw: () => sprite(`pedal-loop-${loopLight(loop, t)}`, 0, 0) });
     if (set) for (const p of set.crowd.people) things.push({ y: p.y, draw: () => sprite(personFrame(p, t, time, set.clock.beat), p.x, p.y) });
     const flying = [];
-    for (const b of pigeonsAt(scene, t, time)) {
+    const cat = scene.place === 'market' ? catAt(scene, t, time) : null;
+    if (cat) things.push({ y: cat.y, draw: () => sprite(`cat-${cat.pose}-${cat.frame}-${cat.dir > 0 ? 'right' : 'left'}`, cat.x, cat.y) });
+    for (const b of scene.place === 'market' ? [] : pigeonsAt(scene, t, time)) {
       const name = `pigeon-${b.pose}-${b.frame}-${b.dir > 0 ? 'right' : 'left'}`;
       if (b.pose === 'fly') flying.push(() => sprite(name, b.x, b.y));
       else things.push({ y: b.y, draw: () => sprite(name, b.x, b.y) });
@@ -298,16 +358,30 @@ export function createRenderer(g, art) {
     }
   }
 
+  // A dark backing behind a piece of the bottom line, so it reads on any ground (the station's platform
+  // is pale), leaving the pigeons or the cat beside it alone.
+  function backing(x, w) {
+    g.globalAlpha = BACKING;
+    px(x, BACKING_TOP, w, BACKING_H, C.ink);
+    g.globalAlpha = 1;
+  }
+
   function hud({ keys, gear, stomp, loop, loopSaid, t, time }, set) {
+    backing(0, keys.lock ? 102 : 74);
     text(`oct ${keys.octave >= 0 ? '+' : ''}${keys.octave}`, 4, 170);
     for (let i = 0; i < PLAY.strengthMax; i++) px(52 + i * 5, 172, 4, 4, i < keys.strength ? C.light : C.ink);
     if (keys.lock) text('lock', 78, 170, C.gold);
-    if (set) text(`bar ${Math.min(set.bars, Math.floor(set.t / set.clock.bar) + 1)}/${set.bars}`, W - 4, 170, C.light, 'right');
+    if (set) {
+      const bar = `bar ${Math.min(set.bars, Math.floor(set.t / set.clock.bar) + 1)}/${set.bars}`;
+      backing(W - 8 - Math.ceil(measure(bar)), Math.ceil(measure(bar)) + 8);
+      text(bar, W - 4, 170, C.light, 'right');
+    }
     // The gear strip: each pedal you own in its own place, with its key, lit while it's on; the name
     // of the one just stomped shows above it for a moment.
     PEDALS.forEach((id, i) => {
       if (!owns(gear, id)) return;
       const on = gear.on.includes(id), x = STRIP_X + i * STRIP_STEP;
+      backing(x - 1, STRIP_STEP);
       sprite(`strip-${id}-${on ? 1 : 0}`, x, 170);
       text(String(stockItem(id).key), x + 9, 170, on ? C.light : C.grey);
     });
@@ -315,6 +389,7 @@ export function createRenderer(g, art) {
     // hold, lit for each recorded and red for the one recording.
     if (owns(gear, 'loop')) {
       const x = STRIP_X + LOOP_SLOT * STRIP_STEP, state = loop ? loopState(loop, t) : 'empty';
+      backing(x - 1, 16 + LOOP.layers * 4);
       sprite(`strip-loop-${loopLight(loop, t)}`, x, 170);
       text('R', x + 9, 170, state === 'empty' ? C.grey : C.light);
       const layers = loop?.layers.length ?? 0;
@@ -486,7 +561,7 @@ export function createRenderer(g, art) {
     g.imageSmoothingEnabled = false;
     if (screen === 'shop') return shopView(view);
     if (screen === 'studio') return drawStudio({ px, text, big, measure, C }, view.studio, t);
-    park(view);
+    ({ park, station, market })[scene.place](view);
     const flying = figures(view);
     if (set) {
       for (const p of set.crowd.people) {

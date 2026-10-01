@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRenderer, shapeTags, personFrame, youFrame, treeFrame, loopLight, loopWords, loopCue, W, H } from '../src/render.js';
 import { createSet, runSet } from '../src/set.js';
-import { createScene, createFlocks, sceneNote, sceneLoopNote, CASE, PIGEONS, LOOP_PEDAL } from '../src/scene.js';
+import { createScene, createFlocks, sceneNote, sceneLoopNote, CASE, PIGEONS, LOOP_PEDAL, CAT, TRAIN, lanternsLit } from '../src/scene.js';
 import { createKeyState } from '../src/keys.js';
 import { goodSet } from '../src/bots.js';
 import { KINDS, LOOKS } from '../src/crowd.js';
 import { LOFI_CLOCK, readyBeat } from '../src/beats.js';
-import { INTEREST, LOOP } from '../src/tuning.js';
+import { INTEREST, LOOP, PARK, STATION } from '../src/tuning.js';
 import { STOCK, PEDALS, INSTRUMENTS, freshGear, buy, stomp } from '../src/gear.js';
 import { createShop, choose, CARD, BUTTON } from '../src/shop.js';
 import { createLoop, record, step, loopLength } from '../src/looper.js';
@@ -879,4 +879,71 @@ test('the list has Save; the name box shows its title, the name with a blinking 
   assert.equal(saved.color, C.go);
   assert.ok(drawAt(2.5).texts.includes('Beat 1x'), 'and the new name on its row');
   assert.ok(!drawAt(2 + 1.6).texts.includes('saved'), 'gone after a moment');
+});
+
+// A set at a place, its scene, and a view of it `t` seconds in.
+function placed(place, t, over = {}) {
+  const set = createSet(2, undefined, place);
+  set.t = t;
+  const scene = createScene(2, { place });
+  return { set, scene, view: view({ set, scene, t, bars: t / BAR, ...over }) };
+}
+
+test("the station: its hall, the train while one is in, doors open as its passengers step off, the board and the clock", () => {
+  const { set } = placed('station', 0), first = set.crowd.trains[0];
+  for (const [t, cars] of [[first.t - STATION.pullIn - 1, null], [first.t - 1, 'station-car-0'], [first.t + 1, 'station-car-1'], [first.t + STATION.stand + 1, 'station-car-0']]) {
+    const g = fakeContext();
+    createRenderer(g, art)(placed('station', t).view);
+    for (const n of ['station-city-0', 'station-hall', 'station-front', 'you-acoustic-', 'case']) assert.ok(drawn(g, n).length, `${n} at ${t}`);
+    assert.equal(drawn(g, 'station-car-').length, cars ? TRAIN.cars : 0, `the train at ${t}`);
+    if (cars) assert.ok(drawn(g, 'station-car-').every((c) => c.name === cars), `${cars} at ${t}`);
+    for (const n of ['ground', 'trees-', 'lamp-', 'roofs-']) assert.equal(drawn(g, n).length, 0, `no ${n}`);
+  }
+  // The board's rows and the clock's hands, amber and ink, inside the board and round the clock.
+  const g = fakeContext();
+  createRenderer(g, art)(placed('station', 5).view);
+  const [x0, y0, x1, y1] = data.station.board, [cx, cy, r] = data.station.clock;
+  assert.ok(g.rects.filter(([x, y, , , c]) => x > x0 && x < x1 && y > y0 && y < y1 && (c === data.colors.gold || c === data.colors.goldDark)).length >= 8, 'the board lists trains');
+  assert.ok(g.rects.filter(([x, y, , , c]) => Math.hypot(x - cx, y - cy) <= r && c === data.colors.ink).length >= 6, 'the clock has hands');
+});
+
+test('the night market: its stalls, its lanterns lit one by one over the set, and the cat by your case instead of the pigeons', () => {
+  for (const bar of [0, 10, 30, PARK.bars]) {
+    const g = fakeContext();
+    createRenderer(g, art)(placed('market', bar * BAR).view);
+    for (const n of ['market-skyline', 'market-stalls', 'market-steam-', 'market-strings', 'market-street']) assert.ok(drawn(g, n).length, n);
+    const n = data.market.lanterns.length;
+    assert.equal(drawn(g, 'lantern-').length, n);
+    assert.equal(drawn(g, 'lantern-off').length, n - lanternsLit(bar, n), `bar ${bar}`);
+    const cats = drawn(g, 'cat-').map((c) => [c.name, c.x + data.frames[c.name][4], c.y + data.frames[c.name][5]]); // by its anchor, its feet
+    assert.equal(cats.length, 1);
+    assert.match(cats[0][0], /^cat-sleep-\d-left$/);
+    assert.deepEqual(cats[0].slice(1), CAT, 'asleep by your case');
+    assert.equal(drawn(g, 'pigeon-').length, 0, 'no pigeons at the market');
+  }
+});
+
+test('every frame the renderer asks for at the station and the market is in the sheet, over a whole set', () => {
+  for (const place of ['station', 'market']) {
+    const { set, scene } = placed(place, 0);
+    stoodAt(set.crowd, 'commuter', 1);
+    const draw = createRenderer(fakeContext(), art);
+    for (let t = 0; t < 62 * BAR; t += 0.37) {
+      if (Math.abs(t - 20) < 0.2) sceneNote(scene, 60, 0, t, 4); // the pigeons scatter, or the cat wakes
+      set.t = t;
+      for (const still of [false, true]) draw(view({ set, scene, t, bars: t / BAR, time: t * 1.1, still }));
+    }
+  }
+});
+
+test("the bottom line's words and the gear strip sit on a dark backing, which leaves the pigeons and the cat beside it alone", () => {
+  const g = fakeContext(), set = createSet(2);
+  set.t = 30;
+  createRenderer(g, art)(view({ set, scene: createScene(2), t: 30, bars: 30 / BAR, gear: allGear() }));
+  const backings = g.rects.filter(([, y, , h, c]) => y === 168 && h === 11 && c === data.colors.ink);
+  assert.ok(backings.some(([x, , w]) => x === 0 && w >= 70), 'behind the octave and the strength');
+  assert.ok(backings.some(([x, , w]) => x + w === W), 'behind the bar count');
+  assert.ok(backings.length >= 3, 'and behind the gear strip');
+  for (const [x, , w] of backings) for (const [px] of PIGEONS) assert.ok(px < x || px > x + w, `the pigeon at ${px} is clear of ${x}..${x + w}`);
+  for (const [x, , w] of backings) assert.ok(CAT[0] + 10 < x || CAT[0] - 10 > x + w, `the cat is clear of ${x}..${x + w}`);
 });
