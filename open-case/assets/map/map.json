@@ -1,0 +1,138 @@
+{
+  "size": [
+    1920,
+    1080
+  ],
+  "land": "land.png",
+  "pictures": [
+    {
+      "name": "city",
+      "x": 884,
+      "y": 132
+    },
+    {
+      "name": "village",
+      "x": 1240,
+      "y": 213
+    },
+    {
+      "name": "lighthouse",
+      "x": 215,
+      "y": 269
+    },
+    {
+      "name": "park",
+      "x": 723,
+      "y": 407
+    },
+    {
+      "name": "station",
+      "x": 1146,
+      "y": 437
+    },
+    {
+      "name": "suburb1",
+      "x": 425,
+      "y": 561
+    },
+    {
+      "name": "suburb2",
+      "x": 1505,
+      "y": 765
+    },
+    {
+      "name": "market",
+      "x": 763,
+      "y": 757
+    },
+    {
+      "name": "marina",
+      "x": 603,
+      "y": 899
+    },
+    {
+      "name": "farm",
+      "x": 1685,
+      "y": 923
+    },
+    {
+      "name": "suspension",
+      "x": 1328,
+      "y": 610
+    },
+    {
+      "name": "truss",
+      "x": 1340,
+      "y": 556
+    }
+  ],
+  "places": {
+    "park": {
+      "name": "The Park",
+      "pin": [
+        808,
+        430
+      ],
+      "label": [
+        808,
+        530
+      ],
+      "view": [
+        808,
+        459
+      ]
+    },
+    "station": {
+      "name": "The Station",
+      "pin": [
+        1208,
+        458
+      ],
+      "label": [
+        1208,
+        546
+      ],
+      "view": [
+        1208,
+        481
+      ]
+    },
+    "market": {
+      "name": "The Night Market",
+      "pin": [
+        848,
+        790
+      ],
+      "label": [
+        848,
+        882
+      ],
+      "view": [
+        848,
+        810
+      ]
+    }
+  },
+  "clouds": [
+    {
+      "name": "cloud1",
+      "x": 300,
+      "y": 120
+    },
+    {
+      "name": "cloud2",
+      "x": 1500,
+      "y": 640
+    },
+    {
+      "name": "cloud1",
+      "x": 1180,
+      "y": 90
+    },
+    {
+      "name": "cloud2",
+      "x": 120,
+      "y": 860
+    }
+  ]
+}
