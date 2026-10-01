@@ -323,7 +323,7 @@ function game(art, atlasView) {
   atlasOn.place = (id) => screen === 'map' && atlasDid(clickPlace(atlas, id));
   atlasOn.track = (i) => screen === 'map' && atlasDid(clickTrack(atlas, i));
   addEventListener('keydown', (e) => {
-    if (screen !== 'map' || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (screen !== 'map' || e.metaKey || e.ctrlKey || e.altKey || (e.repeat && !e.code.startsWith('Arrow'))) return;
     const what = atlasKey(atlas, e.code);
     if (what || e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault(); // no scrolling
     if (what) atlasDid(what);

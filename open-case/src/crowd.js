@@ -70,9 +70,10 @@ export function personName(kind, who) {
 // Deals an arriving `kind` a look, like a card: the first in the kind's deck that no one on screen is
 // wearing, skipping the look just dealt while any other is free. A deck that's run out, or that has
 // only looks someone's wearing left, is refilled with all of them, shuffled, never starting with the
-// look just dealt. So everyone of a kind comes by before any comes back, no two people on screen look
-// the same (at most 5 others are there when one arrives), and the look just dealt comes back only when
-// the other five of its kind are all on screen.
+// look just dealt. So everyone of a kind comes by before any comes back, and two people of a kind look
+// alike only when more than six of that kind are on screen at once (the station allows more than the
+// park and the market do): then, with every look worn, one someone's wearing is given out, not the
+// look just dealt if there's another.
 export function dealLook(c, kind) {
   const worn = new Set(c.people.filter((p) => p.kind === kind).map((p) => p.look));
   if (!c.decks[kind].some((l) => !worn.has(l))) {
@@ -85,7 +86,8 @@ export function dealLook(c, kind) {
     c.decks[kind] = deck;
   }
   const free = (l) => !worn.has(l);
-  const look = c.decks[kind].find((l) => free(l) && l !== c.lastLook[kind]) ?? c.decks[kind].find(free);
+  const look = c.decks[kind].find((l) => free(l) && l !== c.lastLook[kind]) ?? c.decks[kind].find(free)
+    ?? c.decks[kind].find((l) => l !== c.lastLook[kind]) ?? c.decks[kind][0];
   c.decks[kind].splice(c.decks[kind].indexOf(look), 1);
   c.lastLook[kind] = look;
   return look;

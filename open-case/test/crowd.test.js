@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { createCrowd, hear, crowdSize, endTips, dealLook, personName, KINDS, LOOKS } from '../src/crowd.js';
 import { CROWD, INTEREST, TIPS, DT, PLACES } from '../src/tuning.js';
 import { runCrowd, stoodAt } from './helpers.js';
+import { createSet, stepSet, playNote, releaseNote, momentsOf } from '../src/set.js';
+import { goodSet } from '../src/bots.js';
+import { LOFI } from '../src/beats.js';
 
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) <= eps;
 
@@ -342,4 +345,31 @@ test("a train's passengers who find the platform full wait a few seconds, then g
   const before = c.nextId;
   runCrowd(c, after, 0.5);
   assert.ok(c.nextId - before <= 1, `${c.nextId - before} arrived at once`);
+});
+
+test('with every look of a kind on screen, a seventh of that kind still gets a whole-number look', () => {
+  const c = createCrowd(1, 'station');
+  for (let i = 0; i < LOOKS; i++) stoodAt(c, 'commuter', i % 6, { look: i });
+  c.decks.commuter = [];
+  c.lastLook.commuter = 3;
+  const look = dealLook(c, 'commuter');
+  assert.ok(Number.isInteger(look) && look >= 0 && look < LOOKS, `look ${look}`);
+  assert.notEqual(look, 3, 'not the look just dealt, while another is there');
+});
+
+test('over a whole good set at the station, everyone on screen always has a whole-number look', () => {
+  const set = createSet(2, LOFI, 'station'), moments = momentsOf(goodSet(2));
+  let i = 0;
+  while (set.phase !== 'over') {
+    const until = set.t + DT;
+    for (; i < moments.length && moments[i].t <= until; i++) {
+      const m = moments[i];
+      if (m.note) playNote(set, m.note.pitch, m.note.strength, m.t);
+      else releaseNote(set, m.t);
+    }
+    stepSet(set, DT);
+    for (const p of set.crowd.people) {
+      assert.ok(Number.isInteger(p.look) && p.look >= 0 && p.look < LOOKS, `t=${set.t.toFixed(2)}: a ${p.kind} with look ${p.look}`);
+    }
+  }
 });
