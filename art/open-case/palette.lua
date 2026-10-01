@@ -26,4 +26,6 @@ return {
   auburn = "#8c3a22", -- hair
   blonde = "#e2bc72", -- hair
   go = "#6ed89a", -- the loop pedal playing, a listener's nod of recognition
+  stone = { "#958873", "#bdb097", "#c9bca3" }, -- the station's platform: its joints, its slabs, every other slab
+  brick = { "#6a3426", "#a4573c", "#c27a50" }, -- the night market's street: its joints, its bricks, bricks in the lanterns' light
 }

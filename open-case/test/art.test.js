@@ -36,6 +36,11 @@ const FAMILIES = [
   ])),
   ...REACTIONS.map((r) => [new RegExp(`^react-${r}-\\d$`), 2]),
   ...['peck', 'walk', 'fly'].flatMap((p) => ['left', 'right'].map((d) => [new RegExp(`^pigeon-${p}-\\d-${d}$`), 2])),
+  // the station and the night market
+  [/^station-city-\d$/, 5], ['station-hall', 1], [/^station-car-\d$/, 2], ['station-front', 1],
+  ['market-skyline', 1], ['market-stalls', 1], [/^market-steam-\d$/, 2], ['market-strings', 1], ['market-street', 1],
+  ['lantern-off', 1], [/^lantern-\d$/, 3],
+  ...['sleep', 'walk', 'run'].flatMap((p) => ['left', 'right'].map((d) => [new RegExp(`^cat-${p}-\\d-${d}$`), 2])),
 ];
 
 test('every frame the game draws is there, as many of each as the spec says, and nothing else', () => {
@@ -45,6 +50,16 @@ test('every frame the game draws is there, as many of each as the spec says, and
   // numbered from 0, so the renderer can pick one by counting
   for (const s of range(5)) for (const n of [`roofs-back-${s}`, `roofs-front-${s}`, `train-${s}`]) assert.ok(names.includes(n), n);
   for (const who of PEOPLE) for (const i of range(4)) assert.ok(names.includes(`${who}-walk-${i}-left`), `${who}-walk-${i}`);
+});
+
+test("the station's and the night market's layout: the board and the clock inside the hall, the lanterns along their strings, in order", () => {
+  const { board, clock } = data.station;
+  assert.ok(board[0] < board[2] && board[1] < board[3] && board[2] < 320 && board[3] < 100, `board ${board}`);
+  assert.ok(clock[2] > 4 && clock[1] - clock[2] > 30 && clock[0] + clock[2] < 320, `clock ${clock}`);
+  const { lanterns, stars } = data.market;
+  assert.ok(lanterns.length >= 20, `${lanterns.length} lanterns`);
+  for (const [x, y, c] of lanterns) assert.ok(x >= 0 && x < 320 && y > 0 && y < 70 && [0, 1, 2].includes(c), `${x}, ${y}, ${c}`);
+  assert.ok(stars.length >= 20 && stars.every(([x, y]) => x >= 0 && x < 320 && y >= 0 && y < 70));
 });
 
 test('every frame lies inside sprites.png', () => {

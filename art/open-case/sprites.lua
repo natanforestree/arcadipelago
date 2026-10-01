@@ -24,6 +24,10 @@
 --              pedal's 2x2 one), door [x, y, w, h]
 --              (the door and its sign, a click leaves), sign and board [x, y] (the middle of the top of
 --              the words on the sign and on the chalkboard), lift (pixels a chosen item rises)
+--   station    the station's layout: board [x0, y0, x1, y1] (the departure board's face, for its rows)
+--              and clock [x, y, r] (the clock's middle and radius, for its hands)
+--   market     the night market's: lanterns [[x, y, colour], ...] (where each hangs, in the order they
+--              light; their frames are lantern-off and lantern-<colour>) and stars [[x, y], ...]
 --   looks      { kind: ["woman" | "man", ...] }: each kind's passers-by, look 0 first (their frames are
 --              <kind>-<look>-walk-<0-3>, -stand-<0-1> and -nod-<0-1>, each -left and -right)
 --   colors     the named colours the game draws with in code
@@ -33,6 +37,8 @@ local D = dofile(here .. "draw.lua")
 local F = dofile(here .. "figures.lua")
 local G = dofile(here .. "gear.lua")
 local S = dofile(here .. "shop.lua")
+local ST = dofile(here .. "station.lua")
+local MK = dofile(here .. "market.lua")
 local L, C = D.L, D.C
 local W, H = D.W, D.H
 local STAGES = D.stages()
@@ -120,6 +126,32 @@ for _, pose in ipairs({ "peck", "walk", "fly" }) do
   end
 end
 for f = 0, 1 do add("bird-" .. f, 7, 3, 3, 1, function(b) F.bird(b, f, 3, 1) end) end
+
+-- The station: the far city through its arches in each stage of the sky, the hall, a car of the train
+-- with its doors shut (0) and open (1), and what stands in front of the train
+for s, st in ipairs(STAGES) do screen("station-city-" .. (s - 1), function(b) ST.city(b, st) end) end
+screen("station-hall", ST.hall)
+for f = 0, 1 do add("station-car-" .. f, ST.CAR, ST.TRAIN_BOTTOM + 1, 0, 0, function(b) ST.car(b, f == 1) end) end
+screen("station-front", ST.front)
+
+-- The night market: the skyline, the stalls, the steam (two frames), the strings, a lantern dark and
+-- lit in each colour, the street, and the cat asleep, walking and running, facing left and right
+screen("market-skyline", MK.skyline)
+screen("market-stalls", MK.stalls)
+for f = 0, 1 do screen("market-steam-" .. f, function(b) MK.steam(b, f) end) end
+screen("market-strings", MK.strings)
+add("lantern-off", 7, 9, 3, 0, function(b) MK.lantern(b, nil) end)
+for c = 0, 2 do add("lantern-" .. c, 7, 9, 3, 0, function(b) MK.lantern(b, c) end) end
+screen("market-street", MK.street)
+for _, pose in ipairs({ "sleep", "walk", "run" }) do
+  for f = 0, 1 do
+    local name = ("cat-%s-%d"):format(pose, f)
+    add(name .. "-left", 24, 12, 11, 10, function(b) MK.cat(b, 11, 10, pose, f) end)
+    local b = L.buffer(24, 12)
+    MK.cat(b, 11, 10, pose, f)
+    frames[#frames + 1] = { name = name .. "-right", b = D.mirror(b), px = 12, py = 10 }
+  end
+end
 
 -- The music shop: the room, the counter (drawn over the shopkeeper), the shopkeeper breathing (0, 1)
 -- and nodding at a sale (2, 3), the stock as it stands and chosen, and the tags
@@ -257,6 +289,14 @@ local json = table.concat({
   ('    "sign": [%d, %d],'):format((S.SIGN[1] + S.SIGN[3]) // 2, S.SIGN[2] + 3),
   ('    "board": [%d, %d],'):format((S.BOARD[1] + S.BOARD[3]) // 2, S.BOARD[2] + 6),
   ('    "lift": %d'):format(S.LIFT),
+  "  },",
+  '  "station": {',
+  ('    "board": [%d, %d, %d, %d],'):format(ST.BOARD[1], ST.BOARD[2], ST.BOARD[3], ST.BOARD[4]),
+  ('    "clock": [%d, %d, %d]'):format(ST.CLOCK[1], ST.CLOCK[2], ST.CLOCK[3]),
+  "  },",
+  '  "market": {',
+  '    "lanterns": ' .. list(MK.lanterns(), function(l) return ("[%d, %d, %d]"):format(l[1], l[2], l[3]) end) .. ",",
+  '    "stars": ' .. list(MK.stars(), pair),
   "  },",
   '  "looks": { ' .. table.concat((function()
     local out = {}
