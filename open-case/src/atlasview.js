@@ -4,7 +4,9 @@
 // chosen one, two clouds drifting over with their shadows; over it: the title, the track you'll play
 // (or the "What track?" panel) and the keys' hint. The view is SCREEN map pixels, scaled to
 // fit the window; it glides to each place you choose. A click on a place, its label or a track calls
-// on.place(id) or on.track(i), for main.js to hand to atlas.js.
+// on.place(id) or on.track(i), and a click on the game's title (the first map of a visit has one over
+// everything, dimming the map, its clouds still drifting) calls on.title(), for main.js to hand to
+// atlas.js. While the title is up the map's own words (heading, track, hint) are hidden.
 import { PLACE_IDS, PLACE_WORDS } from './places.js';
 import { moodName } from './beats.js';
 import { placeOf, trackOf, viewAt } from './atlas.js';
@@ -33,7 +35,7 @@ function loadImage(src) {
   });
 }
 
-// root: the page's #atlas, empty and hidden. on: { place(id), track(i) }.
+// root: the page's #atlas, empty and hidden. on: { place(id), track(i), title() }.
 export async function createAtlasView(root, on, base = new URL('../assets/map/', import.meta.url)) {
   const map = await (await fetch(new URL('map.json', base))).json();
   const [mapW, mapH] = map.size;
@@ -82,7 +84,7 @@ export async function createAtlasView(root, on, base = new URL('../assets/map/',
   }
 
   el('div', 'shade', stage);
-  el('h1', 'title', stage, 'Where to busk?');
+  const heading = el('h1', 'title', stage, 'Where to busk?');
   const chip = el('div', 'chip', stage);
   el('span', 'music', chip, '♪');
   const chipWords = el('div', null, chip);
@@ -92,6 +94,12 @@ export async function createAtlasView(root, on, base = new URL('../assets/map/',
   const rows = el('div', 'rows', panel);
   el('div', 'foot', panel, '↑↓ choose · enter busk here · esc back');
   const hint = el('div', 'hint', stage);
+  const intro = el('div', 'intro', stage);
+  const card = el('div', 'card', intro);
+  el('div', 'name', card, 'Open Case');
+  el('div', 'blurb', card, 'Busk for a crowd');
+  el('div', 'go', card, 'press any key or click to start');
+  intro.addEventListener('click', () => on.title());
 
   const fit = () => stage.style.setProperty('--s', String(Math.min(innerWidth / SCREEN[0], innerHeight / SCREEN[1])));
   fit();
@@ -140,17 +148,20 @@ export async function createAtlasView(root, on, base = new URL('../assets/map/',
         Object.assign(c.img.style, { left: `${Math.round(x)}px`, top: `${c.y}px` });
         Object.assign(c.shadow.style, { left: `${Math.round(x) + CLOUD_SHADOW[0]}px`, top: `${c.y + CLOUD_SHADOW[1]}px` });
       }
+      intro.hidden = !a.intro;
+      heading.hidden = a.intro;
       const t = trackOf(a);
-      chip.hidden = a.panel || !t;
+      chip.hidden = a.intro || a.panel || !t;
       if (t) {
         chipName.textContent = t.name;
         chipAbout.textContent = about(t);
       }
-      panel.hidden = !a.panel;
+      panel.hidden = a.intro || !a.panel;
       if (a.panel) {
         if (rowsOf !== a.tracks) makeRows(a.tracks);
         [...rows.querySelectorAll('.row')].forEach((r, i) => r.classList.toggle('on', i === a.track));
       }
+      hint.hidden = a.intro;
       hint.textContent = a.panel ? '↑↓ choose a track · enter to busk · esc back'
         : `← → choose a place · enter ${a.straightGo ? 'to busk here' : 'to go'}`;
     },

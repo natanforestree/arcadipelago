@@ -5,7 +5,8 @@
 // the audio is suspended, so the set's clock stops with it. Notes reach the set the moment they're
 // played, timed in seconds since the first note.
 //
-// The game opens on the map (atlas.js, atlasview.js); the sound starts on its first key or click.
+// The game opens on the map (atlas.js, atlasview.js), with the title over it: the sound starts on the
+// first key or click, which only clears the title.
 // Before each set it asks where to busk and what track to play, your last answers already chosen: the
 // park, the station at rush hour or the night market (places.js), each with its own crowd and scene.
 // Between sets, the end card leads back to it, or to the music shop: your coins are saved, and your
@@ -38,7 +39,7 @@ import { createShop, choose, move, action, trying, hit } from './shop.js';
 import { createLoop, record, note, release, ring, step, undo, due, countBeats } from './looper.js';
 import { LOFI, clockOf, readyBeat } from './beats.js';
 import { PLACE_WORDS, isPlace, loadPlace, savePlace } from './places.js';
-import { createAtlas, atlasKey, clickPlace, clickTrack, trackList, placeOf, trackOf } from './atlas.js';
+import { createAtlas, atlasKey, clickPlace, clickTrack, clickTitle, trackList, placeOf, trackOf } from './atlas.js';
 import { createAtlasView } from './atlasview.js';
 import { createStudio, loadBeats, saveBeats, chosenBeat, advance, letGo, setErase } from './studio.js';
 import { keyDown, keyUp, mouseDown, mouseMove, mouseUp, scroll, tick } from './studioinput.js';
@@ -67,7 +68,7 @@ const keepsNothing = debugSavings !== null || tryStudio;
 
 const storage = safeStorage();
 const audio = createAudio(storage);
-const atlasOn = {}; // what a click on the map does (game() sets it up): { place(id), track(i) }
+const atlasOn = {}; // what a click on the map does (game() sets it up): { place(id), track(i), title() }
 const touchOnly = matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches;
 
 if (touchOnly) document.getElementById('phone').hidden = false;
@@ -76,7 +77,7 @@ else {
   // The art and the map load before the game opens; if they can't, or the game can't start, say
   // something went wrong.
   const atlasRoot = document.getElementById('atlas');
-  Promise.all([loadArt(), createAtlasView(atlasRoot, { place: (id) => atlasOn.place(id), track: (i) => atlasOn.track(i) })]).then(([art, atlasView]) => game(art, atlasView)).catch((err) => {
+  Promise.all([loadArt(), createAtlasView(atlasRoot, { place: (id) => atlasOn.place(id), track: (i) => atlasOn.track(i), title: () => atlasOn.title() })]).then(([art, atlasView]) => game(art, atlasView)).catch((err) => {
     console.error(err);
     document.getElementById('message').hidden = false;
   });
@@ -299,14 +300,15 @@ function game(art, atlasView) {
 
   // The map, before each set: where to busk and what track to play, your last answers already chosen.
   // straightGo: the track's chosen already (the studio's Busk to this, or ?beat=), so Enter on a place
-  // goes straight there. With ?place= there's no map: straight to the place.
-  function openMap({ straightGo = false } = {}) {
+  // goes straight there. intro: the title is over it (the first map of a visit). With ?place= there's
+  // no map: straight to the place.
+  function openMap({ straightGo = false, intro = false } = {}) {
     audio.stopBand();
     set = null;
     if (fixedPlace) return toPlace();
     atlas = createAtlas({
       place, tracks: trackList(beats, owns(gear, 'studio')), chosen: fixedBeat ? { ready: fixedBeat.id } : beats.chosen,
-      straightGo: straightGo || !!fixedBeat,
+      straightGo: straightGo || !!fixedBeat, intro,
     });
     canvas.hidden = true;
     screen = 'map';
@@ -318,7 +320,8 @@ function game(art, atlasView) {
   }
   const beatOf = (key) => (key.ready ? readyBeat(key.ready) : beats.slots[key.slot]) ?? LOFI;
   // What happened on the map (atlas.js): the track you're on plays softly while the tracks are open;
-  // going keeps the place and the track for next time and sets off to the place.
+  // going keeps the place and the track for next time and sets off to the place. 'start' (the title
+  // cleared) needs nothing more: the sound's started already.
   function atlasDid(what) {
     if (what === 'panel' || what === 'track') audio.previewBand(audio.now() + 0.1, beatOf(trackOf(atlas).key));
     else if (what === 'back') audio.stopBand();
@@ -346,9 +349,16 @@ function game(art, atlasView) {
     startSound();
     atlasDid(clickTrack(atlas, i));
   };
+  atlasOn.title = () => {
+    if (screen !== 'map') return;
+    startSound();
+    atlasDid(clickTitle(atlas));
+  };
   addEventListener('keydown', (e) => {
     if (screen !== 'map' || e.metaKey || e.ctrlKey || e.altKey || (e.repeat && !e.code.startsWith('Arrow'))) return;
-    if (!NON_ACTIVATING_KEYS.has(e.key)) startSound();
+    if (NON_ACTIVATING_KEYS.has(e.key)) {
+      if (atlas.intro) return; // not a user activation: leave the title up, doing nothing
+    } else startSound();
     const what = atlasKey(atlas, e.code);
     if (what || e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault(); // no scrolling
     if (what) atlasDid(what);
@@ -736,6 +746,6 @@ function game(art, atlasView) {
     }
     requestAnimationFrame(frame);
   };
-  if (screen === 'map') openMap(); // the game opens on the map
+  if (screen === 'map') openMap({ intro: true }); // the game opens on the map, under the title
   requestAnimationFrame(frame);
 }

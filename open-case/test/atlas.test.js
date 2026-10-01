@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { trackList, createAtlas, placeOf, trackOf, atlasKey, clickPlace, clickTrack, viewAt } from '../src/atlas.js';
+import { trackList, createAtlas, placeOf, trackOf, atlasKey, clickPlace, clickTrack, clickTitle, viewAt } from '../src/atlas.js';
 import { READY, blankBeat } from '../src/beats.js';
 
 const map = JSON.parse(readFileSync(new URL('../assets/map/map.json', import.meta.url), 'utf8'));
@@ -102,4 +102,37 @@ test('the view centres on the chosen place, kept inside the map', () => {
   }
   const wide = viewAt(createAtlas({ tracks: [] }), map, map.size);
   assert.deepEqual(wide, { x: 0, y: 0 }, 'a screen as big as the map sees all of it');
+});
+
+test('the title: off unless asked for, and any key but Esc clears it and does nothing else', () => {
+  assert.equal(createAtlas({ tracks: trackList(beats(), false) }).intro, false);
+  assert.equal(createAtlas({ tracks: trackList(beats(), false), intro: true }).intro, true);
+  for (const code of ['ArrowRight', 'Enter', 'Space']) {
+    const a = createAtlas({ tracks: trackList(beats(), false), intro: true });
+    const [at, track] = [a.at, a.track];
+    assert.equal(atlasKey(a, code), 'start', code);
+    assert.equal(a.intro, false, code);
+    assert.deepEqual([a.at, a.panel, a.track], [at, false, track], `${code} changes nothing else`);
+    assert.deepEqual(keys(a, 'ArrowRight'), ['place']);
+    assert.equal(a.at, at + 1);
+  }
+  const up = createAtlas({ tracks: trackList(beats(), false), intro: true });
+  assert.equal(atlasKey(up, 'Escape'), null);
+  assert.equal(up.intro, true, 'Esc leaves the title up');
+});
+
+test('the title: a click on a place or a track clears it without choosing, and clickTitle clears it', () => {
+  const a = createAtlas({ tracks: trackList(beats(), false), intro: true });
+  const [at, track] = [a.at, a.track];
+  assert.equal(clickPlace(a, 'market'), 'start');
+  assert.equal(a.intro, false);
+  assert.deepEqual([a.at, a.panel, a.track], [at, false, track]);
+  const b = createAtlas({ tracks: trackList(beats(), false), intro: true });
+  assert.equal(clickTrack(b, 2), 'start');
+  assert.equal(b.intro, false);
+  assert.deepEqual([b.at, b.panel, b.track], [at, false, track]);
+  const c = createAtlas({ tracks: trackList(beats(), false), intro: true });
+  assert.equal(clickTitle(c), 'start');
+  assert.equal(c.intro, false);
+  assert.equal(clickTitle(c), null, 'no title, nothing to click');
 });

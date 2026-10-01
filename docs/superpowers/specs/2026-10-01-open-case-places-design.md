@@ -252,7 +252,7 @@ Nathan opens the game, sees the city, picks the station and a track, and busks t
 
 ## Later
 
-On 2026-10-01, after it went live, Nathan asked for the game to open on the map rather than the title card ("it just doesn't flow well or make sense"). So the game now opens on the map, and the sound starts on its first key or click. The title card is left only for the pages that skip the map (`?studio`, `?place=`, `?bot=`), and it shows just the name and "press any key". The key chart moved to the waiting screen of the first set of each visit, and the pause card lists the keys. The minimap and the compass were removed from the map.
+On 2026-10-01, after it went live, Nathan asked for the game to open on the map rather than the title card ("it just doesn't flow well or make sense"). So the game now opens on the map, and the sound starts on its first key or click. The title card is left only for the pages that skip the map (`?studio`, `?place=`, `?bot=`), and it shows just the name and "press any key". The key chart moved to the waiting screen of the first set of each visit, and the pause card lists the keys. The minimap and the compass were removed from the map. Later the same day, since the bare map was a bit ambiguous, the first map of each visit got a title over it (Open Case, "Busk for a crowd" and "press any key or click to start", the map dimmed beneath), which any key or click clears and starts the sound; the maps between sets have none.
 
 ## Not in this change
 

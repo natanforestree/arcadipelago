@@ -43,3 +43,7 @@ test('the pause card lists the keys', () => {
 test('the map has no minimap or compass', () => {
   assert.ok(!/minimap|compass/.test(html + scripts));
 });
+
+test('the page styles the title over the map', () => {
+  assert.match(html, /#atlas \.intro \{/);
+});
