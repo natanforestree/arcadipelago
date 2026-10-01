@@ -103,15 +103,18 @@ RAIL = [(970, 300), (900, 300), (830, 300), (760, 300), (712, 300), (692, 300), 
 
 # Where each picture stands (places.py): its bottom middle and the size of the clear ground it needs,
 # where no trees grow: (x, y, w, h). The music shop stands in the city on the road into town, just
-# above its kerb, halfway from the park to the station, where its label fits between theirs.
+# above its kerb, halfway from the park to the station, where its label fits between theirs. Your
+# home stands at the west end of the first suburb's street, a bit apart from its houses, just above
+# the road to the coast with its gate facing it; its clear ground is no taller than the house and its
+# garden, so the woods come up close behind it.
 PICTURES = {
     'park': (404, 262, 80, 50), 'station': (604, 270, 92, 52), 'market': (424, 438, 76, 44),
-    'shop': (500, 284, 32, 22),
+    'shop': (500, 284, 32, 22), 'home': (192, 323, 30, 20),
     'suburb1': (250, 318, 70, 34), 'suburb2': (790, 420, 70, 34), 'farm': (870, 500, 54, 34),
     'lighthouse': (120, 178, 26, 30), 'marina': (334, 478, 60, 26), 'village': (650, 150, 56, 30),
 }
 PLACES = ['park', 'station', 'market']  # the pictures that are places to busk
-STOPS = PLACES + ['shop']  # the map's stops: the places to busk, then the music shop
+STOPS = PLACES + ['shop', 'home']  # the map's stops: the places to busk, the music shop, then your home
 # Where the road and the railway cross the river, on bridges drawn from the side: each deck's left end
 # and its length.
 BRIDGES = {'suspension': (664, 344, 48), 'truss': (670, 300, 44)}

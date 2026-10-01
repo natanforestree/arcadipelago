@@ -5,6 +5,8 @@
 #     the night market (striped stalls under lanterns on warm brick, townhouses behind, a boardwalk);
 #   the music shop, on the road into town between the park and the station (a flat over a shopfront
 #     with a striped awning and a guitar in its lit window);
+#   your home, at the west end of the first suburb's street (a cottage with lit windows, smoke from its
+#     chimney and a front garden, a sign with a gold note by its gate);
 #   the city, in loose clusters over the land between the park, the station and the village: towers by
 #     the station, flats further out, houses at the edges, trees in the gaps;
 #   the settlements without a name: a village with a church, two suburbs, a farm, a lighthouse, a marina;
@@ -17,9 +19,9 @@
 #   land      the land's picture
 #   pictures  [{ name, x, y }]: each picture's top left, in the order they're drawn (the city first)
 #   places    { id: { name, pin: [x, y], label: [x, y], view: [x, y] } }: each of the map's stops (the
-#             places to busk, then the music shop): its name, where its gold pin points (just over its
-#             picture's top), where its label hangs (under it), and the point the view centres on when
-#             it's chosen
+#             places to busk, the music shop, then your home): its name, where its gold pin points (just
+#             over its picture's top), where its label hangs (under it), and the point the view centres
+#             on when it's chosen
 #   clouds    [{ name, x, y }]: where each cloud starts, drawn at SCALE times its size
 # It's deterministic: an unchanged script writes the same bytes.
 import json, math
@@ -530,6 +532,84 @@ def shop():
     back_to_front(items)
     return cv
 
+
+def home():
+    """Your home, at the west end of the first suburb's street: a cottage a touch bigger than its
+    neighbours, built the same way, with warm light in its windows, smoke from its chimney and a little
+    porch over a green door; a small front garden behind a picket fence, with a flower bed, a path to
+    the gate and a tree either side; and by the gate a green sign with a gold note, like the music
+    shop's."""
+    cv = Canvas(64, 50)
+    ground(cv, 31, 41, 29, 7, lambda x, y, d: (122, 164, 66) if (x + y) % 7 else (112, 156, 62), 23)  # the lawn
+    x, y, w, h = 18, 38, 24, 12  # the front's bottom left, its width and its height to the eaves
+    wall, roof = (234, 222, 200), (162, 72, 58)
+    GREEN, GOLD, FRAME = (34, 78, 64), (252, 208, 98), (92, 64, 52)
+    WARM, WARM_DEEP = (255, 238, 190), (246, 198, 116)
+    gx = x + 10  # the door, the path and the gate, in a line
+    def window(wx, wy, ww, wh):  # lit warm, brighter at the top, in a dark frame, a sill under it
+        cv.rect(wx, wy, wx + ww - 1, wy + wh - 1, FRAME)
+        for yy in range(wy + 1, wy + wh - 1):
+            cv.line([(wx + 1, yy), (wx + ww - 2, yy)], mix(WARM, WARM_DEEP, (yy - wy - 1) / max(1, wh - 3)))
+        cv.line([(wx - 1, wy + wh), (wx + ww, wy + wh)], lighter(wall, 0.5))
+    def house():
+        building(cv, x, y, w, h, 12, wall, roof, 'gable', lit=0.6, seed=3, floors=1, door=False)
+        cv.rect(x, y - h, x + w - 1, y - 1, wall)  # the front, painted afresh for its own windows
+        for yy in range(y - h + 2, y, 3):
+            cv.line([(x, yy), (x + w - 1, yy)], darker(wall, 0.06))
+        window(x + 2, y - 9, 6, 5)  # the big window on the left, a mullion down it, and a smaller one
+        cv.line([(x + 4, y - 8), (x + 4, y - 6)], FRAME)
+        window(x + w - 7, y - 9, 5, 5)
+        cv.line([(gx - 1, y - 7), (gx + 3, y - 7)], darker(wall, 0.3))  # the porch's shadow
+        cv.rect(gx, y - 6, gx + 2, y - 1, GREEN)  # the door, its glass lit, its brass knob
+        cv.put(gx + 1, y - 5, (246, 206, 128))
+        cv.put(gx + 2, y - 3, GOLD)
+        cv.poly([(gx - 2, y - 8), (gx + 1, y - 11), (gx + 4, y - 8)], roof)  # the porch's little gable
+        cv.line([(gx - 2, y - 8), (gx + 1, y - 11)], lighter(roof, 0.3))
+        cv.line([(gx + 2, y - 10), (gx + 4, y - 8)], darker(roof, 0.28))
+        cv.line([(gx - 2, y - 8), (gx + 4, y - 8)], darker(roof, 0.4))
+        cv.rect(gx - 1, y, gx + 3, y, (200, 190, 170))  # the step
+        # The chimney, over the stub building() may have drawn but a little taller, and its smoke
+        # drifting east, fading.
+        ch = x + w - 4
+        cv.rect(ch, y - h - 11, ch + 1, y - h - 6, (120, 80, 64))
+        cv.put(ch, y - h - 11, (150, 104, 84))
+        for k, (sx, sy, r) in enumerate(((ch + 1, y - h - 14, 1.2), (ch + 3, y - h - 17, 1.6), (ch + 6, y - h - 19, 1.8))):
+            cv.oval(sx - r, sy - r * 0.8, sx + r, sy + r * 0.8, (238, 238, 234, 170 - k * 45))
+    def garden():  # the path to the gate, flower beds either side of it, the picket fence and its gate
+        for yy in range(y + 1, y + 7):
+            for xx in range(gx, gx + 3):
+                cv.put(xx, yy, mix((206, 192, 160), (222, 210, 182), hsh(xx, yy, 24)))
+        flowers = [(222, 84, 92), (248, 212, 98), (240, 240, 220), (214, 120, 176)]
+        for (bx0, bx1) in ((x + 1, gx - 1), (gx + 4, x + w - 1)):
+            for xx in range(bx0, bx1):
+                cv.put(xx, y + 2, flowers[(xx * 3) % 4] if xx % 2 else (64, 108, 50))
+                cv.put(xx, y + 3, (64, 108, 50) if xx % 2 else (84, 128, 56))
+        fy = y + 7
+        for xx in range(x - 6, x + w + 8):
+            if gx - 1 <= xx <= gx + 3:
+                continue
+            cv.put(xx, fy, (226, 218, 198))
+            if xx % 2 == 0:
+                cv.put(xx, fy - 1, (244, 238, 224))
+            cv.put(xx + 1, fy + 1, (10, 24, 14, 70))
+        for px in (gx - 2, gx + 4):
+            cv.line([(px, fy - 2), (px, fy)], (246, 240, 228))
+            cv.put(px + 1, fy + 1, (10, 24, 14, 70))
+    def sign():  # on a post by the gate: a green board with a gold note, like the music shop's sign
+        sx, sy = gx + 5, y - 1  # the board's top left; its post stands on the fence's line
+        cv.line([(sx + 2, sy + 7), (sx + 2, sy + 8)], (100, 72, 48))
+        cv.put(sx + 3, sy + 9, (10, 24, 14, 70))
+        cv.rect(sx, sy, sx + 5, sy + 6, GREEN)
+        cv.line([(sx, sy), (sx + 5, sy)], (62, 112, 90))
+        for r, row in enumerate(['..XX', '..XX', '..X.', 'XXX.', 'XX..']):
+            for c, k in enumerate(row):
+                if k == 'X':
+                    cv.put(sx + 1 + c, sy + 1 + r, GOLD)
+    items = [(y, 0, house), (y + 7, 1, garden), (y + 8, 2, sign)]
+    items += [(y + 2, 3, lambda: tree(cv, x - 5, y + 2, 5.5, 41)), (y + 1, 4, lambda: tree(cv, x + w + 9, y + 1, 4.5, 44))]
+    back_to_front(items)
+    return cv
+
 # ---------------------------------------------------------------------------------------------
 # The settlements without a name
 
@@ -847,7 +927,7 @@ def top_row(cv):
 
 
 pictures = {
-    'park': park(), 'station': station(), 'market': market(), 'shop': shop(), 'suburb1': suburb(3),
+    'park': park(), 'station': station(), 'market': market(), 'shop': shop(), 'home': home(), 'suburb1': suburb(3),
     'suburb2': suburb(11), 'village': village(), 'farm': farm(), 'lighthouse': lighthouse(), 'marina': marina(),
 }
 the_city, city_at = city(pictures, masks())
@@ -856,7 +936,7 @@ clouds = {'cloud1': cloud(120, 44, 5), 'cloud2': cloud(90, 34, 9)}
 
 placed = [{'name': 'city', 'x': city_at[0], 'y': city_at[1]}]
 places = {}
-NAMES = {'park': 'The Park', 'station': 'The Station', 'market': 'The Night Market', 'shop': 'The Music Shop'}
+NAMES = {'park': 'The Park', 'station': 'The Station', 'market': 'The Night Market', 'shop': 'The Music Shop', 'home': 'Home'}
 for name, (cx, by, w, h) in sorted(PICTURES.items(), key=lambda kv: (kv[1][1], kv[0])):
     cv = pictures[name]
     x, y = cx * SCALE - cv.w // 2, by * SCALE - cv.h + 3
