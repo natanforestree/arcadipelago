@@ -477,9 +477,9 @@ test('the Mix: a fader follows the mouse as one change; a mute and the switches 
   assert.equal(studio.undo.length, 1);
   mouseDown(studio, drag, 104 + 7, 106 + 5, 0);
   assert.equal(studio.beat.mix.muted.drums, true);
-  mouseDown(studio, drag, 275, 45, 0);
+  mouseDown(studio, drag, 272, 36 + 14, 0); // the Pad switch's lamp
   assert.equal(studio.beat.mix.pad, true);
-  mouseDown(studio, drag, 275, 61, 0);
+  mouseDown(studio, drag, 272, 66 + 14, 0); // the Vinyl switch's lamp
   assert.equal(studio.beat.mix.vinyl, true);
 });
 

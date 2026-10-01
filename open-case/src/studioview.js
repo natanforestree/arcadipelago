@@ -2,7 +2,8 @@
 // song's settings across the top; on the left, on a blue faceplate with screws, the rhythm knob (a
 // vintage MIDI encoder: a knurled silver edge, a gold cap with the rhythm's number, a ring of lights
 // showing its hits, ◀ and ▶ to turn it) over the buttons, drawn as raised keys; the big pad on the
-// right (the Mix tab's faders in its place); and along the bottom, a picture of the loop, only to look
+// right (the Mix tab's mixing desk in its place: faders with coloured caps, raised mute keys, toggle
+// switches with lamps); and along the bottom, a picture of the loop, only to look
 // at: bar numbers, a lane for each part showing its notes, and the playhead. The list of beats, the
 // question of which slot to replace, and the name box (the list's Save) open over the pad. studioHit
 // says what a click lands on; drawStudio draws it all with render.js's tools.
@@ -40,7 +41,8 @@ export const STRIP = [16, 134, 300, 44]; // the picture of the loop: its numbers
 const MIX_FADERS = { drums: 104, bass: 144, chords: 184, pump: 244 }; // each fader's x, 14 wide
 const FADER = [38, 62]; // the faders' top and height
 const MUTE_Y = 106;
-const SWITCHES = { pad: [270, 40, 40, 12], vinyl: [270, 56, 40, 12] };
+// the Pad and Vinyl switches, one above the other; each box covers its name, lamp and toggle
+export const SWITCHES = { pad: [266, 34, 46, 26], vinyl: [266, 64, 46, 26] };
 const LIST_ROW = 11; // the list's rows
 const LANES = { drums: [144, 10], bass: [156, 9], chords: [167, 10] }; // each lane's top and height
 
@@ -197,11 +199,7 @@ function disc(px, cx, cy, r, at) {
 function wheel({ px, text, measure, C }, studio, [base]) {
   const [cx, cy] = WHEEL, rhythm = rhythmOf(studio), n = studio.rhythm[studio.tab], turn = knobAngle(n);
   px(...PANEL, C.dusk);
-  for (const [sx, sy] of [[4, 23], [74, 23], [4, 77], [74, 77]]) {
-    px(sx, sy, 3, 3, C.greyDark);
-    px(sx, sy + 1, 3, 1, C.ink); // the slot
-    px(sx + 1, sy, 1, 1, C.grey); // a glint
-  }
+  for (const [sx, sy] of [[4, 23], [74, 23], [4, 77], [74, 77]]) screw(px, C, sx, sy);
   for (let k = 0; k < 16; k++) {
     const len = rhythm.find(([s]) => s === k)?.[1] ?? 0;
     const light = ringLight(k, len);
@@ -233,6 +231,20 @@ function wheel({ px, text, measure, C }, studio, [base]) {
   }
 }
 
+// A screw on a faceplate: 3x3, a slot across it and a glint.
+function screw(px, C, x, y) {
+  px(x, y, 3, 3, C.greyDark);
+  px(x, y + 1, 3, 1, C.ink); // the slot
+  px(x + 1, y, 1, 1, C.grey); // a glint
+}
+
+// A raised key: a lighter top edge and a dark bottom one; when it's pressed in, the edges swap.
+function raisedKey(px, C, [x, y, w, h], colour, pressed) {
+  px(x, y, w, h, colour);
+  px(x, y, w, 1, pressed ? C.ink : C.greyDark);
+  px(x, y + h - 1, w, 1, pressed ? C.greyDark : C.ink);
+}
+
 // Where to centre a text in a box from x to its arrows (arrowsIn), a pixel short of them.
 const textLeftOf = (x, arrows) => Math.round((x + arrows.up[0] - 1) / 2);
 
@@ -253,9 +265,7 @@ function buttons({ px, text, C }, studio) {
     // a raised key: a lighter top edge and a dark bottom one; when it's on, pressed in (the edges
     // swap and its word sits a pixel lower)
     const pressed = lit[id] ? 1 : 0;
-    px(x, y, w, h, lit[id] ? C.red : C.charcoal);
-    px(x, y, w, 1, pressed ? C.ink : C.greyDark);
-    px(x, y + h - 1, w, 1, pressed ? C.greyDark : C.ink);
+    raisedKey(px, C, box, lit[id] ? C.red : C.charcoal, pressed);
     const sound = PARTS.includes(studio.tab) ? SOUNDS[studio.tab][studio.beat.sounds[studio.tab]].name : 'sound';
     const word = id === 'range' ? `oct ${studio.range > 0 ? '+1' : studio.range < 0 ? '-1' : '0'}` : id === 'sound' ? sound : id;
     const arrows = id === 'range' && arrowsIn(box); // the octave's ▲ and ▼, dimmed at its ends
@@ -301,28 +311,58 @@ function finger(px, C, x, y) {
   px(x - 2, y - 2, 5, 5, C.light);
 }
 
-// The Mix tab: a fader and a mute for each part, the Pump's fader, and the Pad and Vinyl switches.
-function mix({ px, text, C }, studio, tone) {
+// The Mix tab, a vintage mixing desk like the knob's faceplate: on blue with a screw in each corner, a
+// fader for each part and the Pump (a console cap in the part's colour on a scale, over a slot that
+// fills with colour below the cap), a raised mute key under each part, and the Pad and Vinyl switches
+// stacked at the right, each a name over a jewel lamp that glows gold when on, beside a toggle whose
+// lever is up when on.
+function mix({ px, text, measure, C }, studio, tone) {
   const [x0, y0, w, h] = PAD, m = studio.beat.mix;
-  px(x0, y0, w, h, C.charcoal);
+  px(x0, y0, w, h, C.dusk);
+  for (const [sx, sy] of [[x0 + 2, y0 + 2], [x0 + w - 5, y0 + 2], [x0 + 2, y0 + h - 5], [x0 + w - 5, y0 + h - 5]]) screw(px, C, sx, sy);
   const fader = (fx, value, [base, shadow], label) => {
-    px(fx + 5, FADER[0], 4, FADER[1], C.night);
-    const top = FADER[0] + Math.round((1 - value) * FADER[1]);
-    px(fx + 5, top, 4, FADER[0] + FADER[1] - top, shadow);
-    px(fx, top - 2, 14, 4, base);
-    text(label, fx + 7, FADER[0] - 9, C.grey, 'center');
+    const cx = fx + 7, top = FADER[0], level = top + Math.round((1 - value) * FADER[1]);
+    // the scale: a tick every eighth either side of the slot, longer at the ends and the middle
+    for (let i = 0; i <= 8; i++) {
+      const ty = Math.round(top + (i / 8) * FADER[1]), long = i % 4 === 0;
+      px(cx - 6 - (long ? 1 : 0), ty, long ? 3 : 2, 1, long ? C.grey : C.greyDark);
+      px(cx + 5, ty, long ? 3 : 2, 1, long ? C.grey : C.greyDark);
+    }
+    // the slot, sunk into the desk, filled with the part's colour below the cap
+    px(cx - 2, top - 1, 4, FADER[1] + 2, C.ink);
+    px(cx - 1, top, 2, FADER[1], C.night);
+    px(cx - 1, level, 2, top + FADER[1] - level, base);
+    // the cap: a console fader's, 12 wide and 7 high, lit from above, a line across its middle
+    const capX = cx - 6, capY = level - 3;
+    px(capX + 1, capY + 1, 12, 7, C.ink); // its shadow
+    px(capX, capY, 12, 7, base);
+    px(capX, capY, 12, 1, C.light);
+    px(capX, capY + 5, 12, 2, shadow);
+    px(capX, capY + 3, 12, 1, C.light);
+    // the label from a whole pixel, as centring an odd width would blur the font on a half pixel
+    text(label, Math.round(cx - measure(label) / 2), FADER[0] - 12, C.grey);
   };
   for (const p of PARTS) {
-    fader(MIX_FADERS[p], m.levels[p], tone[p], p);
-    px(MIX_FADERS[p], MUTE_Y, 14, 10, m.muted[p] ? C.red : C.night);
-    text('m', MIX_FADERS[p] + 7, MUTE_Y + 1, m.muted[p] ? C.light : C.grey, 'center');
+    const fx = MIX_FADERS[p], on = m.muted[p];
+    fader(fx, m.levels[p], tone[p], p);
+    // the mute: a raised key, pressed in and lit red when muted
+    raisedKey(px, C, [fx, MUTE_Y, 14, 10], on ? C.red : C.charcoal, on);
+    text('m', fx + 7, MUTE_Y + 1 + (on ? 1 : 0), on ? C.light : C.grey, 'center');
   }
   fader(MIX_FADERS.pump, m.pump, [C.gold, C.goldDark], 'pump');
-  for (const [id, [x, y, sw, sh]] of Object.entries(SWITCHES)) {
-    const on = m[id];
-    px(x, y, sh, sh, on ? C.gold : C.night);
-    text(id, x + sh + 4, y + 2, on ? C.light : C.grey);
-  }
+  Object.keys(SWITCHES).forEach((id, i) => {
+    const on = m[id], x = 268, y = 36 + i * 30;
+    text(id, x, y, on ? C.light : C.grey);
+    px(x, y + 10, 9, 9, C.ink); // the lamp's rim
+    px(x + 1, y + 11, 7, 7, on ? C.gold : C.charcoal);
+    px(x + 1, y + 15, 7, 3, on ? C.goldDark : C.ink);
+    px(x + 2, y + 12, 2, 1, on ? C.light : C.greyDark); // its glint
+    const tx = x + 15, ty = y + 13;
+    px(tx, ty, 7, 4, C.greyDark); // the toggle's plate
+    px(tx + 1, ty + 1, 5, 2, C.grey); // its nut
+    if (on) { px(tx + 2, ty - 5, 3, 6, C.grey); px(tx + 2, ty - 6, 3, 2, C.light); }
+    else { px(tx + 2, ty + 3, 3, 6, C.greyDark); px(tx + 2, ty + 8, 3, 2, C.grey); }
+  });
 }
 
 // The picture of the loop: bar numbers and a line on every beat; the drums as four rows of marks,

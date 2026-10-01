@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  studioHit, padAt, faderValue, moodShort, arrowsIn, NAME, TAB_BOXES, SETTINGS, WHEEL, PANEL, KNOB_ARROWS, knobAngle, ringLight, BUTTONS, PAD, STRIP, LIST_BUTTONS, NAME_BUTTONS, NAME_FIELD,
+  studioHit, padAt, faderValue, moodShort, arrowsIn, NAME, TAB_BOXES, SETTINGS, WHEEL, PANEL, KNOB_ARROWS, knobAngle, ringLight, BUTTONS, PAD, STRIP, SWITCHES, LIST_BUTTONS, NAME_BUTTONS, NAME_FIELD,
 } from '../src/studioview.js';
 import { createStudio, newBeat, setTab, startNaming, DRUMS } from '../src/studio.js';
 import { STUDIO } from '../src/tuning.js';
@@ -158,6 +158,28 @@ test('the Mix tab: a fader for each part and the Pump, a mute under each part, a
   assert.ok(Math.min(...levels) === 0 && Math.max(...levels) === 1, 'from none at the bottom to full at the top');
   assert.equal(faderValue(-50), 1);
   assert.equal(faderValue(500), 0);
+});
+
+test('the Mix tab: the Pad and Vinyl switches are stacked on the desk, clear of the faders, and a click on a lamp or a toggle lands on its own', () => {
+  const studio = createStudio(empty());
+  setTab(studio, 'mix');
+  const names = Object.keys(SWITCHES);
+  assert.deepEqual(names, ['pad', 'vinyl']);
+  names.forEach((which, i) => {
+    const box = SWITCHES[which], [x, y, w, h] = box;
+    assert.ok(inPad(box), `${which}'s box is on the desk`);
+    assert.ok(x >= 244 + 17, `${which}'s box is clear of the Pump fader`);
+    if (i) {
+      const [, py, , ph] = SWITCHES[names[i - 1]];
+      assert.ok(y >= py + ph, `${which}'s box is under the one before`);
+    }
+    const top = 36 + 30 * i, left = 268;
+    assert.deepEqual(studioHit(studio, left + 1, top + 1), { hit: 'switch', which }, 'its name');
+    assert.deepEqual(studioHit(studio, left + 4, top + 14), { hit: 'switch', which }, 'its lamp');
+    assert.deepEqual(studioHit(studio, left + 18, top + 14), { hit: 'switch', which }, 'its toggle');
+    assert.deepEqual(studioHit(studio, left + 18, top + 8), { hit: 'switch', which }, 'its lever, up');
+    assert.ok(x <= left && left + 22 <= x + w && y <= top && top + 19 <= y + h, 'covers name, lamp and toggle');
+  });
 });
 
 test('the list of beats opens the ready-made ones and yours, and has New, Busk to this and Close', () => {
