@@ -7,11 +7,11 @@
 //
 // The game opens on the map (atlas.js, atlasview.js); the sound starts on its first key or click.
 // Before each set it asks where to busk and what track to play, your last answers already chosen: the
-// park, the station at rush hour or the night market (places.js),
-// each with its own crowd and scene. Between sets, the end card leads back to it, or to the music
-// shop: your coins are saved, and your gear (gear.js) changes how your notes sound, wherever you
-// play and while you try things in the shop. Once the loop pedal is yours, R records your notes into a
-// loop (looper.js) that plays on under you; the crowd only ever hears the notes you play live.
+// park, the station at rush hour or the night market (places.js), each with its own crowd and scene.
+// Between sets, the end card leads back to it, or to the music shop: your coins are saved, and your
+// gear (gear.js) changes how your notes sound, wherever you play and while you try things in the shop.
+// Once the loop pedal is yours, R records your notes into a loop (looper.js) that plays on under you;
+// the crowd only ever hears the notes you play live.
 //
 // URL options: ?sound (the sound check); ?debug (interest bars, the corner panel, and Run the bots on
 // the end card); ?seed=N (fixes the passers-by, and the park's windows, train and birds); ?bot=random or
@@ -97,7 +97,9 @@ function game(art, atlasView) {
   const pageTime = () => (performance.now() - t0) / 1000; // seconds since the page opened
 
   // On the map, except on the pages that skip it (?studio, ?place=, ?bot=), which open on a title card.
-  let screen = bot || tryStudio || fixedPlace ? 'title' : 'map'; // 'title', 'map', 'ready' (waiting for your first note), 'playing', 'paused', 'over', 'shop', 'studio', 'thanks'
+  // The screens: 'title', 'map', 'ready' (waiting for your first note), 'playing', 'paused', 'over',
+  // 'shop', 'studio', 'thanks'.
+  let screen = bot || tryStudio || fixedPlace ? 'title' : 'map';
   // Where you busk: ?place='s, or the place you chose last time on the map (kept unless the page keeps
   // nothing). The map's state while it's up (atlas.js).
   let place = fixedPlace ?? loadPlace(storage), atlas = null;
@@ -274,7 +276,7 @@ function game(art, atlasView) {
   // started before the key is read, and it plays no note.
   let soundStarted = false;
   function startSound() {
-    audio.start();
+    audio.start(); // before the once-only guard on purpose: it resumes a context that is still suspended
     if (soundStarted) return;
     soundStarted = true;
     warmLayout();

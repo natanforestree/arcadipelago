@@ -4,7 +4,8 @@
 // you on your crate with your instrument, your pedals and the loop pedal, the open case and the band's
 // speaker, the passers-by, their reactions, the pigeons and birds (or the market's cat), the note
 // trail (and your loop's), the memory strip, the gear strip, the music shop, and the title card (on the
-// pages that skip the map), the key chart, and the pause and ?debug overlays. The end card and the map are HTML (index.html, atlasview.js).
+// pages that skip the map), the key chart, and the pause and ?debug overlays. The end card and the map
+// are HTML (index.html, atlasview.js).
 import { CROWD, PLAY, LAYERS, INTEREST, LOOP } from './tuning.js';
 import { LOFI_CLOCK } from './beats.js';
 import {
