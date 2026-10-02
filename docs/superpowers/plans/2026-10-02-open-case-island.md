@@ -5,7 +5,7 @@
 **Goal:** The little island with one pine in the map's lake becomes a fourth place to busk, at sunrise. Animals come to listen instead of people and nobody pays. Now and then an animal that liked your playing leaves a keepsake in your case. Your keepsakes go on a shelf in your room at home (Home now opens the room, and its desk opens the studio), and up to three ride in your case's lid wherever you busk.
 
 **Architecture:**
-- **The animals are people by another name.** `animals.js` gives each of the eleven animals one of the four kinds of town listener. The crowd (`crowd.js`) deals an arriving kind one of its animals the way it deals a person a look, from the looks' own stream, so every draw at the other places is unchanged. Animals cross along their own lines, settle on the island's nine spots by sort (`tuning.js` `ISLAND`), and their tips count as fondness, not coins (`PLACES.island.coins: false`).
+- **The animals are people by another name.** `animals.js` gives each of the eleven animals one of the four kinds of town listener. The crowd (`crowd.js`) deals an arriving kind one of its animals the way it deals a person a look, from the looks' own stream, so every draw at the other places is unchanged. The island's land runs right across the screen: the land animals walk along it as people walk the park's path, the swimmers cross the lake behind it, and the birds fly over, each along its own line. They settle on the island's eleven spots by sort (`tuning.js` `ISLAND`), and their tips count as fondness, not coins (`PLACES.island.coins: false`).
 - **Keepsakes are rules and storage, pure.** `keepsakes.js` holds the 22 keepsakes, the end-of-set rule (`keepsakeFor`: the first always comes, then a chance that rises with fondness, from the fan that stayed longest), the storage under `open-case-keepsakes`, and the case's rules (three at most; the first goes in by itself). `set.js` asks for the keepsake at the set's end and reports it as an event.
 - **The sunrise is pure scene data** (`scene.js`: the sky's stages horizon first, the sun's rise, the mist, the fish, the keepsake's drop). Its art is in the sprite sheet: `island.lua`, `animals.lua`, `keepsakes.lua` and `room.lua`. `render.js` draws the island, the animals and the room.
 - **Your room is a screen like the shop:** `room.js` is pure (the pointer, the keys, the clicks, the card), and `render.js` draws it. `main.js` adds the `room` screen and wires the rest: Home, the studio's way back, the birds, saving keepsakes, the end card and `?keepsakes=`.
@@ -18,18 +18,21 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-02-open-case-island-design.md`.
 - Nathan agreed the design in chat, one part at a time, and approved the written spec ("go ahead and continue").
+- Seeing the prototype's screenshots, he asked for two changes, which the spec now has (`92e0550`) and this plan builds:
+  - the land runs off the screen, so the animals don't all cross from the water ("can you make the land extend to outside of the frame, right now the animals cross from the water and its a bit weird");
+  - the room's window shows the woods behind the house, as the map has them ("where the house is there are trees and no water.. so it should show trees").
 - It builds on the places' spec (`2026-10-01-open-case-places-design.md`), the studio's (`2026-09-30-open-case-studio-design.md`), the passers-by's (`2026-09-29-open-case-passers-by-design.md`), the art's (`2026-09-28-open-case-art-design.md`) and the game's (`2026-09-28-open-case-design.md`).
 - Task 9 adds the spec's "What the build settled" section.
 
 **Prototyped:** everything below was built and run before this plan was written, in a scratch copy of the repo, one commit per task.
-- **Tests:** each task's end state passes the whole suite: 438 tests before, then 449, 465, 469, 473, 476, 484, 494, 495 and 496 after the tasks.
+- **Tests:** each task's end state passes the whole suite: 438 tests before, then 449, 465, 469, 473, 477, 485, 495, 496 and 497 after the tasks.
 - **The art:** the sprite sheet (801 frames, 61 colours) and the map's art rebuild byte for byte.
 - **Checked by eye in Chrome:**
   - the map's new stop, its label and line;
-  - a set on the island from before dawn to morning, all eleven animals on their spots, with others crossing, reactions over their heads, and the "fondness" in `?debug`'s panel;
+  - a set on the island from before dawn to morning: all eleven animals on their spots, the land animals walking and hopping along the island, the swimmers out on the lake behind it, reactions over their heads, and "fondness" in `?debug`'s panel;
   - a random bot's whole set on the island: its first keepsake (a crunchy leaf from the hedgehog) dropping into the case with a sparkle, then the end card ("The hedgehog left you a crunchy leaf.", "0 animals stopped to listen on One Tree Island.", "No animal stayed this time."), and the bot's keepsake never joining the shelf;
   - a whole set of your own there: "The frog left you a water lily.", the lily kept, in your case by itself and in the log, and the birds stopping at the shop's door and singing again outside it;
-  - your room with `?keepsakes=7`: the shelf, the count, the gold marks, a fourth refused with its message, a keepsake taken out;
+  - your room with `?keepsakes=7`: the woods through its window, the shelf, the count, the gold marks, a fourth refused with its message, a keepsake taken out;
   - the desk opening the studio with "room" on its corner key, Esc back to the room, Esc again to the map;
   - Enter on the music shop no longer buying the first pedal (see Review Focus).
 
@@ -85,20 +88,19 @@ These are the cases most likely to go wrong that the spec implies but no Node te
 
 The spec left these open, or the prototype changed them. Task 9 records them in the spec's "What the build settled".
 - **Where the animals cross and settle (`ISLAND`):**
-  - **Lines:** the swimmers cross the water just behind the island (y 138), the floaters a little further out (y 134), and the birds high up (y 40).
-  - **The ducks** cross behind the island with the other swimmers, not in front as the spec said, where they'd be under the bottom line's words.
-  - **The nine spots:**
+  - **Lines:** the land animals walk along the island at y 146, where people walk the park's path; the swimmers cross the lake at y 124, behind the reeds, the rock and the rowboat on the shore; and the birds fly high up, at y 40.
+  - **The eleven spots:**
     - the pine: (122, 93), (190, 77), (138, 61);
-    - the grass: (98, 162), (192, 164);
-    - the shallows: (58, 158), (232, 160);
-    - the rock: (262, 166);
-    - the lily pad: (30, 150).
+    - the grass round you: (70, 158), (96, 165), (196, 165), (228, 158);
+    - the shallows: (52, 134), (214, 134);
+    - the rock: (290, 133);
+    - the lily pad: (22, 136).
   - **Which spot:** the turtle takes the rock, else the nearest shallows; the frog takes only the lily pad.
-- **A floating animal** shows on its raft as it comes by, heads for its spot and leaves, and without it once settled.
+- **The squirrel** hops along the land like the others, then up to its branch in the pine.
 - **The numbers:**
   - `PLACES.island` brings one animal every 10 to 16 s, at most 6 on screen, with the park's pace, patience, stays and tips.
-  - Over seeds 1 to 200, the honest set wins 33 to 69 fondness.
-  - `KEEPSAKE` is `{ full: 30, most: 0.22, caseHolds: 3 }`. With one keepsake found, the honest set is left one in 26% of sets, a set in key that never brings an idea back in 4.5%, and the random and lick bots in none.
+  - Over seeds 1 to 200, the honest set wins 17 to 80 fondness.
+  - `KEEPSAKE` is `{ full: 30, most: 0.22, caseHolds: 3 }`. With one keepsake found, the honest set is left one in 26% of sets, a set in key that never brings an idea back in 5%, and the random and lick bots in none.
 - **The sunrise:**
   - **The sky** keeps the evening's timing reversed (`skyStages(bar).reverse()`), so the horizon lightens first. Its five stages are the dusk's colours, then three new morning blues.
   - **The far shore and the lake** follow the horizon's band.
@@ -109,7 +111,7 @@ The spec left these open, or the prototype changed them. Task 9 records them in 
   - It falls from 70 pixels above the case for 0.8 s, lands where the coins do with a coin's clink, and twinkles until the end card.
   - **The case's lid** holds 5 × 5 versions at (157, 154), (163, 154) and (169, 154).
 - **Your room:**
-  - **The look:** a teal wall, a window onto the lake with the island far off, the shelf with 11 columns by 2 rows of 14-pixel cubbies, and a desk with the groovebox, a mug and a lamp. A rug and a plant fill the rest.
+  - **The look:** a teal wall, a window onto the woods behind the house, the shelf with 11 columns by 2 rows of 14-pixel cubbies, and a desk with the groovebox, a mug and a lamp. A rug and a plant fill the rest.
   - **The card** runs along the bottom, as in the shop.
   - **Marks:** a gold 2 × 2 mark on a cubby whose keepsake is in your case. The pointer is a gold frame, or an arrow over the groovebox for the desk.
   - **The arrow keys:** right from the end of a row goes to the desk.
@@ -155,12 +157,12 @@ The spec left these open, or the prototype changed them. Task 9 records them in 
 - Consumes: `crowd.js`'s `KINDS`, `dealLook`, `stoodAt` (`test/helpers.js`), `PLACES` (as today).
 - Produces:
   - `animals.js`:
-    - `ANIMALS` (`{ id: { kind, cross: 'water' | 'sky' | 'float', spots: [sorts, first preferred], name: 'the fox', plural? } }`);
+    - `ANIMALS` (`{ id: { kind, cross: 'land' | 'water' | 'sky', spots: [sorts, first preferred], name: 'the fox', plural? } }`);
     - `ANIMAL_IDS` (bunny, ducks, squirrel, heron, turtle, deer, fox, frog, hedgehog, crow, owl);
     - `ANIMALS_OF` (`{ kind: [ids] }`), `LIKES` (`{ kind: words }`), `animalName(id)` (`'The fox'`).
   - `tuning.js`:
     - `PLACES.island`, with `coins: false` and `animals: true`;
-    - `ISLAND.lanes` (`{ water: 138, float: 134, sky: 40 }`) and `ISLAND.spots` (`[[x, y, sort], ...]`, nine of them).
+    - `ISLAND.lanes` (`{ land: 146, water: 124, sky: 40 }`) and `ISLAND.spots` (`[[x, y, sort], ...]`, eleven of them).
   - `crowd.js`:
     - on the island, each person also has `animal` and `lane`;
     - `crowd.first` (`{ kind, look }`), `spotsOf(c)`;
@@ -190,7 +192,7 @@ test('each animal crosses in its own way and settles on spots of its own sort, w
   const sorts = new Set(ISLAND.spots.map(([, , s]) => s));
   for (const id of ANIMAL_IDS) {
     const a = ANIMALS[id];
-    assert.ok(['water', 'sky', 'float'].includes(a.cross), id);
+    assert.ok(['land', 'water', 'sky'].includes(a.cross), id);
     assert.ok(Number.isFinite(ISLAND.lanes[a.cross]), id);
     assert.ok(a.spots.length >= 1 && a.spots.every((s) => sorts.has(s)), id);
     assert.match(a.name, /^the /);
@@ -200,10 +202,12 @@ test('each animal crosses in its own way and settles on spots of its own sort, w
   assert.equal(animalName('ducks'), 'The ducks');
 });
 
-test('the island has nine spots: three in the pine, two on the grass, two in the shallows, the rock and the lily pad', () => {
+test('the island has eleven spots: three in the pine, four on the grass, two in the shallows, the rock and the lily pad', () => {
   const count = (sort) => ISLAND.spots.filter(([, , s]) => s === sort).length;
-  assert.equal(ISLAND.spots.length, 9);
-  assert.deepEqual(['pine', 'grass', 'shallows', 'rock', 'lily'].map(count), [3, 2, 2, 1, 1]);
+  assert.equal(ISLAND.spots.length, 11);
+  assert.deepEqual(['pine', 'grass', 'shallows', 'rock', 'lily'].map(count), [3, 4, 2, 1, 1]);
+  const landAnimals = Object.values(ANIMALS).filter((a) => a.spots[0] === 'grass').length;
+  assert.equal(count('grass'), landAnimals, 'room on the grass for every animal that settles there');
   for (const [x, y] of ISLAND.spots) assert.ok(x > 0 && x < 320 && y > 0 && y < 180, `${x}, ${y}`);
 });
 ````
@@ -212,7 +216,7 @@ Apply to `open-case/test/crowd.test.js`:
 
 ````diff
 diff --git a/open-case/test/crowd.test.js b/open-case/test/crowd.test.js
-index ed09a7e..1d757c9 100644
+index ed09a7e..5bf2f71 100644
 --- a/open-case/test/crowd.test.js
 +++ b/open-case/test/crowd.test.js
 @@ -1,7 +1,8 @@
@@ -225,7 +229,7 @@ index ed09a7e..1d757c9 100644
  import { runCrowd, stoodAt } from './helpers.js';
  import { createSet, stepSet, playNote, releaseNote, momentsOf } from '../src/set.js';
  import { goodSet } from '../src/bots.js';
-@@ -373,3 +374,111 @@ test('over a whole good set at the station, everyone on screen always has a whol
+@@ -373,3 +374,113 @@ test('over a whole good set at the station, everyone on screen always has a whol
      }
    }
  });
@@ -304,11 +308,11 @@ index ed09a7e..1d757c9 100644
 +  // A turtle hooked with the rock taken goes to the nearest free spot in the shallows.
 +  const c = createCrowd(1, 'island');
 +  c.nextArrival = Infinity;
-+  settled(c, 'turtle', 7);
++  settled(c, 'turtle', 9);
 +  const turtle = settled(c, 'turtle', 0, { state: 'passing', listening: true, spot: -1, x: 200, y: ISLAND.lanes.water, interest: 0.6 });
 +  runCrowd(c, 0, DT);
 +  assert.equal(turtle.state, 'joining');
-+  assert.deepEqual(ISLAND.spots[turtle.spot], [232, 160, 'shallows']);
++  assert.deepEqual(ISLAND.spots[turtle.spot], [214, 134, 'shallows']);
 +});
 +
 +test('an animal hooked with no free spot of its sort passes by, as a person does when the arc is full', () => {
@@ -316,10 +320,12 @@ index ed09a7e..1d757c9 100644
 +  c.nextArrival = Infinity;
 +  settled(c, 'fox', 3);
 +  settled(c, 'hedgehog', 4);
-+  const bunny = settled(c, 'bunny', 0, { state: 'passing', listening: true, spot: -1, x: 120, y: ISLAND.lanes.float, interest: 0.6, dir: 1 });
++  settled(c, 'deer', 5);
++  settled(c, 'fox', 6);
++  const bunny = settled(c, 'bunny', 0, { state: 'passing', listening: true, spot: -1, x: 120, y: ISLAND.lanes.land, interest: 0.6, dir: 1 });
 +  runCrowd(c, 0, 1);
 +  assert.equal(bunny.state, 'passing');
-+  assert.ok(bunny.x > 120, 'it floats on by');
++  assert.ok(bunny.x > 120, 'it hops on by');
 +  const frog = settled(c, 'frog', 0, { state: 'passing', listening: true, spot: -1, x: 120, y: ISLAND.lanes.water, interest: 0.6 });
 +  runCrowd(c, 1, DT);
 +  assert.equal(frog.state, 'joining', 'the lily pad is free');
@@ -327,7 +333,7 @@ index ed09a7e..1d757c9 100644
 +
 +test('nobody pays on the island: a callback, a happy goodbye and the end of a set give fondness, not coins', () => {
 +  const c = createCrowd(1, 'island');
-+  settled(c, 'heron', 5, { budget: 5, interest: 0.9 });
++  settled(c, 'heron', 7, { budget: 5, interest: 0.9 });
 +  settled(c, 'fox', 3);
 +  hear(c, { rule: 'callback' }, 1);
 +  runCrowd(c, 1, 5.1);
@@ -421,20 +427,20 @@ Create `open-case/src/animals.js`:
 // and settles, once it's hooked, on a free spot of its own sort (tuning.js ISLAND.spots). Their order
 // here is the keepsakes' and the shelf's (keepsakes.js).
 //   kind    the town listener it stands for
-//   cross   how it comes by: 'water' (it swims or wades), 'sky' (it flies) or 'float' (a land animal
-//           floating over on something), each along its own line (tuning.js ISLAND.lanes)
+//   cross   how it comes by: 'land' (it walks or hops along the island), 'water' (it swims or wades
+//           out on the lake) or 'sky' (it flies), each along its own line (tuning.js ISLAND.lanes)
 //   spots   the sorts of spot it settles on: the first sort with a free spot is the one it takes
 //   name    what the end card and the shelf call it; plural for the ducks ("the ducks like")
 export const ANIMALS = {
-  bunny: { kind: 'jogger', cross: 'float', spots: ['grass'], name: 'the bunny' },
+  bunny: { kind: 'jogger', cross: 'land', spots: ['grass'], name: 'the bunny' },
   ducks: { kind: 'jogger', cross: 'water', spots: ['shallows'], name: 'the ducks', plural: true },
-  squirrel: { kind: 'jogger', cross: 'float', spots: ['pine'], name: 'the squirrel' },
+  squirrel: { kind: 'jogger', cross: 'land', spots: ['pine'], name: 'the squirrel' },
   heron: { kind: 'elder', cross: 'water', spots: ['shallows'], name: 'the heron' },
   turtle: { kind: 'elder', cross: 'water', spots: ['rock', 'shallows'], name: 'the turtle' },
-  deer: { kind: 'elder', cross: 'water', spots: ['shallows'], name: 'the deer' },
-  fox: { kind: 'student', cross: 'float', spots: ['grass'], name: 'the fox' },
+  deer: { kind: 'elder', cross: 'land', spots: ['grass'], name: 'the deer' },
+  fox: { kind: 'student', cross: 'land', spots: ['grass'], name: 'the fox' },
   frog: { kind: 'student', cross: 'water', spots: ['lily'], name: 'the frog' },
-  hedgehog: { kind: 'student', cross: 'float', spots: ['grass'], name: 'the hedgehog' },
+  hedgehog: { kind: 'student', cross: 'land', spots: ['grass'], name: 'the hedgehog' },
   crow: { kind: 'commuter', cross: 'sky', spots: ['pine'], name: 'the crow' },
   owl: { kind: 'commuter', cross: 'sky', spots: ['pine'], name: 'the owl' },
 };
@@ -459,7 +465,7 @@ Apply to `open-case/src/tuning.js`:
 
 ````diff
 diff --git a/open-case/src/tuning.js b/open-case/src/tuning.js
-index cab91b6..50e7f5f 100644
+index cab91b6..251b1a3 100644
 --- a/open-case/src/tuning.js
 +++ b/open-case/src/tuning.js
 @@ -107,6 +107,8 @@ export const TIPS = { callback: 1, happy: 2, happyElder: 3, end: 1 };
@@ -471,7 +477,7 @@ index cab91b6..50e7f5f 100644
  // The park's are CROWD's and TIPS's own, so a set there plays exactly as it always has.
  export const PLACES = {
    park: {
-@@ -122,6 +124,25 @@ export const PLACES = {
+@@ -122,6 +124,26 @@ export const PLACES = {
      kinds: [0, 0.4, 0.4, 0.2], arrive: [4, 7], waves: null, onScreen: 6, pace: 0.7, patience: 1.5, stay: [90, 240],
      tips: { callback: 1, happy: 1, happyElder: 2, end: 1 },
    },
@@ -483,16 +489,17 @@ index cab91b6..50e7f5f 100644
 +  },
 +};
 +
-+// One Tree Island's crowd: the line each sort of animal crosses along (animals.js cross), as people
-+// walk the path at y 146 (the water's behind you, the floaters a little further out, the birds high
-+// up), and the nine spots they settle on, [x, y of their feet, sort]: three in the pine, two on the
-+// grass either side of you, and four in the water (two in the shallows, the rock and the lily pad).
++// One Tree Island's crowd: the line each sort of animal crosses along (animals.js cross): the land
++// animals walk along the island at y 146, as people walk the park's path, the swimmers out on the lake
++// behind it (behind the reeds, the rock and the rowboat on its shore), and the birds high up; and the
++// eleven spots they settle on, [x, y of their feet, sort]: three in the pine, four on the grass round
++// you, and four in the water just off the shore (two in the shallows, the rock and the lily pad).
 +export const ISLAND = {
-+  lanes: { water: 138, float: 134, sky: 40 },
++  lanes: { land: 146, water: 124, sky: 40 },
 +  spots: [
 +    [122, 93, 'pine'], [190, 77, 'pine'], [138, 61, 'pine'],
-+    [98, 162, 'grass'], [192, 164, 'grass'],
-+    [58, 158, 'shallows'], [232, 160, 'shallows'], [262, 166, 'rock'], [30, 150, 'lily'],
++    [70, 158, 'grass'], [96, 165, 'grass'], [196, 165, 'grass'], [228, 158, 'grass'],
++    [52, 134, 'shallows'], [214, 134, 'shallows'], [290, 133, 'rock'], [22, 136, 'lily'],
 +  ],
  };
  
@@ -1109,10 +1116,10 @@ Apply to `open-case/src/tuning.js`:
 
 ````diff
 diff --git a/open-case/src/tuning.js b/open-case/src/tuning.js
-index 50e7f5f..099786c 100644
+index 251b1a3..6c670b6 100644
 --- a/open-case/src/tuning.js
 +++ b/open-case/src/tuning.js
-@@ -145,6 +145,13 @@ export const ISLAND = {
+@@ -146,6 +146,13 @@ export const ISLAND = {
    ],
  };
  
@@ -1347,18 +1354,19 @@ Apply to `open-case/src/tuning.js`:
 
 ````diff
 diff --git a/open-case/src/tuning.js b/open-case/src/tuning.js
-index 099786c..96c88c4 100644
+index 6c670b6..21de94a 100644
 --- a/open-case/src/tuning.js
 +++ b/open-case/src/tuning.js
-@@ -132,11 +132,17 @@ export const PLACES = {
+@@ -132,12 +132,18 @@ export const PLACES = {
    },
  };
  
--// One Tree Island's crowd: the line each sort of animal crosses along (animals.js cross), as people
-+// One Tree Island. Its crowd: the line each sort of animal crosses along (animals.js cross), as people
- // walk the path at y 146 (the water's behind you, the floaters a little further out, the birds high
- // up), and the nine spots they settle on, [x, y of their feet, sort]: three in the pine, two on the
- // grass either side of you, and four in the water (two in the shallows, the rock and the lily pad).
+-// One Tree Island's crowd: the line each sort of animal crosses along (animals.js cross): the land
++// One Tree Island. Its crowd: the line each sort of animal crosses along (animals.js cross): the land
+ // animals walk along the island at y 146, as people walk the park's path, the swimmers out on the lake
+ // behind it (behind the reeds, the rock and the rowboat on its shore), and the birds high up; and the
+ // eleven spots they settle on, [x, y of their feet, sort]: three in the pine, four on the grass round
+ // you, and four in the water just off the shore (two in the shallows, the rock and the lily pad).
 +// Its sunrise (scene.js and render.js), over the same PARK.bars as the park's evening: the sky lightens
 +// a band at a time from the horizon up, through its five stages; the sun comes up from behind the far
 +// pines, rising `sunRise` pixels from bar `sunFrom` to bar `sunTo`; the mist's `mist` streaks thin out
@@ -1366,7 +1374,7 @@ index 099786c..96c88c4 100644
 +// the water's y there), which then stays down PARK.pigeonsAway bars, as the pigeons stay away.
  export const ISLAND = {
 +  sunFrom: 4, sunTo: 50, sunRise: 44, mist: 4, mistGone: 40, fish: [262, 124],
-   lanes: { water: 138, float: 134, sky: 40 },
+   lanes: { land: 146, water: 124, sky: 40 },
    spots: [
      [122, 93, 'pine'], [190, 77, 'pine'], [138, 61, 'pine'],
 ````
@@ -1520,7 +1528,7 @@ Apply to `open-case/test/art.test.js`:
 
 ````diff
 diff --git a/open-case/test/art.test.js b/open-case/test/art.test.js
-index e37916f..fb800b6 100644
+index e37916f..e0a9fa3 100644
 --- a/open-case/test/art.test.js
 +++ b/open-case/test/art.test.js
 @@ -7,7 +7,8 @@ import assert from 'node:assert/strict';
@@ -1544,7 +1552,7 @@ index e37916f..fb800b6 100644
  ];
  
  test('every frame the game draws is there, as many of each as the spec says, and nothing else', () => {
-@@ -222,3 +227,51 @@ test("the shop window's view stays inside its frame: the wall beside it is plain
+@@ -222,3 +227,52 @@ test("the shop window's view stays inside its frame: the wall beside it is plain
      for (const x of [56, 57]) assert.equal(colourAt('shop-room', x, y), colourAt('shop-room', 54, y), `wall at ${x},${y}`);
    }
  });
@@ -1560,14 +1568,15 @@ index e37916f..fb800b6 100644
 +  for (const [x] of data.island.glints.slice(0, data.island.sunGlints)) assert.ok(Math.abs(x - sx) <= 4, 'the sun\'s glints lie under it');
 +});
 +
-+test("the island's animals cross open water, and each settles where its sort of spot says: on a branch, on the grass, in the shallows, on the rock or the lily pad", () => {
-+  const [, waterTop] = cover('island-water-0', 0, 0);
-+  for (const lane of [ISLAND.lanes.water, ISLAND.lanes.float]) {
-+    assert.ok(lane > waterTop + 10, `the ${lane} line is out on the lake`);
-+    for (let x = 0; x < 320; x++) assert.ok(!opaqueAt('island-land', 0, 0, x, lane), `nothing of the island at ${x}, ${lane}`);
-+  }
-+  assert.ok(ISLAND.lanes.sky < waterTop - 30, 'the birds fly high');
++test("the island's land runs right across the screen, the swimmers cross open water behind it, and each animal settles where its sort of spot says", () => {
++  const [, waterTop] = cover('island-water-0', 0, 0), { land, water, sky } = ISLAND.lanes;
 +  const grass = new Set(['69,128,110', '46,93,92']); // the island's grass: the palette's two lighter leaf greens (palette.lua)
++  for (let x = 0; x < 320; x++) {
++    assert.ok(opaqueAt('island-land', 0, 0, x, land) && opaqueAt('island-land', 0, 0, x, land - 3), `the land animals walk on the island at ${x}`);
++    assert.ok(!opaqueAt('island-land', 0, 0, x, water + 1), `the swimmers are out on the lake at ${x}, behind everything on its shore`);
++  }
++  assert.ok(water > waterTop + 10 && water < land - 15, 'on the lake, well behind the land animals');
++  assert.ok(sky < waterTop - 30, 'the birds fly high');
 +  for (const [x, y, sort] of ISLAND.spots) {
 +    const under = [1, 2, 3].map((d) => colourAt('island-land', x, y + d));
 +    if (sort === 'pine') assert.ok([1, 2, 3].some((d) => opaqueAt('island-pine', 0, 0, x, y + d)), `a branch under ${x}, ${y}`);
@@ -1604,7 +1613,7 @@ Run: `cd open-case && npm test`
 Expected: FAIL. Five art tests fail, as the sheet has no island yet:
 - "every frame the game draws is there…";
 - "One Tree Island's sunrise…";
-- "the island's animals cross open water…";
+- "the island's land runs right across the screen…";
 - "every animal fits on screen…";
 - "each animal is its own…".
 
@@ -1638,13 +1647,14 @@ Create `art/open-case/island.lua`:
 --   the lake, from the far shore down, in each stage's colours, the horizon's colour along its far edge;
 --   the dawn mist, a streak at a time (render.js leaves them off one by one as it lifts);
 --   the fish that jumps at a loud note, and its splash;
---   the island: its sandy edge and its grass, the rock and the lily pad in the water either side, the
---     reeds, and the rowboat tied up beside you;
+--   the island: its grass running across the screen and on out of it either side, its sandy shore,
+--     the reeds, the rock and the lily pads in the water just off it, and the rowboat pulled up on it;
 --   the one pine: its branches over your head, and its trunk, which render.js draws among the figures
---     so the animals crossing behind it pass behind it.
--- Everything is laid out round the park's positions: you on your crate, the case at your feet. The
--- animals settle on tuning.js ISLAND.spots: three on the pine's branches, two on the grass either side
--- of you, two in the shallows, one on the rock and one on the lily pad.
+--     so the animals passing behind it pass behind it.
+-- Everything is laid out round the park's positions: you on your crate, the case at your feet, and
+-- the land animals walking along the island at y 146, as people walk the park's path, the swimmers
+-- out on the lake behind its shore. They settle on tuning.js ISLAND.spots: three on the pine's branches, four on the
+-- grass round you, two in the shallows, one on the rock and one on the lily pad.
 local here = debug.getinfo(1, "S").source:sub(2):match("^(.-)[^/]+$") or ""
 local D = dofile(here .. "draw.lua")
 local L, C, rect, oval, stamp = D.L, D.C, D.rect, D.oval, D.stamp
@@ -1655,8 +1665,8 @@ local I = {}
 I.SHORE = 100 -- the lake's far edge: the far shore's pines stand on it
 I.SUN = { 66, 120 } -- the sun's middle before it comes up, hidden by the lake (scene.js sunUp lifts it)
 I.TRUNK_FEET = 147 -- the row the pine's trunk stands on, to sort it among the figures
-I.ROCK = { 262, 169 } -- the turtle's rock: its middle
-I.LILY = { 30, 151 } -- the frog's lily pad: its middle
+I.ROCK = { 290, 136 } -- the turtle's rock, in the water off the shore: its middle
+I.LILY = { 22, 137 } -- the frog's lily pad: its middle
 
 -- The sunrise's five stages, before dawn to morning: each its seven bands' colours, top to horizon.
 -- The dusk's colours, then the morning's blues.
@@ -1748,60 +1758,63 @@ function I.fish(b, pose, frame, x, y)
   end
 end
 
--- The island, round you: where its ground is (the grass and the sand round it), rising from the water
--- either side of you to its top just behind your crate.
-local function top(x) return 145 + ((x - 148) / 70) ^ 2 * 24 end
-local function ground(x, y) return y >= top(x) and y < H end
+-- The island's shore: the row its ground starts on at x. It runs right across the screen and on out of
+-- it either side, gently uneven, a pixel higher behind your crate.
+local function shore(x)
+  return 139 + math.floor(1.6 * math.sin(x / 21) + math.sin(x / 8 + 1) + 0.5) - (math.abs(x - 140) < 40 and 1 or 0)
+end
+local function ground(x, y) return y >= shore(x) and y < H end
 
--- The island and what's round it in the water: the grass edged in sand, with tufts and a few flowers;
--- the reeds by the shallows; the turtle's rock; the lily pads, the frog's with a flower beside it; and
--- the rowboat pulled up to the right, its rope tied to a stake.
+-- The island in front of the lake: its wet edge and its sand along the shore, then the grass, with
+-- tufts, a few flowers and pebbles; the reeds and the lily pads in the water just off it, the frog's
+-- with a flower beside it; the turtle's rock; and the rowboat pulled up on the shore to the right, its
+-- rope tied to a stake.
 function I.land(b)
-  for y = 140, H - 1 do
+  for y = 130, H - 1 do
     for x = 0, W - 1 do
       if ground(x, y) then
-        local edge = not ground(x - 2, y) or not ground(x + 2, y) or not ground(x, y - 2)
-        local wet = not ground(x - 1, y) or not ground(x + 1, y) or not ground(x, y - 1)
-        if wet then b[y][x] = C.path[2]
-        elseif edge then b[y][x] = C.path[3]
+        local d = y - shore(x) -- rows in from the water's edge
+        if d == 0 then b[y][x] = C.path[2]
+        elseif d == 1 or (d == 2 and L.rnd(x, y, 42) < 0.6) then b[y][x] = C.path[3]
         else b[y][x] = (L.rnd(x, y, 41) < 0.08) and C.leaf[2] or C.leaf[3] end
       end
     end
   end
-  for x = 86, 212, 7 do -- tufts of taller grass, and a few flowers
-    local y = math.ceil(top(x)) + 3 + math.floor(L.rnd(x, 1, 43) * 4)
-    if ground(x, y + 1) and ground(x - 2, y) and ground(x + 2, y) then
-      set(b, x, y, C.leaf[2]); set(b, x + 1, y - 1, C.leaf[2]); set(b, x + 2, y, C.leaf[2])
-      if L.rnd(x, 2, 43) < 0.3 then set(b, x + 1, y - 2, L.rnd(x, 3, 43) < 0.5 and C.light or C.yellow[2]) end
-    end
+  for x = 3, W - 3, 6 do -- tufts of taller grass, a few flowers, and pebbles on the sand
+    local y = shore(x) + 6 + math.floor(L.rnd(x, 1, 43) * 30)
+    set(b, x, y, C.leaf[2]); set(b, x + 1, y - 1, C.leaf[2]); set(b, x + 2, y, C.leaf[2])
+    if L.rnd(x, 2, 43) < 0.4 then set(b, x + 1, y - 2, ({ C.light, C.yellow[2], C.rose[2] })[1 + math.floor(L.rnd(x, 3, 43) * 3)]) end
+    if L.rnd(x, 4, 43) < 0.25 then rect(b, x + 4, shore(x + 4) + 1, x + 5, shore(x + 4) + 1, C.coat[1]) end
   end
-  -- the reeds: a clump by each of the shallows
-  for _, r in ipairs({ { 44, 160 }, { 70, 166 }, { 246, 163 } }) do
+  -- the reeds, by the shallows, standing in the water at the shore
+  for _, r in ipairs({ { 40, 0 }, { 202, 0 } }) do
     for k = 0, 4 do
-      local x, h = r[1] + k * 2 - 4, 6 + math.floor(L.rnd(r[1], k, 45) * 6)
-      rect(b, x, r[2] - h, x, r[2], C.leaf[2])
-      if k % 2 == 0 then rect(b, x, r[2] - h - 2, x, r[2] - h, C.wood[2]) end -- a bulrush's head
+      local x = r[1] + k * 2 - 4
+      local foot, h = shore(x) - 1, 4 + math.floor(L.rnd(r[1], k, 45) * 5)
+      rect(b, x, foot - h, x, foot, C.leaf[2])
+      if k % 2 == 0 then rect(b, x, foot - h - 2, x, foot - h, C.wood[2]) end -- a bulrush's head
     end
   end
   -- the rock, grey, its top lit, a ripple round its foot
   local rx, ry = I.ROCK[1], I.ROCK[2]
-  oval(b, rx + 0.5, ry + 0.5, 9, 4, C.coat[1])
-  oval(b, rx - 0.5, ry - 1.5, 7, 2.5, C.coat[2])
-  rect(b, rx - 11, ry + 4, rx - 7, ry + 4, C.mist); rect(b, rx + 7, ry + 4, rx + 11, ry + 4, C.mist)
+  oval(b, rx + 0.5, ry + 0.5, 8, 3.5, C.coat[1])
+  oval(b, rx - 0.5, ry - 1, 6, 2, C.coat[2])
+  rect(b, rx - 11, ry + 3, rx - 7, ry + 3, C.mist); rect(b, rx + 7, ry + 3, rx + 11, ry + 3, C.mist)
   -- the lily pads: the frog's, with a notch, and two small ones; a pink flower beside the frog's
   local function pad(cx, cy, rx2, ry2)
     oval(b, cx + 0.5, cy + 0.5, rx2, ry2, C.leaf[2])
     oval(b, cx + 0.5, cy, rx2 - 1, ry2 - 1, C.leaf[3])
     set(b, cx + 1, cy, nil); set(b, cx + 2, cy - 1, nil); set(b, cx + 1, cy - 1, nil)
   end
-  pad(I.LILY[1], I.LILY[2], 7, 2.5)
-  pad(12, 160, 4, 1.5)
-  pad(50, 147, 3, 1.5)
-  stamp(b, I.LILY[1] + 7, I.LILY[2] - 4, { ".f.", "fwf", "eFe" })
-  -- the rowboat, pulled up on the right with its bow on the sand, an oar across it, its rope to a stake
-  stamp(b, 206, 167, { "kk", "DD", "DD", "DD" })
-  for x = 208, 214 do set(b, x, 166 + (x - 208) // 3, C.wood[1]) end
-  stamp(b, 212, 167, {
+  pad(I.LILY[1], I.LILY[2], 6, 2)
+  pad(6, 132, 3, 1.5)
+  pad(76, 131, 3, 1.5)
+  stamp(b, I.LILY[1] + 6, I.LILY[2] - 4, { ".f.", "fwf", "eFe" })
+  -- the rowboat, pulled up on the shore to the right, its stern in the water, an oar across it, its
+  -- rope to a stake in the grass
+  stamp(b, 229, 140, { "kk", "DD", "DD", "DD" })
+  for x = 231, 237 do set(b, x, 140 - (x - 231) // 3, C.wood[1]) end
+  stamp(b, 236, 134, {
     "....ggggggggggggggggggggggg...",
     "..gGDDDDDDDDDGDDDDDDDDDDDDGgg.",
     ".ggGDDDDDDDDDGDDDDDDDDDDDDGggg",
@@ -1809,9 +1822,9 @@ function I.land(b)
     "...GGGGGGGGGGGGGGGGGGGGGGGGG..",
     ".....GGGGGGGGGGGGGGGGGGGGG....",
   })
-  rect(b, 214, 166, 236, 166, C.wood[3]) -- the oar
-  rect(b, 236, 165, 240, 167, C.wood[3])
-  rect(b, 216, 173, 242, 173, C.mist) -- its ripple on the water
+  rect(b, 238, 133, 260, 133, C.wood[3]) -- the oar
+  rect(b, 260, 132, 264, 134, C.wood[3])
+  rect(b, 262, 137, 270, 137, C.mist) -- a ripple off its stern
 end
 
 -- The pine's branches, in tiers over your head: dark teal, lit on their upper left where the sun comes
@@ -1851,7 +1864,7 @@ end
 function I.glints()
   local out = {}
   for i = 0, 7 do out[#out + 1] = { I.SUN[1] - 3 + math.floor(L.rnd(i, 1, 49) * 7), I.SHORE + 3 + i * 4 } end
-  for i = 0, 13 do out[#out + 1] = { math.floor(L.rnd(i, 2, 49) * W), I.SHORE + 6 + math.floor(L.rnd(i, 3, 49) * 70) } end
+  for i = 0, 13 do out[#out + 1] = { math.floor(L.rnd(i, 2, 49) * W), I.SHORE + 6 + math.floor(L.rnd(i, 3, 49) * 26) } end
   return out
 end
 I.SUN_GLINTS = 8 -- the first this many glints are the sun's reflection
@@ -1865,8 +1878,8 @@ Create `art/open-case/animals.lua`:
 -- The animals of One Tree Island in the flat style, for the sprite sheet (sprites.lua). Each is drawn
 -- facing left, its feet (or for a swimmer, the waterline) at (x, y), and the sheet mirrors it to face
 -- right. Each has three poses, two frames each:
---   cross  coming by: the swimmers swim or wade, the birds fly, and the land animals float over, the
---          fox on a log, the bunny on a big leaf, the squirrel on a branch, the hedgehog curled in a ball
+--   cross  coming by: the land animals walk or hop along the island, the swimmers swim or wade just off
+--          its shore, and the birds fly
 --   sit    settled on its spot, breathing (frame 1 a breath)
 --   beat   keeping the beat once it's hooked: frame 0 is its sit, and frame 1 its move on the beat (the
 --          frog bobs, the fox's tail sways, the ducks bob, the bunny's ears twitch, the heron dips its
@@ -1902,8 +1915,7 @@ local function lower(rows, n)
 end
 
 -- Each animal's maps: sit, its breath (sit1; by default its top `head` rows lowered a pixel), its move
--- on the beat (beat), and its two crossing frames (cross). A floater's crossing is its sit on its raft
--- (cross nil, raft its two frames, the raft's top row `on` rows over its foot).
+-- on the beat (beat), and its two crossing frames (cross).
 local M = {}
 
 M.bunny = {
@@ -1934,9 +1946,33 @@ M.bunny = {
     "..cwwwwwcww",
     "...cc..cc..",
   },
-  raft = { -- a big autumn leaf, its stalk curled up behind
-    { "...........xx", ".OOOOOOOOOOx.", "OOxOOxOOxOOOO", ".OOOOOOOOOOO.", "~~~~.....~~~~" },
-    { "...........x.", ".OOOOOOOOOOxx", "OOxOOxOOxOOOO", ".OOOOOOOOOOO.", ".~~~~...~~~~." },
+  cross = { -- hopping: crouched, then stretched out in the air
+    {
+      "..w.w......",
+      ".wf.wf.....",
+      ".wf.wf.....",
+      ".ww.ww.....",
+      ".wwwww.....",
+      "wkwwwwc....",
+      "fwwwwwwww..",
+      ".cwwwwwwwww",
+      "..wwwwwwwcw",
+      "..cwwwwwcww",
+      "...cc..cc..",
+    },
+    {
+      "..ww........",
+      ".wfwf.......",
+      "..wfwf......",
+      "..wwww......",
+      ".wkwwwwwww..",
+      "fwwwwwwwwwww",
+      "..cwwwwwwccc",
+      "........cc..",
+      "............",
+      "............",
+      "............",
+    },
   },
 }
 
@@ -2004,9 +2040,31 @@ M.squirrel = {
     "..xxxxG....",
     "...G.G.....",
   },
-  raft = { -- a floating branch, a few leaves still on it
-    { "...ll......e", "GGGGGGGGGGGGG", "DD...ee...DD.", "~~~~...~~~~~" },
-    { "...ll.....e.", "GGGGGGGGGGGGG", "DD...ee...DD.", ".~~~~~.~~~~." },
+  cross = { -- hopping, its tail up behind
+    {
+      "........xx.",
+      ".x.....xxxx",
+      "xxx...xxGxx",
+      "kxxx..xG.xx",
+      "xxxx..xG..x",
+      ".xxxx.xG...",
+      "..xwxxxG...",
+      "..xwxxGG...",
+      "..xxxxG....",
+      "...G.G.....",
+    },
+    {
+      "...........xx",
+      "..x......xxxx",
+      ".xxx....xxGx.",
+      "kxxxxxxxxG...",
+      "xxxxxxxxxG...",
+      "..xwxxxxG....",
+      "..G....GG....",
+      ".............",
+      ".............",
+      ".............",
+    },
   },
 }
 
@@ -2135,7 +2193,7 @@ M.deer = {
     "...gggggggGGG.",
     "...G.G...G.G..",
     "...G.G...G.G..",
-    "..~~~~~~~~~~~.",
+    "...D.D...D.D..",
   },
   beat = { -- an ear flicks back
     "G...G.........",
@@ -2151,11 +2209,41 @@ M.deer = {
     "...gggggggGGG.",
     "...G.G...G.G..",
     "...G.G...G.G..",
-    "..~~~~~~~~~~~.",
+    "...D.D...D.D..",
   },
-  cross = { -- swimming, just its head up
-    { "G...G.....", ".G.G......", "..GG......", ".gggg.....", "ggkgg.....", "kggggg....", "..ggg.....", "..gggGGG..", "~~~~~~~~~~" },
-    { "G...G.....", ".G.G......", "..GG......", ".gggg.....", "ggkgg.....", "kggggg....", "..ggg.....", "..gggGGG..", ".~~~~~~~~." },
+  cross = { -- walking
+    {
+      "G...G.........",
+      ".G.G..........",
+      "..GG..........",
+      ".gggg.........",
+      "ggkgg.........",
+      "kggggg........",
+      "..ggg.........",
+      "..gggggggggg..",
+      "..gwgggggggGgw",
+      "...gwgggggGGG.",
+      "...gggggggGGG.",
+      "...G.G...G.G..",
+      "..G...G.G...G.",
+      "..D...D.D...D.",
+    },
+    {
+      "G...G.........",
+      ".G.G..........",
+      "..GG..........",
+      ".gggg.........",
+      "ggkgg.........",
+      "kggggg........",
+      "..ggg.........",
+      "..gggggggggg..",
+      "..gwgggggggGgw",
+      "...gwgggggGGG.",
+      "...gggggggGGG.",
+      "...G.G...G.G..",
+      "....GG....GG..",
+      "....DD....DD..",
+    },
   },
 }
 
@@ -2189,9 +2277,27 @@ M.fox = {
     "..k.OOOOxOOxx.",
     "..k.kxxxxOOww.",
   },
-  raft = { -- a log, a branch stub sticking up
-    { ".........D....", "GGGGGGGGGGGGGG", "gDDDDDDDDDDDDg", "~~~~~...~~~~~~" },
-    { ".........D....", "GGGGGGGGGGGGGG", "gDDDDDDDDDDDDg", ".~~~~~~.~~~~~." },
+  cross = { -- trotting, its tail out behind
+    {
+      "..O.O.............",
+      "..OOO.............",
+      ".OkOO.............",
+      "wOOOOOOOOOOOOx....",
+      ".kwwOOOOOOOOOOxxx.",
+      "...wwOOOOOOOOxOOOx",
+      "...k..k...k..k.Oww",
+      "..k....k.k....k...",
+    },
+    {
+      "..O.O.............",
+      "..OOO.............",
+      ".OkOO.............",
+      "wOOOOOOOOOOOOx....",
+      ".kwwOOOOOOOOOOxxx.",
+      "...wwOOOOOOOOxOOOx",
+      "....k.k....k.k.Oww",
+      "....k.k....k.k....",
+    },
   },
 }
 
@@ -2250,9 +2356,9 @@ M.hedgehog = {
     "sssssbBbBbB.",
     "............",
   },
-  cross = { -- curled up in a ball, bobbing round
-    { "..BbBbB.", ".BbBbBbB", "BbBsBbBb", "bBbkbBbB", ".BbBbBb.", "~~bBbB~~" },
-    { "..bBbBb.", ".bBbBbBb", "bBbBsBbB", "BbBbBkBb", ".bBbBbB.", "~~BbBb~~" },
+  cross = { -- trundling along
+    { "....BbBbB...", "...BbBbBbB..", "..ssBbBbBbB.", ".kssbBbBbBb.", "sssssbBbBbB.", "..ss.s..s..." },
+    { "....BbBbB...", "...BbBbBbB..", "..ssBbBbBbB.", ".kssbBbBbBb.", "sssssbBbBbB.", "...s.s...s.." },
   },
 }
 
@@ -2357,11 +2463,7 @@ function A.draw(b, id, pose, frame, x, y)
     for _, r in ipairs(rows) do w = math.max(w, #r) end
     stamp(b, x - w // 2, y - #rows + 1 + (dy or 0), rows)
   end
-  if pose == "cross" and m.raft then
-    local raft = m.raft[frame + 1]
-    put(raft)
-    put(m.sit, 2 - #raft) -- the animal sits on the raft's second row, its first being what sticks up
-  elseif pose == "cross" then put(m.cross[frame + 1])
+  if pose == "cross" then put(m.cross[frame + 1])
   elseif pose == "beat" and frame == 1 then put(m.beat)
   elseif frame == 1 then put(m.sit1 or lower(m.sit, m.head))
   else put(m.sit) end
@@ -2450,7 +2552,7 @@ index 1c2908d..f45bd81 100644
 Then rebuild the sheet from the repo root:
 
 Run: `/Applications/Aseprite.app/Contents/MacOS/aseprite -b --script art/open-case/sprites.lua`
-Expected: `sprites: 734 frames on a 512x3109 sheet, 61 colours`. A second run leaves `git status` unchanged.
+Expected: `sprites: 734 frames on a 512x3077 sheet, 61 colours`. A second run leaves `git status` unchanged.
 
 - [ ] **Step 4: Run the tests to see them pass**
 
@@ -2490,7 +2592,7 @@ Apply to `open-case/test/art.test.js`:
 
 ````diff
 diff --git a/open-case/test/art.test.js b/open-case/test/art.test.js
-index fb800b6..0ffb54f 100644
+index e0a9fa3..a9f8176 100644
 --- a/open-case/test/art.test.js
 +++ b/open-case/test/art.test.js
 @@ -9,6 +9,7 @@ import { readPng } from './png.js';
@@ -2511,7 +2613,7 @@ index fb800b6..0ffb54f 100644
  ];
  
  test('every frame the game draws is there, as many of each as the spec says, and nothing else', () => {
-@@ -275,3 +279,44 @@ test('each animal is its own, and smaller than a person: its frames are no talle
+@@ -276,3 +280,57 @@ test('each animal is its own, and smaller than a person: its frames are no talle
      for (const other of ANIMAL_IDS) if (id < other) assert.ok(differ(`${id}-sit-0-left`, `${other}-sit-0-left`) >= 30, `${id} and ${other}`);
    }
  });
@@ -2544,6 +2646,19 @@ index fb800b6..0ffb54f 100644
 +  assert.ok(sx > 44, 'clear of the map key in the corner');
 +});
 +
++test("your room's window looks out on the woods behind your house, kept inside its frame: the wall beside it is plain wall", () => {
++  // The window's glass runs from x 12 to 70 (art/open-case/room.lua R.WINDOW) and its frame 3 pixels
++  // past it; the two columns of wall either side of the frame match the wall beyond them.
++  for (let y = 16; y <= 66; y++) {
++    for (const x of [7, 8]) assert.equal(colourAt('room', x, y), colourAt('room', 4, y), `wall at ${x},${y}`);
++    for (const x of [74, 75]) assert.equal(colourAt('room', x, y), colourAt('room', 76, y), `wall at ${x},${y}`);
++  }
++  const woods = new Set(['29,59,66', '46,93,92', '69,128,110']); // the palette's leaf greens (palette.lua)
++  let trees = 0;
++  for (let y = 50; y <= 66; y++) for (let x = 12; x <= 70; x++) if (woods.has(colourAt('room', x, y))) trees++;
++  assert.ok(trees > 0.8 * 17 * 59, `trees fill the bottom of the window (${trees} pixels)`);
++});
++
 +test("the keepsakes in your case lie on its lid's lining, side by side", () => {
 +  assert.equal(data.caseKeeps.length, 3);
 +  data.caseKeeps.forEach(([x, y], i) => {
@@ -2561,10 +2676,11 @@ index fb800b6..0ffb54f 100644
 - [ ] **Step 2: Run the tests to see them fail**
 
 Run: `cd open-case && npm test`
-Expected: FAIL. Four art tests fail, as the sheet has no keepsakes or room yet:
+Expected: FAIL. Five art tests fail, as the sheet has no keepsakes or room yet:
 - "every frame the game draws is there…";
 - "each keepsake fits its cubby…";
 - "your room: the shelf's 22 cubbies…";
+- "your room's window looks out on the woods…";
 - "the keepsakes in your case lie on its lid's lining…".
 
 The other 472 tests pass.
@@ -2854,7 +2970,7 @@ Create `art/open-case/room.lua`:
 
 ````lua
 -- Your room at home in the flat style, for the sprite sheet (sprites.lua): one picture, the wall and its
--- window onto a morning over the lake (the one-tree island far off), the shelf for your keepsakes with
+-- window onto a morning over the woods behind your house, the shelf for your keepsakes with
 -- its twenty-two empty cubbies (render.js puts each keepsake in its own, and the outlines of the ones
 -- still to find), the desk with your groovebox, which opens the studio, a rug and a plant, and the
 -- wooden floor. render.js draws the count over the shelf, the card along the bottom and the map key.
@@ -2895,21 +3011,27 @@ function R.room(b)
   oval(b, 168.5, 121.5, 58, 9, C.red[1])
   oval(b, 168.5, 121, 54, 7, C.red[2])
   for x = 120, 216, 8 do rect(b, x, 119, x + 3, 122, C.red[1]) end
-  -- the window: the morning sky, the far pines, the lake with the island on it, the frame and the sill
+  -- the window: the morning sky over the woods behind your house (as on the map, where they come up close
+  -- behind it), the sun through the treetops, two pines and the round crowns of the trees in front, lit
+  -- on their upper left; drawn on their own and kept to the glass, then the frame and the sill
   local w = R.WINDOW
+  local view = L.buffer(W, H)
   local sky = { C.morning[1], C.morning[2], C.morning[3] }
-  for y = w[2], 46 do rect(b, w[1], y, w[3], y, sky[math.min(3, 1 + (y - w[2]) // 10)]) end
-  oval(b, w[1] + 14.5, 30.5, 5, 5, C.light)
-  for x = w[1], w[3] do
-    local top = 42 + math.floor(L.rnd(x // 3, 1, 51) * 4)
-    rect(b, x, top, x, 47, C.leaf[2])
+  for y = w[2], w[4] do rect(view, w[1], y, w[3], y, sky[math.min(3, 1 + (y - w[2]) // 12)]) end
+  oval(view, w[1] + 15.5, 31.5, 5, 5, C.light)
+  for _, p in ipairs({ { w[1] + 31, 25 }, { w[1] + 50, 31 } }) do
+    for y = p[2], w[4] do
+      local hw = math.floor((y - p[2]) * 0.3) + ((y - p[2]) % 4 == 3 and 1 or 0)
+      rect(view, p[1] - hw, y, p[1] + hw, y, C.leaf[1])
+    end
   end
-  rect(b, w[1], 48, w[3], w[4], C.lake[2])
-  for y = 51, w[4], 4 do rect(b, w[1] + (y * 7) % 13, y, w[1] + (y * 7) % 13 + 5, y, C.morning[2]) end
-  oval(b, w[1] + 38.5, 56.5, 6, 1.5, C.leaf[3]) -- the island, and its pine
-  rect(b, w[1] + 38, 48, w[1] + 39, 55, C.leaf[1])
-  rect(b, w[1] + 37, 50, w[1] + 40, 55, C.leaf[1])
-  rect(b, w[1] + 36, 53, w[1] + 41, 55, C.leaf[1])
+  rect(view, w[1], 56, w[3], w[4], C.leaf[1]) -- the woods' shade under the crowns
+  for _, c in ipairs({ { w[1] - 2, 50, 10 }, { w[1] + 13, 44, 9 }, { w[1] + 27, 51, 10 }, { w[1] + 43, 45, 9 }, { w[1] + 58, 51, 11 },
+    { w[1] + 6, 60, 9 }, { w[1] + 36, 61, 10 } }) do
+    oval(view, c[1] + 0.5, c[2] + 0.5, c[3], c[3] * 0.85, C.leaf[2])
+    oval(view, c[1] - 1.5, c[2] - 1.5, c[3] * 0.7, c[3] * 0.6, C.leaf[3])
+  end
+  for y = w[2], w[4] do for x = w[1], w[3] do b[y][x] = view[y][x] end end
   rect(b, w[1] - 3, w[2] - 3, w[3] + 3, w[2] - 1, C.wood[3])
   rect(b, w[1] - 3, w[2] - 3, w[1] - 1, w[4] + 2, C.wood[3])
   rect(b, w[3] + 1, w[2] - 3, w[3] + 3, w[4] + 2, C.wood[3])
@@ -3077,12 +3199,12 @@ index f45bd81..dc74bba 100644
 Then rebuild the sheet from the repo root:
 
 Run: `/Applications/Aseprite.app/Contents/MacOS/aseprite -b --script art/open-case/sprites.lua`
-Expected: `sprites: 801 frames on a 512x3301 sheet, 61 colours`.
+Expected: `sprites: 801 frames on a 512x3265 sheet, 61 colours`.
 
 - [ ] **Step 4: Run the tests to see them pass**
 
 Run: `cd open-case && npm test`
-Expected: PASS, 476 tests.
+Expected: PASS, 477 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -3117,7 +3239,7 @@ Apply to `open-case/test/render.test.js`:
 
 ````diff
 diff --git a/open-case/test/render.test.js b/open-case/test/render.test.js
-index c11c9f7..c8dba26 100644
+index c11c9f7..105bccd 100644
 --- a/open-case/test/render.test.js
 +++ b/open-case/test/render.test.js
 @@ -1,14 +1,16 @@
@@ -3183,7 +3305,7 @@ index c11c9f7..c8dba26 100644
 +});
 +
 +test("the island's animals: crossing as they come by, settled facing you, breathing, or keeping the beat once they're hooked", () => {
-+  const p = { animal: 'fox', id: 1, x: 200, y: ISLAND.lanes.float, dir: -1, state: 'passing', interest: 0.3 };
++  const p = { animal: 'fox', id: 1, x: 200, y: ISLAND.lanes.land, dir: -1, state: 'passing', interest: 0.3 };
 +  assert.match(animalFrame(p, 0, 0), /^fox-cross-\d-left$/);
 +  assert.notEqual(animalFrame(p, 0, 0), animalFrame(p, 0, 0.3), 'its strokes come and go');
 +  assert.match(animalFrame({ ...p, state: 'joining', x: 100 }, 0, 0), /^fox-cross-\d-right$/, 'heading for its spot, facing you');
@@ -3192,12 +3314,12 @@ index c11c9f7..c8dba26 100644
 +  const hooked = { ...p, state: 'stopped', interest: 0.9 };
 +  assert.equal(animalFrame(hooked, 0.05, 0), 'fox-beat-1-left', 'its move on the beat');
 +  assert.equal(animalFrame(hooked, BEAT * 0.6, 0), 'fox-beat-0-left');
-+  assert.match(animalFrame({ ...p, state: 'leaving', dir: 1 }, 0, 0), /^fox-cross-\d-right$/, 'back on its log as it goes');
++  assert.match(animalFrame({ ...p, state: 'leaving', dir: 1 }, 0, 0), /^fox-cross-\d-right$/, 'trotting off as it goes');
 +});
 +
 +test('on the island the animals take the people\'s place, the trunk stands among them, and their reactions sit just over their heads', () => {
 +  const { set, view: v } = placed('island', 30);
-+  const heron = animalAt(set, 'heron', 5, { reaction: { rule: 'taste', t: 29.5 } });
++  const heron = animalAt(set, 'heron', 7, { reaction: { rule: 'taste', t: 29.5 } });
 +  const crow = animalAt(set, 'crow', 0, { reaction: { rule: 'callback', t: 29.5 } });
 +  const ducks = animalAt(set, 'ducks', 0, { state: 'passing', x: 150, y: ISLAND.lanes.water });
 +  const g = fakeContext();
@@ -3258,7 +3380,7 @@ index c11c9f7..c8dba26 100644
 +  const states = ['passing', 'joining', 'stopped', 'leaving'];
 +  ANIMAL_IDS.forEach((animal, i) => {
 +    for (const [j, state] of states.entries()) {
-+      animalAt(set, animal, (i + j) % 9, { state, dir: j % 2 ? 1 : -1, interest: j % 2 ? 0.9 : 0.3, x: 20 + i * 25 + j * 5, reaction: { rule: 'taste', t: 0 } });
++      animalAt(set, animal, (i + j) % ISLAND.spots.length, { state, dir: j % 2 ? 1 : -1, interest: j % 2 ? 0.9 : 0.3, x: 20 + i * 25 + j * 5, reaction: { rule: 'taste', t: 0 } });
 +    }
 +  });
 +  const draw = createRenderer(fakeContext(), art);
@@ -3275,7 +3397,7 @@ index c11c9f7..c8dba26 100644
 - [ ] **Step 2: Run the tests to see them fail**
 
 Run: `cd open-case && npm test`
-Expected: FAIL. `test/render.test.js` can't load: `The requested module '../src/render.js' does not provide an export named 'animalFrame'`. The other 420 tests pass.
+Expected: FAIL. `test/render.test.js` can't load: `The requested module '../src/render.js' does not provide an export named 'animalFrame'`. The other 421 tests pass.
 
 - [ ] **Step 3: Draw it**
 
@@ -3283,7 +3405,7 @@ Apply to `open-case/src/render.js`:
 
 ````diff
 diff --git a/open-case/src/render.js b/open-case/src/render.js
-index ab93382..80fa967 100644
+index ab93382..8607190 100644
 --- a/open-case/src/render.js
 +++ b/open-case/src/render.js
 @@ -1,8 +1,10 @@
@@ -3312,7 +3434,7 @@ index ab93382..80fa967 100644
  const NOD_SHOW = 1.2; // seconds the shopkeeper nods after a sale...
  const NOD_FPS = 4; // ...this many nods a second
  const BOARD_ROWS = 4; // trains on the station's departure board
-+const PADDLE = 0.3; // seconds each of an animal's two crossing frames shows (a swimmer's stroke, a wingbeat)
++const ANIMAL_STEP = 0.3; // seconds each of an animal's two crossing frames shows (a step or a hop, a stroke, a wingbeat)
 +const OVER_ANIMAL = 3; // pixels above the top of an animal's frame its reaction's tail points to
 +const SUN_UP = 12; // pixels the island's sun has risen before its reflection glints on the water
 +const GLINT = 1.7; // how fast (rad/s) the water's glints come and go
@@ -3324,12 +3446,12 @@ index ab93382..80fa967 100644
  }
  
 +// The frame an animal shows, on the island (p.animal: animals.js), as people's do: crossing as it comes
-+// by, settles and leaves (swimming, flying, or floating on its raft), its strokes on the page's clock;
++// by, settles and leaves (walking or hopping, swimming or flying), its steps on the page's clock;
 +// settled, facing you, breathing, or keeping the beat once it's hooked.
 +export function animalFrame(p, t, time, beat = LOFI_CLOCK.beat) {
 +  const facingYou = p.state === 'stopped' || p.state === 'joining';
 +  const face = (facingYou ? (p.x < CROWD.playerX ? 1 : -1) : p.dir) > 0 ? 'right' : 'left';
-+  if (p.state !== 'stopped') return `${p.animal}-cross-${frameOf(time / PADDLE + p.id * 0.37, 2)}-${face}`;
++  if (p.state !== 'stopped') return `${p.animal}-cross-${frameOf(time / ANIMAL_STEP + p.id * 0.37, 2)}-${face}`;
 +  if (p.interest > INTEREST.hook) return `${p.animal}-beat-${t / beat - Math.floor(t / beat) < NOD ? 1 : 0}-${face}`;
 +  return `${p.animal}-sit-${frameOf(time / BREATH + p.id * 0.37, 2)}-${face}`;
 +}
@@ -3467,7 +3589,7 @@ index ab93382..80fa967 100644
 - [ ] **Step 4: Run the tests to see them pass**
 
 Run: `cd open-case && npm test`
-Expected: PASS, 484 tests.
+Expected: PASS, 485 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -3636,7 +3758,7 @@ Apply to `open-case/test/render.test.js`:
 
 ````diff
 diff --git a/open-case/test/render.test.js b/open-case/test/render.test.js
-index c8dba26..62b9a93 100644
+index 105bccd..8cf54ee 100644
 --- a/open-case/test/render.test.js
 +++ b/open-case/test/render.test.js
 @@ -10,7 +10,8 @@ import { KINDS, LOOKS } from '../src/crowd.js';
@@ -3694,7 +3816,7 @@ index c8dba26..62b9a93 100644
 - [ ] **Step 2: Run the tests to see them fail**
 
 Run: `cd open-case && npm test`
-Expected: FAIL. `test/room.test.js` and `test/render.test.js` can't load: `Cannot find module '…/open-case/src/room.js'`. The other 420 tests pass.
+Expected: FAIL. `test/room.test.js` and `test/render.test.js` can't load: `Cannot find module '…/open-case/src/room.js'`. The other 421 tests pass.
 
 - [ ] **Step 3: The room, and the studio's way back to it**
 
@@ -3874,7 +3996,7 @@ Apply to `open-case/src/render.js`:
 
 ````diff
 diff --git a/open-case/src/render.js b/open-case/src/render.js
-index 80fa967..581f726 100644
+index 8607190..191c489 100644
 --- a/open-case/src/render.js
 +++ b/open-case/src/render.js
 @@ -5,9 +5,9 @@
@@ -3976,7 +4098,7 @@ index 80fa967..581f726 100644
 - [ ] **Step 4: Run the tests to see them pass**
 
 Run: `cd open-case && npm test`
-Expected: PASS, 494 tests.
+Expected: PASS, 495 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -4127,7 +4249,7 @@ Expected: FAIL. Seven fail, as the island isn't a place or a stop yet:
 - in `atlas.test.js`: the stops' order, Enter on the island, and the shop test that now starts from the island;
 - in `map.test.js`: "each place to busk has its picture…".
 
-The other 488 tests pass.
+The other 489 tests pass.
 
 - [ ] **Step 3: The island as a stop, and its picture**
 
@@ -4309,7 +4431,7 @@ Expected: `land: 960x540, 309 colours`, then `places: 15 pictures, 2 clouds`.
 - [ ] **Step 4: Run the tests to see them pass**
 
 Run: `cd open-case && npm test`
-Expected: PASS, 495 tests.
+Expected: PASS, 496 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -4367,7 +4489,7 @@ index 2c17a03..8305c0a 100644
 - [ ] **Step 2: Run it**
 
 Run: `cd open-case && npm test`
-Expected: PASS, 496 tests. The log keeps whatever a set gives it, so this test passes already: it pins the island's entry, which `main.js` writes in Step 3.
+Expected: PASS, 497 tests. The log keeps whatever a set gives it, so this test passes already: it pins the island's entry, which `main.js` writes in Step 3.
 
 - [ ] **Step 3: Wire it in**
 
@@ -4740,7 +4862,7 @@ Apply to `README.md`:
 
 ````diff
 diff --git a/README.md b/README.md
-index cc528ec..cac3af2 100644
+index cc528ec..7e389e3 100644
 --- a/README.md
 +++ b/README.md
 @@ -77,21 +77,22 @@ That writes the editable `art/snake-icon.aseprite` and the `snake/icon.png` the
@@ -4748,7 +4870,7 @@ index cc528ec..cac3af2 100644
  ## Open Case
  
 -`open-case/` is a busking game, a work in progress. You improvise on the computer keyboard, laid out like GarageBand's Musical Typing, over the band's beat, and passers-by stop, stay and tip according to what you play. The game opens on a map of the city (painted after a friend's atlas), with a title over the first map of each visit that any key or click clears (and starts the sound); before each set it asks where to busk and what to play: the park at sunset, the station at rush hour (commuters come in waves off each train, in a hurry, and tip well) or the night market (slow browsers who stay long, for smaller coins), to one of five ready-made tracks or one of your own. Birds sing on the map, quietly, made live like the rest of the game's sound. The keys are shown on the first set's waiting screen, and again on the pause card (Esc); the try-out pages (`?studio`, `?place=`, `?bot=`), which skip the map, keep a small press-any-key card. Four kinds walk by, joggers, elders, students and commuters, each with their own taste, and six different people of each kind. Repeating yourself bores them, off-key notes on strong beats make them frown, and an earlier idea brought back changed earns a coin. The band gains layers as the crowd grows. The coins you earn are saved, and between sets a music shop (also a fourth stop on the map, between the park and the station: choose it and press Enter) sells five pedals, which you stomp on keys 2 to 6 while you play, four more instruments, and a loop pedal: R records 4 bars of your notes that play on under you, up to three layers, and Backspace takes the last one off. The studio is free from the start: Home, the fifth stop on the map (the house at the west end of the street in its bottom left; choose it and press Enter), opens it, as does the Studio button on the end card. In it you make your own beats to busk to the way Figure makes them: pick a rhythm, hold the pad, and it's written into the loop as it goes round. Each part has a choice of sounds, eight drum kits (lo-fi, brushes, funk, reggae, 808, hand drums, house and rock), seven basses and nine chord sounds, and the sound key steps through them (its left end back, its right end on). It comes with five ready-made beats (lo-fi, bossa nova, funk, reggae and a slow ballad), keeps six of your own (Save names one), and "Busk to this" picks the beat your sets play and takes you to the map. A "map" key in its bottom left corner (or Esc) goes back to the map. The design spec is `docs/superpowers/specs/2026-09-28-open-case-design.md`, the shop's is `docs/superpowers/specs/2026-09-28-open-case-shop-design.md`, the loop pedal's is `docs/superpowers/specs/2026-09-29-open-case-loop-pedal-design.md`, the passers-by's is `docs/superpowers/specs/2026-09-29-open-case-passers-by-design.md`, the studio's is `docs/superpowers/specs/2026-09-30-open-case-studio-design.md`, and the places' and the map's is `docs/superpowers/specs/2026-10-01-open-case-places-design.md`.
-+`open-case/` is a busking game, a work in progress. You improvise on the computer keyboard, laid out like GarageBand's Musical Typing, over the band's beat, and passers-by stop, stay and tip according to what you play. The game opens on a map of the city (painted after a friend's atlas), with a title over the first map of each visit that any key or click clears (and starts the sound); before each set it asks where to busk and what to play: the park at sunset, the station at rush hour (commuters come in waves off each train, in a hurry, and tip well), the night market (slow browsers who stay long, for smaller coins) or One Tree Island, the little island in the lake, at sunrise, to one of five ready-made tracks or one of your own. On the island you play alone, squeezed under its one pine: animals come instead of people (a fox floating over on a log, a heron wading, a crow in the pine, eleven of them), each liking what one kind of town listener likes, and nobody pays. Instead, now and then an animal that liked your playing leaves a keepsake in your case: always one after your first set there, then about one good set in four. There are twenty-two to find, two from each animal. Birds sing on the map, quietly, made live like the rest of the game's sound. The keys are shown on the first set's waiting screen, and again on the pause card (Esc); the try-out pages (`?studio`, `?place=`, `?bot=`), which skip the map, keep a small press-any-key card. Four kinds walk by, joggers, elders, students and commuters, each with their own taste, and six different people of each kind. Repeating yourself bores them, off-key notes on strong beats make them frown, and an earlier idea brought back changed earns a coin. The band gains layers as the crowd grows. The coins you earn are saved, and between sets a music shop (also a fourth stop on the map, between the park and the station: choose it and press Enter) sells five pedals, which you stomp on keys 2 to 6 while you play, four more instruments, and a loop pedal: R records 4 bars of your notes that play on under you, up to three layers, and Backspace takes the last one off. Home, the sixth stop on the map (the house at the west end of the street in its bottom left; choose it and press Enter), opens your room: the keepsakes you've found sit on a shelf there (point at one for its story, or at an empty cubby for a hint about who brings it), and Enter puts one in your case or takes it out, where up to three ride in the lid wherever you busk. The studio is free from the start: the desk in your room opens it, as does the Studio button on the end card. In it you make your own beats to busk to the way Figure makes them: pick a rhythm, hold the pad, and it's written into the loop as it goes round. Each part has a choice of sounds, eight drum kits (lo-fi, brushes, funk, reggae, 808, hand drums, house and rock), seven basses and nine chord sounds, and the sound key steps through them (its left end back, its right end on). It comes with five ready-made beats (lo-fi, bossa nova, funk, reggae and a slow ballad), keeps six of your own (Save names one), and "Busk to this" picks the beat your sets play and takes you to the map. A "map" key in its bottom left corner (or Esc) goes back to the map, or "room" back to your room if you came from its desk. The design spec is `docs/superpowers/specs/2026-09-28-open-case-design.md`, the shop's is `docs/superpowers/specs/2026-09-28-open-case-shop-design.md`, the loop pedal's is `docs/superpowers/specs/2026-09-29-open-case-loop-pedal-design.md`, the passers-by's is `docs/superpowers/specs/2026-09-29-open-case-passers-by-design.md`, the studio's is `docs/superpowers/specs/2026-09-30-open-case-studio-design.md`, the places' and the map's is `docs/superpowers/specs/2026-10-01-open-case-places-design.md`, and One Tree Island's and the keepsakes' is `docs/superpowers/specs/2026-10-02-open-case-island-design.md`.
++`open-case/` is a busking game, a work in progress. You improvise on the computer keyboard, laid out like GarageBand's Musical Typing, over the band's beat, and passers-by stop, stay and tip according to what you play. The game opens on a map of the city (painted after a friend's atlas), with a title over the first map of each visit that any key or click clears (and starts the sound); before each set it asks where to busk and what to play: the park at sunset, the station at rush hour (commuters come in waves off each train, in a hurry, and tip well), the night market (slow browsers who stay long, for smaller coins) or One Tree Island, the little island in the lake, at sunrise, to one of five ready-made tracks or one of your own. On the island you play alone, squeezed under its one pine: animals come instead of people (a fox trotting along the shore, a heron wading, a crow in the pine, eleven of them), each liking what one kind of town listener likes, and nobody pays. Instead, now and then an animal that liked your playing leaves a keepsake in your case: always one after your first set there, then about one good set in four. There are twenty-two to find, two from each animal. Birds sing on the map, quietly, made live like the rest of the game's sound. The keys are shown on the first set's waiting screen, and again on the pause card (Esc); the try-out pages (`?studio`, `?place=`, `?bot=`), which skip the map, keep a small press-any-key card. Four kinds walk by, joggers, elders, students and commuters, each with their own taste, and six different people of each kind. Repeating yourself bores them, off-key notes on strong beats make them frown, and an earlier idea brought back changed earns a coin. The band gains layers as the crowd grows. The coins you earn are saved, and between sets a music shop (also a fourth stop on the map, between the park and the station: choose it and press Enter) sells five pedals, which you stomp on keys 2 to 6 while you play, four more instruments, and a loop pedal: R records 4 bars of your notes that play on under you, up to three layers, and Backspace takes the last one off. Home, the sixth stop on the map (the house at the west end of the street in its bottom left; choose it and press Enter), opens your room: the keepsakes you've found sit on a shelf there (point at one for its story, or at an empty cubby for a hint about who brings it), and Enter puts one in your case or takes it out, where up to three ride in the lid wherever you busk. The studio is free from the start: the desk in your room opens it, as does the Studio button on the end card. In it you make your own beats to busk to the way Figure makes them: pick a rhythm, hold the pad, and it's written into the loop as it goes round. Each part has a choice of sounds, eight drum kits (lo-fi, brushes, funk, reggae, 808, hand drums, house and rock), seven basses and nine chord sounds, and the sound key steps through them (its left end back, its right end on). It comes with five ready-made beats (lo-fi, bossa nova, funk, reggae and a slow ballad), keeps six of your own (Save names one), and "Busk to this" picks the beat your sets play and takes you to the map. A "map" key in its bottom left corner (or Esc) goes back to the map, or "room" back to your room if you came from its desk. The design spec is `docs/superpowers/specs/2026-09-28-open-case-design.md`, the shop's is `docs/superpowers/specs/2026-09-28-open-case-shop-design.md`, the loop pedal's is `docs/superpowers/specs/2026-09-29-open-case-loop-pedal-design.md`, the passers-by's is `docs/superpowers/specs/2026-09-29-open-case-passers-by-design.md`, the studio's is `docs/superpowers/specs/2026-09-30-open-case-studio-design.md`, the places' and the map's is `docs/superpowers/specs/2026-10-01-open-case-places-design.md`, and One Tree Island's and the keepsakes' is `docs/superpowers/specs/2026-10-02-open-case-island-design.md`.
  
 -- Tests (Node 22, no dependencies): `cd open-case && npm test`. The headline test plays a scripted honest set against a random bot and a lick bot over ten seeds, and another checks that every place pays an honest set about the same. The art tests check the committed sprite sheet and map against what the game draws.
 +- Tests (Node 22, no dependencies): `cd open-case && npm test`. The headline test plays a scripted honest set against a random bot and a lick bot over ten seeds, another checks that every place pays an honest set about the same, and another that the island leaves the honest set a keepsake about one time in four over 200 seeds, and the bots almost never. The art tests check the committed sprite sheet and map against what the game draws.
@@ -4780,38 +4902,37 @@ Apply to `docs/superpowers/specs/2026-10-02-open-case-island-design.md`:
 
 ````diff
 diff --git a/docs/superpowers/specs/2026-10-02-open-case-island-design.md b/docs/superpowers/specs/2026-10-02-open-case-island-design.md
-index 72d9a4b..0b1d9e5 100644
+index 05ba787..3912e0b 100644
 --- a/docs/superpowers/specs/2026-10-02-open-case-island-design.md
 +++ b/docs/superpowers/specs/2026-10-02-open-case-island-design.md
 @@ -1,7 +1,7 @@
  # Open Case: One Tree Island and keepsakes (design spec)
  
  **Date:** 2026-10-02
--**Status:** Nathan agreed the design in chat, one part at a time ("yes that looks right"). The spec is awaiting his review.
-+**Status:** Nathan agreed the design in chat, one part at a time ("yes that looks right"), and approved this spec ("go ahead and continue"). Built as `docs/superpowers/plans/2026-10-02-open-case-island.md`; what the build settled is at the end.
+-**Status:** Nathan agreed the design in chat, one part at a time ("yes that looks right"), and approved this spec ("go ahead and continue"). Then, seeing the prototype, he asked for two changes, which this version has:
++**Status:** Nathan agreed the design in chat, one part at a time ("yes that looks right"), and approved this spec ("go ahead and continue"). It's built as `docs/superpowers/plans/2026-10-02-open-case-island.md`, and what the build settled is at the end. Then, seeing the prototype, he asked for two changes, which this version has:
+ - **The land runs off the screen:** "can you make the land extend to outside of the frame, right now the animals cross from the water and its a bit weird". The island's grass now runs across the screen, and the land animals walk along it instead of floating over the water.
+ - **The room's window shows woods:** "where the house is there are trees and no water.. so it should show trees". It looked out on the lake before.
  
- It started with Nathan: "it would be really fun to add a wonky silly place to go busk, like you go play on the island with the tree by yourself, no people, just a peaceful landscape surrounded by water and the one tree maybe some animals." He wasn't sure the island should pay, and was "open to ideas to things you maybe unlock there like trinkets or cosmetic things."
+@@ -305,6 +305,50 @@ They're only for looks, and the crowd doesn't notice them, just as your gear onl
  
-@@ -304,6 +304,51 @@ They're only for looks, and the crowd doesn't notice them, just as your gear onl
- 
- Nathan picks One Tree Island on the map and rows out. As the mist lifts, a duck family paddles by, the fox floats over on its log and settles on the grass beside him, its tail swaying to his groove, and a crow lands in the pine. At the end, a blackberry drops into his case. At home, it sits on his shelf, the first of 22, and in his case's lid at the park the next evening. Later island sets mostly give nothing, until one morning the crow leaves a gold ring.
+ Nathan picks One Tree Island on the map and rows out. As the mist lifts, a duck family paddles by, the fox trots along the shore and settles on the grass beside him, its tail swaying to his groove, and a crow lands in the pine. At the end, a blackberry drops into his case. At home, it sits on his shelf, the first of 22, and in his case's lid at the park the next evening. Later island sets mostly give nothing, until one morning the crow leaves a gold ring.
  
 +## What the build settled
 +
 +- **Where the animals cross and settle** (`ISLAND` in `tuning.js`):
-+  - **Lines:** the swimmers cross the water just behind the island (y 138), as people walk behind you, the floaters a little further out (y 134), and the birds high up (y 40).
-+  - **The ducks** paddle across behind the island with the other swimmers, not in front of it as the spec said: in front, they'd be under the bottom line's words.
-+  - **The nine spots:**
++  - **Lines:** the land animals walk along the island at y 146, where people walk the park's path; the swimmers cross the lake at y 124, behind the reeds, the rock and the rowboat on the shore; and the birds fly high up, at y 40.
++  - **The eleven spots:**
 +    - the pine's branches: the low left tip (122, 93), the middle right (190, 77) and the upper left (138, 61);
-+    - the grass: either side of you, at (98, 162) and (192, 164);
-+    - the shallows: (58, 158) and (232, 160);
-+    - the rock: (262, 166);
-+    - the lily pad: (30, 150).
++    - the grass round you: (70, 158), (96, 165), (196, 165) and (228, 158);
++    - the shallows: (52, 134) and (214, 134);
++    - the rock: (290, 133);
++    - the lily pad: (22, 136).
 +  - **Which spot:** the turtle takes the rock, or if it's taken, the nearest shallows. The frog only takes the lily pad.
-+- **A floating animal** shows on its raft (the fox's log, the bunny's leaf, the squirrel's branch, the hedgehog curled in a ball) as it comes by, heads for its spot and leaves. Settled, it's on the grass or the branch without it.
++- **The squirrel** hops along the land like the others, then up to its branch in the pine.
 +- **The numbers:**
-+  - Over seeds 1 to 200, the honest set wins 33 to 69 fondness a set, and the random bot and the lick bot almost none.
-+  - `KEEPSAKE` is a chance of 0.22 at 30 fondness or more, less below. With one keepsake found, the honest set is left one in 26% of sets, a set in key that never brings an idea back in 4.5%, and the random bot and the lick bot in none.
++  - Over seeds 1 to 200, the honest set wins 17 to 80 fondness a set, and the random bot and the lick bot almost none.
++  - `KEEPSAKE` is a chance of 0.22 at 30 fondness or more, less below. With one keepsake found, the honest set is left one in 26% of sets, a set in key that never brings an idea back in 5%, and the random bot and the lick bot in none.
 +- **The sunrise:**
 +  - **The sky** keeps the evening's timing in reverse, so the horizon lightens first. Its five stages are the dusk's colours, then the morning's blues.
 +  - **The far shore's pines and the lake** follow the horizon's band.
@@ -4822,7 +4943,7 @@ index 72d9a4b..0b1d9e5 100644
 +  - It falls from 70 pixels above the case for 0.8 s and lands where the coins do, with a coin's clink, then twinkles there until the end card.
 +  - **The case's lid** shows 5 × 5 versions, which fit its lining better than the 6 × 6 the spec planned.
 +- **Your room:**
-+  - **The look:** a teal wall, a window onto the lake with the one-tree island far off, the shelf with 11 columns by 2 rows of 14-pixel cubbies, and on the right a desk with the groovebox, a mug and a lamp. A rug and a plant fill the rest.
++  - **The look:** a teal wall, a window onto the woods behind the house, the shelf with 11 columns by 2 rows of 14-pixel cubbies, and on the right a desk with the groovebox, a mug and a lamp. A rug and a plant fill the rest.
 +  - **The card** runs along the bottom, as in the shop.
 +  - **Marks:** a keepsake in your case has a 2 × 2 gold mark at its cubby's top right. The pointer is a gold frame, or a gold arrow over the groovebox for the desk.
 +  - **The arrow keys:** right from the end of a row goes to the desk.
@@ -4849,7 +4970,7 @@ index 72d9a4b..0b1d9e5 100644
 - [ ] **Step 4: Run the tests to see them pass**
 
 Run: `cd open-case && npm test`
-Expected: PASS, 496 tests.
+Expected: PASS, 497 tests.
 
 - [ ] **Step 5: Check it in Chrome**
 
@@ -4859,12 +4980,12 @@ Serve the repo root: `python3 -m http.server 8123 --bind 127.0.0.1` (from the re
    - On `/open-case/?coins=500`, choose the shop (right four times) and press Enter. `__openCase.screen` is `'shop'` and `__openCase.gear.savings` is still 500: nothing was bought.
    - On `/open-case/?keepsakes=7`, choose Home (right five times) and press Enter. `__openCase.screen` is `'room'` and `__openCase.keeps.inCase` is still `['dandelion', 'clover', 'feather']`.
 3. **Your room** (that page):
-   - The shelf shows 7 keepsakes, 15 outlines and "7 of 22", with gold marks on the first three. The card names the dandelion clock and says "in your case: enter to take it out".
+   - The window looks out on the woods. The shelf shows 7 keepsakes, 15 outlines and "7 of 22", with gold marks on the first three. The card names the dandelion clock and says "in your case: enter to take it out".
    - Right twice to the acorn, then Enter: the card says "your case holds three, take one off first" in red for two seconds, and `inCase` is unchanged.
    - Left twice, then Enter: the dandelion clock comes out.
    - Right until the gold arrow is over the groovebox, then Enter: the studio opens with "room" on its corner key (`__openCase.studio.back === 'room'`).
    - Esc goes back to the room, and Esc again to the map.
-4. **A set on the island:** `/open-case/?place=island&seed=3&debug`, press a key, then play a few notes. It's before dawn: dark sky, the mist on the water, the lit-pine island under you, animals crossing behind you. `?debug`'s panel says "fondness", not "coins".
+4. **A set on the island:** `/open-case/?place=island&seed=3&debug`, press a key, then play a few notes. It's before dawn: a dark sky and the mist on the lake behind you. The land animals walk along the island, past the pine's trunk, and the swimmers come by on the lake. `?debug`'s panel says "fondness", not "coins".
 5. **A bot's whole set on the island:** on `/open-case/?place=island&bot=random&seed=5&debug`, first clear `localStorage['open-case-keepsakes']` and reload, so that it's a first set there. Then press a key and wait out the set: about 3 minutes, so poll `__openCase.screen` for `'over'`.
    - As it ends, a keepsake (the crunchy leaf) drops into the case and sparkles there. The sky is morning blue and the sun is up.
    - The end card says "The hedgehog left you a crunchy leaf.", "0 animals stopped to listen on One Tree Island." and "No animal stayed this time."
