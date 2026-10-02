@@ -1,8 +1,10 @@
 // Draws the scene at 320x180 into a 2D context (main.js scales it up by a whole number), in the flat
 // style, from the sprite sheet art/open-case/sprites.lua makes (assets.js loads it): the place you
-// busk in (the park and its sunset, the station and its trains, the night market and its lanterns),
-// you on your crate with your instrument, your pedals and the loop pedal, the open case and the band's
-// speaker, the passers-by, their reactions, the pigeons and birds (or the market's cat), the note
+// busk in (the park and its sunset, the station and its trains, the night market and its lanterns,
+// One Tree Island and its sunrise), you on your crate with your instrument, your pedals and the loop
+// pedal, the open case with your keepsakes in its lid and the band's speaker, the passers-by (or the
+// island's animals), their reactions, the pigeons and birds (or the market's cat, or the island's
+// fish), a keepsake dropping into the case, the note
 // trail (and your loop's), the memory strip, the gear strip, the music shop, and the title card (on the
 // pages that skip the map), the key chart, and the pause and ?debug overlays. The end card and the map
 // are HTML (index.html, atlasview.js).
@@ -11,6 +13,7 @@ import { LOFI_CLOCK } from './beats.js';
 import {
   GUITAR, coinAt, glyphAt, loopGlyphAt, GOLD, skyStages, sunDrop, windowLit, lampState, starsOut, trainX, cloudX,
   birdsAt, pigeonsAt, frameOf, stationClock, trainAt, boardFirst, marketStages, lanternsLit, steamFrame, catAt, TRAIN,
+  sunriseStages, sunUp, mistLeft, fishAt, giftAt,
 } from './scene.js';
 import { STOCK, PEDALS, owns, stockItem } from './gear.js';
 import { card, trying, CARD, BUTTON } from './shop.js';
@@ -47,6 +50,10 @@ const BEATS_PER_BAR = 4; // every beat's 4/4 meter: always 4, unlike LOOP.bars (
 const NOD_SHOW = 1.2; // seconds the shopkeeper nods after a sale...
 const NOD_FPS = 4; // ...this many nods a second
 const BOARD_ROWS = 4; // trains on the station's departure board
+const ANIMAL_STEP = 0.3; // seconds each of an animal's two crossing frames shows (a step or a hop, a stroke, a wingbeat)
+const OVER_ANIMAL = 3; // pixels above the top of an animal's frame its reaction's tail points to
+const SUN_UP = 12; // pixels the island's sun has risen before its reflection glints on the water
+const GLINT = 1.7; // how fast (rad/s) the water's glints come and go
 const BACKING = 0.55; // how dark the backing behind the bottom line's words and the gear strip is...
 const BACKING_TOP = 168, BACKING_H = 11; // ...and where it runs (the line's text sits at y 170)
 
@@ -69,6 +76,17 @@ export function personFrame(p, t, time, beat = LOFI_CLOCK.beat) {
   if (p.state !== 'stopped') return `${p.kind}-${p.look}-walk-${frameOf((Math.abs(p.x) + Math.abs(p.y)) / STEP, 4)}-${face}`;
   if (p.interest > INTEREST.hook) return `${p.kind}-${p.look}-nod-${t / beat - Math.floor(t / beat) < NOD ? 1 : 0}-${face}`;
   return `${p.kind}-${p.look}-stand-${frameOf(time / BREATH + p.id * 0.37, 2)}-${face}`;
+}
+
+// The frame an animal shows, on the island (p.animal: animals.js), as people's do: crossing as it comes
+// by, settles and leaves (walking or hopping, swimming or flying), its steps on the page's clock;
+// settled, facing you, breathing, or keeping the beat once it's hooked.
+export function animalFrame(p, t, time, beat = LOFI_CLOCK.beat) {
+  const facingYou = p.state === 'stopped' || p.state === 'joining';
+  const face = (facingYou ? (p.x < CROWD.playerX ? 1 : -1) : p.dir) > 0 ? 'right' : 'left';
+  if (p.state !== 'stopped') return `${p.animal}-cross-${frameOf(time / ANIMAL_STEP + p.id * 0.37, 2)}-${face}`;
+  if (p.interest > INTEREST.hook) return `${p.animal}-beat-${t / beat - Math.floor(t / beat) < NOD ? 1 : 0}-${face}`;
+  return `${p.animal}-sit-${frameOf(time / BREATH + p.id * 0.37, 2)}-${face}`;
 }
 
 // You with your instrument: playing for a moment after each note (a guitar's strum, a keyboard's
@@ -166,11 +184,12 @@ export function createRenderer(g, art) {
   };
   const bandOf = (y) => data.bands.findLastIndex((b) => b <= y);
 
-  // The sky's bands, each in its stage's colour (stages: one for each band, top down).
-  function sky(stages) {
+  // The sky's bands, each in its stage's colour (stages: one for each band, top down), from the
+  // evening's stages, or the island's sunrise's.
+  function sky(stages, colours = data.sky) {
     data.bands.forEach((top, i) => {
       const bottom = data.bands[i + 1] ?? data.skyBottom + 1;
-      px(0, top, W, bottom - top, data.sky[stages[i]][i]);
+      px(0, top, W, bottom - top, colours[stages[i]][i]);
     });
   }
 
@@ -251,10 +270,36 @@ export function createRenderer(g, art) {
     sprite('market-street', 0, 0);
   }
 
-  // Everyone and everything standing on the path, nearest last: the listeners, you, your pedals, the
-  // loop pedal and the amp, the speaker, the case and its coins, and the pigeons on the ground (at the
-  // night market, the cat). Returns the pigeons in the air, drawn later.
-  function figures({ set, scene, t, time, gear, loop }) {
+  // One Tree Island at sunrise, back to front: the sky lightening from the horizon up, the sun coming up
+  // behind the far shore's pines, the lake (the shore and the water follow the horizon's band) and its
+  // glints (the sun's reflection among them once it's up), the mist's streaks still left, the fish if
+  // it's jumping, the island, and the pine's branches over you (its trunk stands among the figures).
+  function island({ bars, t, time, still, scene }) {
+    const stages = sunriseStages(Math.floor(bars)), horizon = stages[6], up = sunUp(bars), [sx, sy] = data.island.sun;
+    sky(stages, data.sunrise);
+    sprite('sun', sx, sy - up);
+    sprite(`island-shore-${horizon}`, 0, 0);
+    sprite(`island-water-${horizon}`, 0, 0);
+    data.island.glints.forEach(([x, y], i) => {
+      if (i < data.island.sunGlints && up < SUN_UP) return;
+      if (still ? i % 2 === 0 : Math.sin(time * GLINT + i * 2.3) > 0.5) px(x, y, 2, 1, C.light);
+    });
+    for (let i = 0; i < mistLeft(bars); i++) sprite(`island-mist-${i}`, 0, 0);
+    const fish = fishAt(scene, t);
+    if (fish) sprite(`fish-${fish.pose}-${fish.frame}`, fish.x, fish.y);
+    sprite('island-land', 0, 0);
+    sprite('island-pine', 0, 0);
+  }
+
+  // How far above an animal's feet its reaction's tail points: just over the top of the frame it shows.
+  const overAnimal = (name) => data.frames[name][5] + OVER_ANIMAL;
+
+  // Everyone and everything standing on the path, nearest last: the listeners (or the island's animals,
+  // and the pine's trunk among them), you, your pedals, the loop pedal and the amp, the speaker, the
+  // case with your keepsakes in its lid, its coins and a keepsake dropping in, and the pigeons on the
+  // ground (at the night market, the cat; on the island, neither). Returns the pigeons in the air,
+  // drawn later.
+  function figures({ set, scene, t, time, gear, loop, inCase = [] }) {
     const things = [
       { y: data.feet.you, draw: () => sprite(youFrame(scene, t, time, gear.instrument), 0, 0) },
       {
@@ -268,17 +313,32 @@ export function createRenderer(g, art) {
         y: data.feet.case,
         draw: () => {
           sprite('case', 0, 0);
+          inCase.forEach((id, i) => sprite(`keep-${id}-case`, ...data.caseKeeps[i]));
           for (const [x, y] of data.caseCoins.slice(0, scene.caseCoins)) sprite('case-coin', x, y);
+          const gift = giftAt(scene, t, time);
+          if (gift) {
+            sprite(`keep-${gift.id}`, gift.x, gift.y);
+            if (gift.landed) {
+              const sparks = gift.sparkle ? [[-7, -11], [6, -5], [-2, -15]] : [[5, -12], [-6, -4], [8, -9]];
+              for (const [dx, dy] of sparks) px(gift.x + dx, gift.y + dy, 1, 1, C.light);
+            }
+          }
         },
       },
     ];
     if (gear.instrument === 'electric') things.push({ y: data.feet.amp, draw: () => sprite('amp', 0, 0) });
     if (owns(gear, 'loop')) things.push({ y: data.feet.loop, draw: () => sprite(`pedal-loop-${loopLight(loop, t)}`, 0, 0) });
-    if (set) for (const p of set.crowd.people) things.push({ y: p.y, draw: () => sprite(personFrame(p, t, time, set.clock.beat), p.x, p.y) });
+    if (set) {
+      for (const p of set.crowd.people) {
+        const frame = p.animal ? animalFrame(p, t, time, set.clock.beat) : personFrame(p, t, time, set.clock.beat);
+        things.push({ y: p.y, draw: () => sprite(frame, p.x, p.y) });
+      }
+    }
+    if (scene.place === 'island') things.push({ y: data.island.trunk, draw: () => sprite('island-trunk', 0, 0) });
     const flying = [];
     const cat = scene.place === 'market' ? catAt(scene, t, time) : null;
     if (cat) things.push({ y: cat.y, draw: () => sprite(`cat-${cat.pose}-${cat.frame}-${cat.dir > 0 ? 'right' : 'left'}`, cat.x, cat.y) });
-    for (const b of scene.place === 'market' ? [] : pigeonsAt(scene, t, time)) {
+    for (const b of scene.place === 'market' || scene.place === 'island' ? [] : pigeonsAt(scene, t, time)) {
       const name = `pigeon-${b.pose}-${b.frame}-${b.dir > 0 ? 'right' : 'left'}`;
       if (b.pose === 'fly') flying.push(() => sprite(name, b.x, b.y));
       else things.push({ y: b.y, draw: () => sprite(name, b.x, b.y) });
@@ -544,7 +604,7 @@ export function createRenderer(g, art) {
     const lines = [
       `bar ${Math.min(set.bars, Math.floor(set.t / bar) + 1)} beat ${beat}`,
       `layers ${LAYERS.filter((x) => set.layers[x.id]).map((x) => x.id).join(' ')}`,
-      `crowd ${set.crowd.people.filter((p) => p.state === 'joining' || p.state === 'stopped').length}  coins ${set.coins}`,
+      `crowd ${set.crowd.people.filter((p) => p.state === 'joining' || p.state === 'stopped').length}  ${set.crowd.place.coins === false ? `fondness ${set.fondness}` : `coins ${set.coins}`}`,
       `shapes ${shapeTags(l.shapes.slice(-16))}`,
       `delay ${info.reported == null ? '?' : info.reported.toFixed(0)}ms  key ${info.measured == null ? '?' : info.measured.toFixed(0)}ms`,
     ];
@@ -567,18 +627,20 @@ export function createRenderer(g, art) {
   //   the studio screen, where t is the band time of the beat it plays, debug: null | { reported, measured },
   //   busking: null | the name of the beat your next set plays, said over the prompt on the 'ready'
   //     screen (null leaves the prompt alone),
-  //   teach: the 'ready' screen shows the key chart (the first set of the visit), not the short prompt }
+  //   teach: the 'ready' screen shows the key chart (the first set of the visit), not the short prompt,
+  //   inCase: the keepsakes in your case (keepsakes.js), shown in its lid wherever you busk }
   return function draw(view) {
     const { screen, set, scene, keys, t, time } = view;
     g.imageSmoothingEnabled = false;
     if (screen === 'shop') return shopView(view);
     if (screen === 'studio') return drawStudio({ px, text, big, measure, C }, view.studio, t);
-    ({ park, station, market })[scene.place](view);
+    ({ park, station, market, island })[scene.place](view);
     const flying = figures(view);
     if (set) {
       for (const p of set.crowd.people) {
         if (p.reaction && t - p.reaction.t < ICON_TIME) {
-          sprite(`react-${p.reaction.rule}-${frameOf(time * REACT_FPS, 2)}`, p.x, p.y - OVER_HEAD);
+          const over = p.animal ? overAnimal(animalFrame(p, t, time, set.clock.beat)) : OVER_HEAD;
+          sprite(`react-${p.reaction.rule}-${frameOf(time * REACT_FPS, 2)}`, p.x, p.y - over);
         }
       }
     }

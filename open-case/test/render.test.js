@@ -1,14 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createRenderer, shapeTags, personFrame, youFrame, treeFrame, loopLight, loopWords, loopCue, W, H } from '../src/render.js';
+import { createRenderer, shapeTags, personFrame, animalFrame, youFrame, treeFrame, loopLight, loopWords, loopCue, W, H } from '../src/render.js';
 import { createSet, runSet } from '../src/set.js';
-import { createScene, createFlocks, sceneNote, sceneLoopNote, CASE, PIGEONS, LOOP_PEDAL, CAT, TRAIN, lanternsLit } from '../src/scene.js';
+import { createScene, createFlocks, sceneNote, sceneLoopNote, sceneEvents, CASE, PIGEONS, LOOP_PEDAL, CAT, TRAIN, lanternsLit, GIFT_FALL } from '../src/scene.js';
 import { createKeyState } from '../src/keys.js';
 import { goodSet } from '../src/bots.js';
 import { KINDS, LOOKS } from '../src/crowd.js';
 import { LOFI_CLOCK, readyBeat } from '../src/beats.js';
-import { INTEREST, LOOP, PARK, STATION } from '../src/tuning.js';
+import { INTEREST, LOOP, PARK, STATION, ISLAND } from '../src/tuning.js';
+import { ANIMALS, ANIMAL_IDS, ANIMALS_OF } from '../src/animals.js';
+import { KEEPSAKES } from '../src/keepsakes.js';
 import { STOCK, PEDALS, INSTRUMENTS, freshGear, buy, stomp } from '../src/gear.js';
 import { createShop, choose, CARD, BUTTON } from '../src/shop.js';
 import { createLoop, record, step, loopLength } from '../src/looper.js';
@@ -1015,4 +1017,130 @@ test("the bottom line's words and the gear strip sit on a dark backing, which le
   assert.ok(backings.length >= 3, 'and behind the gear strip');
   for (const [x, , w] of backings) for (const [px] of PIGEONS) assert.ok(px < x || px > x + w, `the pigeon at ${px} is clear of ${x}..${x + w}`);
   for (const [x, , w] of backings) assert.ok(CAT[0] + 10 < x || CAT[0] - 10 > x + w, `the cat is clear of ${x}..${x + w}`);
+});
+
+// An animal on the island's set at spot `spot`, settled unless `over` says.
+function animalAt(set, animal, spot, over = {}) {
+  const { kind, cross } = ANIMALS[animal], [x, y] = ISLAND.spots[spot];
+  return stoodAt(set.crowd, kind, 0, { look: ANIMALS_OF[kind].indexOf(animal), animal, lane: ISLAND.lanes[cross], x, y, spot, ...over });
+}
+
+test('One Tree Island: before dawn at the start with the sun hidden and the mist on the water, morning at the end with the sun up and the mist gone', () => {
+  const dawn = fakeContext(), morning = fakeContext();
+  createRenderer(dawn, art)(placed('island', 0.5).view);
+  createRenderer(morning, art)(placed('island', 59.5 * BAR).view);
+  const top = (g) => g.rects.find(([x, y, w]) => x === 0 && y === 0 && w === W)[4];
+  assert.equal(top(dawn), data.sunrise[0][0]);
+  assert.equal(top(morning), data.sunrise[4][0]);
+  for (const n of ['island-shore-0', 'island-water-0', 'island-land', 'island-pine', 'island-trunk', 'you-acoustic-', 'case', 'speaker']) assert.ok(drawn(dawn, n).length, n);
+  assert.equal(drawn(dawn, 'island-mist-').length, ISLAND.mist);
+  assert.equal(drawn(morning, 'island-mist-').length, 0);
+  assert.ok(drawn(morning, 'island-water-4').length && drawn(morning, 'island-shore-4').length);
+  const sun = (g) => drawn(g, 'sun')[0].y + data.frames.sun[5];
+  assert.equal(sun(dawn), data.island.sun[1], 'the sun still under the far shore');
+  assert.equal(sun(morning), data.island.sun[1] - ISLAND.sunRise, 'and up by the end');
+  const order = dawn.sprites.map((x) => x.name);
+  assert.ok(order.indexOf('sun') < order.findIndex((n) => n.startsWith('island-water-')), 'the lake hides the sun until it comes up');
+  for (const n of ['ground', 'trees-', 'lamp-', 'roofs-', 'pigeon-', 'cat-', 'station-', 'market-']) assert.equal(drawn(dawn, n).length, 0, `no ${n}`);
+});
+
+test("the island's sun glints on the water once it's up, and the glints hold still with reduced motion", () => {
+  const sunGlints = (g) => g.rects.filter(([x, y, w, h]) => w === 2 && h === 1 && data.island.glints.slice(0, data.island.sunGlints).some(([gx, gy]) => gx === x && gy === y)).length;
+  const at = (bars, still, time) => {
+    const g = fakeContext();
+    createRenderer(g, art)(placed('island', bars * BAR, { still, time }).view);
+    return g;
+  };
+  assert.equal(sunGlints(at(0, true, 1)), 0, 'not before the sun is up');
+  assert.ok(sunGlints(at(50, true, 1)) > 0);
+  assert.deepEqual(at(50, true, 1).rects, at(50, true, 7).rects, 'still: the same glints whenever');
+});
+
+test("the island's animals: crossing as they come by, settled facing you, breathing, or keeping the beat once they're hooked", () => {
+  const p = { animal: 'fox', id: 1, x: 200, y: ISLAND.lanes.land, dir: -1, state: 'passing', interest: 0.3 };
+  assert.match(animalFrame(p, 0, 0), /^fox-cross-\d-left$/);
+  assert.notEqual(animalFrame(p, 0, 0), animalFrame(p, 0, 0.3), 'its strokes come and go');
+  assert.match(animalFrame({ ...p, state: 'joining', x: 100 }, 0, 0), /^fox-cross-\d-right$/, 'heading for its spot, facing you');
+  assert.match(animalFrame({ ...p, state: 'stopped', x: 200 }, 0, 0), /^fox-sit-\d-left$/);
+  assert.match(animalFrame({ ...p, state: 'stopped', x: 98 }, 0, 0), /^fox-sit-\d-right$/);
+  const hooked = { ...p, state: 'stopped', interest: 0.9 };
+  assert.equal(animalFrame(hooked, 0.05, 0), 'fox-beat-1-left', 'its move on the beat');
+  assert.equal(animalFrame(hooked, BEAT * 0.6, 0), 'fox-beat-0-left');
+  assert.match(animalFrame({ ...p, state: 'leaving', dir: 1 }, 0, 0), /^fox-cross-\d-right$/, 'trotting off as it goes');
+});
+
+test('on the island the animals take the people\'s place, the trunk stands among them, and their reactions sit just over their heads', () => {
+  const { set, view: v } = placed('island', 30);
+  const heron = animalAt(set, 'heron', 7, { reaction: { rule: 'taste', t: 29.5 } });
+  const crow = animalAt(set, 'crow', 0, { reaction: { rule: 'callback', t: 29.5 } });
+  const ducks = animalAt(set, 'ducks', 0, { state: 'passing', x: 150, y: ISLAND.lanes.water });
+  const g = fakeContext();
+  createRenderer(g, art)(v);
+  const names = g.sprites.map((x) => x.name);
+  assert.ok(names.some((n) => n.startsWith('heron-sit-') || n.startsWith('heron-beat-')));
+  assert.ok(names.some((n) => n.startsWith('ducks-cross-')));
+  assert.ok(names.findIndex((n) => n.startsWith('ducks-')) < names.indexOf('island-trunk'), 'the ducks pass behind the trunk');
+  assert.ok(names.indexOf('island-pine') < names.findIndex((n) => n.startsWith('crow-')), 'the crow sits on the pine');
+  for (const [a, rule] of [[heron, 'taste'], [crow, 'callback']]) {
+    const r = drawn(g, `react-${rule}-`)[0], name = animalFrame(a, 30, 1, set.clock.beat);
+    const tip = r.y + data.frames[r.name][5], top = a.y - data.frames[name][5];
+    assert.ok(tip < top && tip >= top - 4, `${a.animal}: its reaction's tail just over its head (${tip} over ${top})`);
+  }
+  assert.equal(drawn(g, 'pigeon-').length, 0, 'no pigeons on the island');
+});
+
+test("a loud note makes the island's fish jump, then splash", () => {
+  const { scene, view: v } = placed('island', 20);
+  sceneNote(scene, 60, 0, 20, 4);
+  const g = fakeContext();
+  createRenderer(g, art)({ ...v, t: 20.3 });
+  assert.equal(drawn(g, 'fish-jump-').length, 1);
+  const later = fakeContext();
+  createRenderer(later, art)({ ...v, t: 21 });
+  assert.equal(drawn(later, 'fish-splash-').length, 1);
+});
+
+test('your keepsakes show in your case\'s lid wherever you busk, none to three of them, in the order put in', () => {
+  for (const place of ['park', 'station', 'market', 'island']) {
+    for (let n = 0; n <= 3; n++) {
+      const inCase = KEEPSAKES.slice(5, 5 + n).map((k) => k.id), g = fakeContext();
+      createRenderer(g, art)(placed(place, 10, { inCase }).view);
+      const shown = drawn(g, 'keep-').map((k) => [k.name, k.x + data.frames[k.name][4], k.y + data.frames[k.name][5]]);
+      assert.deepEqual(shown, inCase.map((id, i) => [`keep-${id}-case`, ...data.caseKeeps[i]]), `${place}, ${n}`);
+    }
+  }
+});
+
+test('a keepsake left at the end drops into the case and lies there, sparkling', () => {
+  const { scene, view: v } = placed('island', 180);
+  sceneEvents(scene, [{ type: 'keepsake', id: 'ring' }], 180);
+  const at = (t, time = 1) => {
+    const g = fakeContext();
+    createRenderer(g, art)({ ...v, t, time });
+    return g;
+  };
+  const falling = drawn(at(180 + GIFT_FALL / 2), 'keep-ring')[0];
+  assert.ok(falling.y + data.frames['keep-ring'][5] < CASE[1], 'on its way down');
+  const landed = at(180 + GIFT_FALL + 1), ring = drawn(landed, 'keep-ring')[0];
+  assert.deepEqual([ring.x + data.frames['keep-ring'][4], ring.y + data.frames['keep-ring'][5]], CASE, 'in the case');
+  const sparks = (g) => g.rects.filter(([, , w, h, c]) => w === 1 && h === 1 && c === data.colors.light).map(([x, y]) => `${x},${y}`).join(' ');
+  assert.notEqual(sparks(at(182, 0)), sparks(at(182, 0.3)), 'its sparkle twinkles');
+});
+
+test('every frame the renderer asks for on the island is in the sheet, over a whole set, every animal in every state', () => {
+  const { set, scene } = placed('island', 0);
+  const states = ['passing', 'joining', 'stopped', 'leaving'];
+  ANIMAL_IDS.forEach((animal, i) => {
+    for (const [j, state] of states.entries()) {
+      animalAt(set, animal, (i + j) % ISLAND.spots.length, { state, dir: j % 2 ? 1 : -1, interest: j % 2 ? 0.9 : 0.3, x: 20 + i * 25 + j * 5, reaction: { rule: 'taste', t: 0 } });
+    }
+  });
+  const draw = createRenderer(fakeContext(), art);
+  for (let t = 0; t < 62 * BAR; t += 0.37) {
+    if (Math.abs(t - 20) < 0.2) sceneNote(scene, 60, 0, t, 4); // the fish jumps
+    if (Math.abs(t - 180) < 0.2) sceneEvents(scene, [{ type: 'keepsake', id: KEEPSAKES[Math.floor(t) % 22].id }], t);
+    set.t = t;
+    for (const p of set.crowd.people) p.reaction.t = t - 0.1;
+    for (const still of [false, true]) draw(view({ set, scene, t, bars: t / BAR, time: t * 1.1, still, inCase: ['sock', 'ring', 'lily'] }));
+  }
 });
