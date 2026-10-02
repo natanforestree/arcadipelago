@@ -107,6 +107,8 @@ export const TIPS = { callback: 1, happy: 2, happyElder: 3, end: 1 };
 //   pace, patience  shares of each kind's own walking speed and patience (crowd's kinds)
 //   stay      seconds a listener stays: from, to
 //   tips      as TIPS
+//   coins     false where nobody pays: each tip counts as the listener's fondness instead (crowd.js)
+//   animals   true where animals come instead of people (animals.js), settling on ISLAND.spots
 // The park's are CROWD's and TIPS's own, so a set there plays exactly as it always has.
 export const PLACES = {
   park: {
@@ -122,6 +124,26 @@ export const PLACES = {
     kinds: [0, 0.4, 0.4, 0.2], arrive: [4, 7], waves: null, onScreen: 6, pace: 0.7, patience: 1.5, stay: [90, 240],
     tips: { callback: 1, happy: 1, happyElder: 2, end: 1 },
   },
+  // One Tree Island: animals instead of people, every kind as likely and as patient as in the park, but
+  // fewer of them, and nobody pays.
+  island: {
+    kinds: [1, 1, 1, 1], arrive: [10, 16], waves: null, onScreen: 6, pace: 1, patience: 1,
+    stay: [CROWD.budgetMin, CROWD.budgetMax], tips: TIPS, coins: false, animals: true,
+  },
+};
+
+// One Tree Island's crowd: the line each sort of animal crosses along (animals.js cross): the land
+// animals walk along the island at y 146, as people walk the park's path, the swimmers out on the lake
+// behind it (behind the reeds, the rock and the rowboat on its shore), and the birds high up; and the
+// eleven spots they settle on, [x, y of their feet, sort]: three in the pine, four on the grass round
+// you, and four in the water just off the shore (two in the shallows, the rock and the lily pad).
+export const ISLAND = {
+  lanes: { land: 146, water: 124, sky: 40 },
+  spots: [
+    [122, 93, 'pine'], [190, 77, 'pine'], [138, 61, 'pine'],
+    [70, 158, 'grass'], [96, 165, 'grass'], [196, 165, 'grass'], [228, 158, 'grass'],
+    [52, 134, 'shallows'], [214, 134, 'shallows'], [290, 133, 'rock'], [22, 136, 'lily'],
+  ],
 };
 
 // The band's layers, and how many listeners each needs. A layer drops out only after the crowd has

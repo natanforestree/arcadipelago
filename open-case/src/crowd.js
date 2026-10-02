@@ -1,14 +1,18 @@
 // The passers-by. Pure: they arrive from the seed, walk the path, listen while in earshot, stop when
 // hooked, and leave bored or happy. Their interest moves with what the ears hear (listen.js events).
-// Coins and the rest are reported in c.out as { type, person, coins? } for the set to collect.
+// Coins and the rest are reported in c.out as { type, person, coins? } for the set to collect; where
+// nobody pays (One Tree Island), a tip is { type: 'fond', person, fondness, why } instead.
 //
 // Each person: { id, kind, look (which of the kind's people they are, 0 to LOOKS - 1), dir (+1 walking
 //   right), x, y, state, listening, heard, interest, budget, stayed, spot, lastRule,
 //   reaction: { rule, t } | null, done }
+// On the island, each is an animal (animals.js) instead: look is its place in its kind's animals
+// (ANIMALS_OF), and it has { animal, lane } too: its name, and the y it crosses along.
 // state: 'passing' (walking by, maybe listening), 'joining' (hooked, walking to a spot), 'stopped',
 // 'leaving'. The crowd is everyone joining or stopped.
-import { CROWD, INTEREST, RULES, PLACES } from './tuning.js';
+import { CROWD, INTEREST, RULES, PLACES, ISLAND } from './tuning.js';
 import { createRng, nextRandom, randomBetween } from './rng.js';
+import { ANIMALS, ANIMALS_OF } from './animals.js';
 
 export const KINDS = ['jogger', 'elder', 'student', 'commuter'];
 export const LOOKS = 6; // each kind's people, three women and three men (art/open-case/figures.lua)
@@ -52,6 +56,7 @@ export function createCrowd(seed, place = 'park') {
     open: true, // new people still arrive
     stoppedEver: 0,
     longest: null, // { kind, look, seconds }: whoever has stayed longest
+    first: null, // { kind, look }: whoever came by first
     out: [],
   };
 }
@@ -73,11 +78,12 @@ export function personName(kind, who) {
 // look just dealt. So everyone of a kind comes by before any comes back, and two people of a kind look
 // alike only when more than six of that kind are on screen at once (the station allows more than the
 // park and the market do): then, with every look worn, one someone's wearing is given out, not the
-// look just dealt if there's another.
+// look just dealt if there's another. On the island the looks are the kind's animals (two or three),
+// so a second of one comes only while all of its kind are on screen.
 export function dealLook(c, kind) {
   const worn = new Set(c.people.filter((p) => p.kind === kind).map((p) => p.look));
   if (!c.decks[kind].some((l) => !worn.has(l))) {
-    const deck = [...Array(LOOKS).keys()];
+    const deck = [...Array(c.place.animals ? ANIMALS_OF[kind].length : LOOKS).keys()];
     for (let i = deck.length - 1; i > 0; i--) {
       const j = Math.floor(nextRandom(c.lookRng) * (i + 1));
       [deck[i], deck[j]] = [deck[j], deck[i]];
@@ -110,12 +116,22 @@ function arrive(c, t) {
   const kind = pickKind(nextRandom(c.rng), c.place.kinds);
   const dir = nextRandom(c.rng) < 0.5 ? 1 : -1;
   const budget = randomBetween(c.rng, c.place.stay[0], c.place.stay[1]);
+  const look = dealLook(c, kind);
+  // On the island, an animal of the kind, crossing along its own line.
+  const animal = c.place.animals ? ANIMALS_OF[kind][look] : null;
+  const lane = animal ? ISLAND.lanes[ANIMALS[animal].cross] : PATH_Y;
+  c.first ??= { kind, look };
   c.people.push({
-    id: c.nextId++, kind, look: dealLook(c, kind), dir, x: dir > 0 ? -CROWD.edge : CROWD.width + CROWD.edge, y: PATH_Y,
+    id: c.nextId++, kind, look, dir, x: dir > 0 ? -CROWD.edge : CROWD.width + CROWD.edge, y: lane,
     state: 'passing', listening: false, heard: 0, walkedOn: false,
     interest: INTEREST.start + INTEREST.draw * crowdSize(c), budget, stayed: 0, spot: -1,
-    lastRule: '', reaction: null, done: false, arrivedAt: t,
+    lastRule: '', reaction: null, done: false, arrivedAt: t, ...(animal && { animal, lane }),
   });
+}
+
+// A tip from p: coins, or where nobody pays, fondness.
+function tip(c, p, amount, why) {
+  c.out.push(c.place.coins === false ? { type: 'fond', person: p, fondness: amount, why } : { type: 'coin', person: p, coins: amount, why });
 }
 
 function nudge(p, rule, delta, t) {
@@ -148,7 +164,7 @@ export function hear(c, e, t) {
         break;
       case 'callback':
         nudge(p, 'callback', INTEREST.callback, t);
-        if (inCrowd(p)) c.out.push({ type: 'coin', person: p, coins: c.place.tips.callback, why: 'callback' });
+        if (inCrowd(p)) tip(c, p, c.place.tips.callback, 'callback');
         break;
       default: // repeat, offKey, recognised, random, silence
         nudge(p, e.rule, INTEREST[e.rule], t);
@@ -156,18 +172,27 @@ export function hear(c, e, t) {
   }
 }
 
-function freeSpot(c, x) {
-  let best = -1;
-  CROWD.spots.forEach(([sx], i) => {
-    if (c.people.some((o) => inCrowd(o) && o.spot === i)) return;
-    if (best < 0 || Math.abs(sx - x) < Math.abs(CROWD.spots[best][0] - x)) best = i;
-  });
-  return best;
+// Where listeners stand: round you in an arc, or on the island, its spots ([x, y, sort]).
+export const spotsOf = (c) => (c.place.animals ? ISLAND.spots : CROWD.spots);
+
+// The free spot nearest to p, or -1: for a person any of the arc's, for an animal one of the first of
+// its sorts (animals.js spots) that has one free.
+function freeSpot(c, p) {
+  const spots = spotsOf(c);
+  for (const sort of p.animal ? ANIMALS[p.animal].spots : [null]) {
+    let best = -1;
+    spots.forEach(([sx, , s], i) => {
+      if ((sort && s !== sort) || c.people.some((o) => inCrowd(o) && o.spot === i)) return;
+      if (best < 0 || Math.abs(sx - p.x) < Math.abs(spots[best][0] - p.x)) best = i;
+    });
+    if (best >= 0) return best;
+  }
+  return -1;
 }
 
 function leave(c, p, happy) {
   p.state = 'leaving';
-  if (happy) c.out.push({ type: 'coin', person: p, coins: p.kind === 'elder' ? c.place.tips.happyElder : c.place.tips.happy, why: 'happy' });
+  if (happy) tip(c, p, p.kind === 'elder' ? c.place.tips.happyElder : c.place.tips.happy, 'happy');
   c.out.push({ type: 'left', person: p, happy });
 }
 
@@ -194,7 +219,7 @@ export function stepCrowd(c, dt, t) {
       if (p.listening) {
         p.heard += dt;
         if (p.interest >= INTEREST.hook) {
-          const spot = freeSpot(c, p.x);
+          const spot = freeSpot(c, p);
           if (spot >= 0) {
             p.state = 'joining';
             p.listening = false;
@@ -213,7 +238,7 @@ export function stepCrowd(c, dt, t) {
       p.stayed += dt;
       if (!c.longest || p.stayed > c.longest.seconds) c.longest = { kind: p.kind, look: p.look, seconds: p.stayed };
       if (p.state === 'joining') {
-        const [sx, sy] = CROWD.spots[p.spot];
+        const [sx, sy] = spotsOf(c)[p.spot];
         const step = kind.speed * dt;
         p.x += Math.max(-step, Math.min(step, sx - p.x));
         p.y += Math.max(-step, Math.min(step, sy - p.y));
@@ -223,7 +248,7 @@ export function stepCrowd(c, dt, t) {
       else if (p.stayed >= p.budget) leave(c, p, p.interest > INTEREST.happy);
     } else if (p.state === 'leaving') {
       p.x += p.dir * kind.speed * dt;
-      p.y += Math.max(-kind.speed * dt, Math.min(kind.speed * dt, PATH_Y - p.y));
+      p.y += Math.max(-kind.speed * dt, Math.min(kind.speed * dt, (p.lane ?? PATH_Y) - p.y));
     }
     if (p.x < -CROWD.edge - 1 || p.x > CROWD.width + CROWD.edge + 1) p.done = true;
   }
@@ -232,5 +257,5 @@ export function stepCrowd(c, dt, t) {
 
 // The set is over: each listener still here tips once.
 export function endTips(c) {
-  for (const p of c.people) if (inCrowd(p)) c.out.push({ type: 'coin', person: p, coins: c.place.tips.end, why: 'end' });
+  for (const p of c.people) if (inCrowd(p)) tip(c, p, c.place.tips.end, 'end');
 }

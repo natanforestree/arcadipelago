@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createSet, stepSet, playNote, momentsOf, endTime } from '../src/set.js';
-import { LOFI_CLOCK, readyBeat } from '../src/beats.js';
-import { DT } from '../src/tuning.js';
+import { LOFI, LOFI_CLOCK, readyBeat } from '../src/beats.js';
+import { DT, TIPS } from '../src/tuning.js';
 import { stoodAt } from './helpers.js';
 const { bar: BAR } = LOFI_CLOCK;
 
@@ -106,4 +106,19 @@ test("a set's ears count its beat's bars", () => {
   runTo(set, set.clock.bar * 2 + 0.01);
   assert.equal(set.listen.bar, 2);
   assert.equal(set.listen.notes[0].s, 0);
+});
+
+test('on the island every tip is fondness, never coins, and the fans are the animals that left happy or stayed to the end', () => {
+  const set = createSet(1, LOFI, 'island');
+  stoodAt(set.crowd, 'elder', 0, { animal: 'heron', budget: 5, interest: 0.9 });
+  stoodAt(set.crowd, 'commuter', 1, { animal: 'crow', budget: 5, interest: 0.3 });
+  const early = runTo(set, endTime(set) - 20);
+  stoodAt(set.crowd, 'student', 2, { animal: 'fox' });
+  const events = [...early, ...runTo(set, endTime(set) + BAR + 2)];
+  assert.equal(set.coins, 0);
+  assert.ok(!events.some((e) => e.type === 'coin'));
+  assert.deepEqual(events.filter((e) => e.type === 'fond').map((e) => [e.person.animal, e.fondness, e.why]), [['heron', TIPS.happyElder, 'happy'], ['fox', TIPS.end, 'end']]);
+  assert.equal(set.fondness, TIPS.happyElder + TIPS.end);
+  assert.deepEqual(set.fans.map((f) => f.animal), ['heron', 'fox'], 'not the crow, who left bored');
+  assert.ok(Math.abs(set.fans[0].stayed - 5) < 0.05 && Math.abs(set.fans[1].stayed - 20) < 0.05);
 });

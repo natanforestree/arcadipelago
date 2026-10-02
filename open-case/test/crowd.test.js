@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createCrowd, hear, crowdSize, endTips, dealLook, personName, KINDS, LOOKS } from '../src/crowd.js';
-import { CROWD, INTEREST, TIPS, DT, PLACES } from '../src/tuning.js';
+import { CROWD, INTEREST, TIPS, DT, PLACES, ISLAND } from '../src/tuning.js';
+import { ANIMALS, ANIMALS_OF } from '../src/animals.js';
 import { runCrowd, stoodAt } from './helpers.js';
 import { createSet, stepSet, playNote, releaseNote, momentsOf } from '../src/set.js';
 import { goodSet } from '../src/bots.js';
@@ -372,4 +373,114 @@ test('over a whole good set at the station, everyone on screen always has a whol
       assert.ok(Number.isInteger(p.look) && p.look >= 0 && p.look < LOOKS, `t=${set.t.toFixed(2)}: a ${p.kind} with look ${p.look}`);
     }
   }
+});
+
+// An animal settled on the island's spot `spot`, for tests that need one without hooking it.
+function settled(c, animal, spot, over = {}) {
+  const { kind, cross } = ANIMALS[animal], [x, y] = ISLAND.spots[spot];
+  return stoodAt(c, kind, 0, { look: ANIMALS_OF[kind].indexOf(animal), animal, lane: ISLAND.lanes[cross], x, y, spot, ...over });
+}
+
+test("the island's animals come as the park's people do, the same kinds from the same side for as long, only further apart", () => {
+  for (const seed of [1, 2, 7]) {
+    const park = arrivals(seed, 300), island = arrivals(seed, 600, undefined, 'island');
+    const same = (list) => list.slice(0, 20).map((p) => [p.kind, p.dir, p.budget]);
+    assert.deepEqual(same(island), same(park), `seed ${seed}`);
+    for (let i = 1; i < 20; i++) {
+      const gap = island[i].at - island[i - 1].at;
+      assert.ok(gap >= 10 - DT && gap <= 16 + DT, `gap ${gap}`);
+    }
+  }
+});
+
+test("on the island every arrival is one of its kind's animals, crossing along its own line, and leaving along it too", () => {
+  const seen = new Set();
+  for (const seed of [1, 2, 3]) {
+    const c = createCrowd(seed, 'island');
+    runCrowd(c, 0, 400, () => {
+      for (const p of c.people) {
+        assert.equal(p.animal, ANIMALS_OF[p.kind][p.look], `a ${p.kind} with look ${p.look}`);
+        assert.equal(p.lane, ISLAND.lanes[ANIMALS[p.animal].cross], p.animal);
+        if (p.state === 'passing') assert.equal(p.y, p.lane, p.animal);
+        if (p.listening) p.interest = 1; // everyone who hears you settles, then leaves when their time is up
+        seen.add(p.animal);
+      }
+    });
+    assert.equal(c.first.kind, arrivals(seed, 3, undefined, 'island')[0].kind, 'the first that came by');
+  }
+  assert.equal(seen.size, 11, 'every animal comes by');
+  const c = createCrowd(1, 'island'), crow = settled(c, 'crow', 2, { budget: 1 });
+  runCrowd(c, 0, 3);
+  assert.equal(crow.state, 'leaving');
+  assert.equal(crow.y, ISLAND.lanes.sky, 'a crow leaving flies off at its own height');
+});
+
+test('a second of one animal comes only while every animal of its kind is on screen', () => {
+  let twice = 0;
+  for (const seed of [1, 2, 3, 4, 5, 6]) {
+    const c = createCrowd(seed, 'island');
+    let before = [];
+    runCrowd(c, 0, 600, () => {
+      for (const p of c.people) if (p.listening) p.interest = 1;
+      const p = c.people.at(-1);
+      if (p && !before.includes(p)) {
+        const others = before.filter((o) => o.kind === p.kind).map((o) => o.animal);
+        if (others.includes(p.animal)) {
+          twice++;
+          assert.equal(new Set(others).size, ANIMALS_OF[p.kind].length, `seed ${seed}: a second ${p.animal} with ${others} on screen`);
+        }
+      }
+      before = [...c.people];
+    });
+  }
+  assert.ok(twice > 0, 'it happens');
+});
+
+test('each animal settles only on a spot of its own sort, never two on one, and the turtle takes the rock while it can', () => {
+  for (const seed of [1, 2, 3, 4]) {
+    const c = createCrowd(seed, 'island');
+    runCrowd(c, 0, 600, () => {
+      for (const p of c.people) if (p.listening) p.interest = 1;
+      const settledOn = c.people.filter((p) => p.state === 'joining' || p.state === 'stopped');
+      for (const p of settledOn) assert.ok(ANIMALS[p.animal].spots.includes(ISLAND.spots[p.spot][2]), `${p.animal} on ${ISLAND.spots[p.spot]}`);
+      assert.equal(new Set(settledOn.map((p) => p.spot)).size, settledOn.length, 'one to a spot');
+    });
+  }
+  // A turtle hooked with the rock taken goes to the nearest free spot in the shallows.
+  const c = createCrowd(1, 'island');
+  c.nextArrival = Infinity;
+  settled(c, 'turtle', 9);
+  const turtle = settled(c, 'turtle', 0, { state: 'passing', listening: true, spot: -1, x: 200, y: ISLAND.lanes.water, interest: 0.6 });
+  runCrowd(c, 0, DT);
+  assert.equal(turtle.state, 'joining');
+  assert.deepEqual(ISLAND.spots[turtle.spot], [214, 134, 'shallows']);
+});
+
+test('an animal hooked with no free spot of its sort passes by, as a person does when the arc is full', () => {
+  const c = createCrowd(1, 'island');
+  c.nextArrival = Infinity;
+  settled(c, 'fox', 3);
+  settled(c, 'hedgehog', 4);
+  settled(c, 'deer', 5);
+  settled(c, 'fox', 6);
+  const bunny = settled(c, 'bunny', 0, { state: 'passing', listening: true, spot: -1, x: 120, y: ISLAND.lanes.land, interest: 0.6, dir: 1 });
+  runCrowd(c, 0, 1);
+  assert.equal(bunny.state, 'passing');
+  assert.ok(bunny.x > 120, 'it hops on by');
+  const frog = settled(c, 'frog', 0, { state: 'passing', listening: true, spot: -1, x: 120, y: ISLAND.lanes.water, interest: 0.6 });
+  runCrowd(c, 1, DT);
+  assert.equal(frog.state, 'joining', 'the lily pad is free');
+});
+
+test('nobody pays on the island: a callback, a happy goodbye and the end of a set give fondness, not coins', () => {
+  const c = createCrowd(1, 'island');
+  settled(c, 'heron', 7, { budget: 5, interest: 0.9 });
+  settled(c, 'fox', 3);
+  hear(c, { rule: 'callback' }, 1);
+  runCrowd(c, 1, 5.1);
+  endTips(c);
+  assert.deepEqual(c.out.filter((e) => e.type !== 'left').map((e) => [e.type, e.person.animal, e.fondness, e.why]), [
+    ['fond', 'heron', TIPS.callback, 'callback'], ['fond', 'fox', TIPS.callback, 'callback'],
+    ['fond', 'heron', TIPS.happyElder, 'happy'], ['fond', 'fox', TIPS.end, 'end'],
+  ]);
 });

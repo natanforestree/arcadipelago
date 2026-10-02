@@ -5,12 +5,13 @@
 // set.events holds this update's news for the screen and the sound, as plain objects:
 //   { type: 'rule', rule, ... }         something the ears noticed (see listen.js)
 //   { type: 'coin', person, coins, why } a coin lands in the case ('callback', 'happy' or 'end')
+//   { type: 'fond', person, fondness, why } where nobody pays (One Tree Island), a tip's fondness
 //   { type: 'hooked', person }  { type: 'left', person, happy }
 //   { type: 'layers', bar, layers }     the layers playing from bar `bar` on (decided just before it)
 //   { type: 'end' }                     the set's last bar is over: fade the band, clap
 //   { type: 'over' }                    the end card
 import { createListener, noteOn, noteOff, tick } from './listen.js';
-import { createCrowd, hear, stepCrowd, crowdSize, endTips } from './crowd.js';
+import { createCrowd, hear, stepCrowd, crowdSize, endTips, inCrowd } from './crowd.js';
 import { LOFI, clockOf, setBars } from './beats.js';
 import { GROOVE, LAYERS, LAYER_HOLD, DT } from './tuning.js';
 
@@ -29,6 +30,8 @@ export function createSet(seed, beat = LOFI, place = 'park') {
     listen: createListener(clock),
     crowd: createCrowd(seed, place),
     coins: 0,
+    fondness: 0, // where nobody pays, the tips' fondness instead
+    fans: [], // the animals won over, { animal, stayed }: each that left happy, or was still there at the end
     layers: Object.fromEntries(LAYERS.map((l) => [l.id, l.min === 0])),
     below: Object.fromEntries(LAYERS.map((l) => [l.id, 0])), // whole bars the crowd has stayed below each layer's number
     most: 0, // the biggest the crowd has been since the last layer decision
@@ -93,6 +96,7 @@ export function stepSet(set, dt = DT) {
     set.phase = 'ending';
     c.open = false;
     endTips(c);
+    for (const p of c.people) if (inCrowd(p) && p.animal) set.fans.push({ animal: p.animal, stayed: p.stayed });
     set.overAt = t + bar + GROOVE.applause; // a bar's fade, then applause
     set.events.push({ type: 'end' });
   } else if (set.phase === 'ending' && t >= set.overAt) {
@@ -101,14 +105,16 @@ export function stepSet(set, dt = DT) {
   }
   for (const e of c.out) {
     if (e.type === 'coin') set.coins += e.coins;
+    else if (e.type === 'fond') set.fondness += e.fondness;
+    else if (e.type === 'left' && e.happy && e.person.animal) set.fans.push({ animal: e.person.animal, stayed: e.person.stayed });
     set.events.push(e);
   }
   c.out.length = 0;
 }
 
-// What the end card shows.
+// What the end card shows. (fondness: where nobody pays, what the tips would have been.)
 export function summary(set) {
-  return { coins: set.coins, stopped: set.crowd.stoppedEver, longest: set.crowd.longest };
+  return { coins: set.coins, fondness: set.fondness, stopped: set.crowd.stoppedEver, longest: set.crowd.longest };
 }
 
 // A list of notes ([{ t, pitch, strength, len }], seconds) as key moments in time order: { t, note }

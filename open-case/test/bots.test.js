@@ -127,3 +127,13 @@ test('every place pays an honest set about what the park does, within a fifth, a
     assert.ok(sum(good) >= 10 * lick, `${place}: honest ${sum(good)}, lick bot ${lick}`);
   }
 });
+
+test('on One Tree Island nobody pays: an honest set wins the animals over, and random notes or a lick hardly any', () => {
+  const at = (bot) => SEEDS.map((seed) => runSet(seed, bot(seed), LOFI, 'island'));
+  const good = at(goodSet), random = at(randomBot), lick = at(lickBot);
+  for (const set of [...good, ...random, ...lick]) assert.equal(set.coins, 0);
+  const fondness = (sets) => sets.map((set) => set.fondness);
+  assert.ok(fondness(good).every((f) => f >= 1), `honest set: ${fondness(good)}`);
+  assert.ok(sum(fondness(good)) >= 10 * sum(fondness(random)), `honest ${fondness(good)}, random bot ${fondness(random)}`);
+  assert.equal(sum(fondness(lick)), 0);
+});
