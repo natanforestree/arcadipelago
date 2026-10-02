@@ -8,7 +8,8 @@ local W, H = 384, 216
 local PHASES = { "dawn", "day", "dusk", "night" }
 -- These match STAGES.landscape in site/layout.js and the landscape spots in site/games.json.
 local MOON, SUN, CLOUD_Y = { 336, 14 }, { 276, 166 }, { 8, 60, 150 }
-local ISLANDS = { { "snake", -7, 97 }, { "marrow", 224, -4 }, { "last-light", 116, 97 }, { "open-case", 245, 124 } }
+local ISLANDS = { { "snake", -7, 105 }, { "marrow", 224, -4 }, { "last-light", 116, 97 }, { "open-case", 245, 124 },
+  { "rowan", 20, 44 } }
 
 local sky = L.readJson("site/assets/sky.json")
 local clouds = L.load("site/assets/clouds.png")

@@ -36,7 +36,8 @@ return {
   shooting = "#fff6dc",
 
   -- The hover glow round each island.
-  glow = { snake = "#fff4c2", marrow = "#ffd9b8", unfinished = "#ffe8b0", ["last-light"] = "#ffd7a0", ["open-case"] = "#ffe2a8" },
+  glow = { snake = "#fff4c2", marrow = "#ffd9b8", unfinished = "#ffe8b0", ["last-light"] = "#ffd7a0", ["open-case"] = "#ffe2a8",
+    rowan = "#ffdcae" },
 
   -- Snake: copied from art/snake-icon.lua (the card icon), plus a rock ramp for the underside.
   snake = {
@@ -104,6 +105,25 @@ return {
     pole = "#2b2733", lamp = { "#ffb347", "#ffd98a", "#fff4d0" },
     note = "#ffe9a8",
     timber = { "#4a3324", "#8f663f", "#b58a58" }, rope = "#c9a46a",
+  },
+
+  -- Under the Rowan Tree (a website, not a game): the autumn leaves are the eight falling-leaf colours of
+  -- undertherowantree.org (apps/web/src/lib/rowanLeaves.ts), with its amber #dd9231, gold #ecaa0b and
+  -- cream #f5ecdb; the grass, earth, bark, berries and the little family under the tree are added here.
+  rowan = {
+    outline = "#2b1d16",
+    g1 = "#3f5a2e", g2 = "#5b7a37", g3 = "#7f9a43", g4 = "#aab35c", -- autumn grass, dark -> light
+    d1 = "#3d2618", d2 = "#5e3b23", d3 = "#80553a", -- earth
+    rock = { "#3b2e2a", "#57443a", "#7a6152" },
+    bark = { "#3a2418", "#5c3b25", "#7d5535" },
+    leaf = { "#7c2f24", "#a8311c", "#c25a1e", "#dd9231", "#ecaa0b" }, -- crown, dark -> light
+    fall = { "#b5471f", "#c96320", "#a8311c", "#b5852a", "#c25a1e" }, -- drifting leaves
+    berry = { "#7a1612", "#c42a1c", "#ef5a3a" }, berryShine = "#ffc9b0",
+    hair = "#2a1d1a", hairShine = "#4a3530",
+    skin = { "#c98b6b", "#e8b394" },
+    mom = { "#9c6f1f", "#c9952f" }, dad = { "#3a5068", "#4f6b8a" }, legs = "#5b5470", shoe = "#3b2a22",
+    blanket = { "#e0cfa6", "#f5ecdb" }, -- the baby's
+    picnic = { "#a8432a", "#f5ecdb", "#d9b27a" }, -- the picnic blanket: check, cream, its shaded edge
   },
 
   -- The sign: a wooden board round a parchment panel, hung on rope.

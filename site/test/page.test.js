@@ -6,9 +6,11 @@ import { readJson, siteFile } from './helpers.js';
 const html = readFileSync(siteFile('../index.html'), 'utf8');
 const links = [...html.matchAll(/<a href="([^"]*)" data-game="([^"]*)">([\s\S]*?)<\/a>/g)].map(([, href, id, body]) => ({ href, id, body }));
 
-test('the page lists exactly the games in games.json, in order, each linking to its folder', () => {
+test('the page lists exactly the games in games.json, in order, each linking to its folder or an outside site', () => {
   assert.deepEqual(links.map((l) => l.id), readJson('games.json').games.map((g) => g.id));
   for (const { href, id } of links) {
+    // Something hosted elsewhere (like Under the Rowan Tree) links to its whole https address instead.
+    if (/^https:\/\/[^/\s]+\//.test(href)) continue;
     assert.equal(href, `./${id}/`);
     assert.ok(existsSync(siteFile(`../${id}/index.html`)), `${id}/index.html exists`);
   }
