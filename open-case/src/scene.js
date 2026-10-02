@@ -1,11 +1,12 @@
 // What's on screen besides the set itself, as plain data updated from what happens: the note trail
-// (and your loop's, fainter), coins flying into the case, the gold link of a callback, and the
-// park's life (the sunset over the set, the lit windows, the train, the pigeons by your case and
-// the birds overhead). Pure, so it's tested in Node; render.js draws it. Times are seconds on the
-// set's clock, except the birds' and the pigeons' pecking, which run on the page's clock (`time`).
+// (and your loop's, fainter), coins flying into the case, the gold link of a callback, a keepsake
+// dropping into it, and the park's life (the sunset over the set, the lit windows, the train, the
+// pigeons by your case and the birds overhead), and each other place's. Pure, so it's tested in Node;
+// render.js draws it. Times are seconds on the set's clock, except the birds' and the pigeons'
+// pecking, which run on the page's clock (`time`).
 import { createRng, nextRandom, randomBetween } from './rng.js';
 import { LOFI_CLOCK } from './beats.js';
-import { PARK, STATION, MARKET, RULES } from './tuning.js';
+import { PARK, STATION, MARKET, ISLAND, RULES } from './tuning.js';
 
 export const GUITAR = [152, 128]; // where notes float up from
 // Where your loop's notes float up from (art/open-case/gear.lua G.LOOP_PEDAL).
@@ -36,6 +37,13 @@ const CAT_RUN = 1.5; // seconds a woken cat takes to run off the screen
 const CAT_WALK = PIGEON_WALK; // seconds it takes to stroll back (as long as the pigeons take, so a loud
 // note while it's on its way sends it off from where it is, as they do: scene.flyFrom)
 const CAT_BREATH = 1.4; // seconds each of a sleeping cat's two breaths shows
+const FISH_JUMP = 0.8; // seconds the island's fish is out of the water...
+const FISH_HIGH = 14; // ...leaping this many pixels high...
+const FISH_ON = 12; // ...and this far along
+const SPLASH = 0.5; // seconds its splash shows, each of its two frames half of it
+const GIFT_FALL = 0.8; // seconds a keepsake takes to drop into the case...
+const GIFT_FROM = 70; // ...from this many pixels above it
+const SPARKLE = 0.25; // seconds each of its sparkle's two frames shows
 // Which of n frames a counter is on, for counters that may be negative (the page's clock can start a
 // hair below zero).
 export const frameOf = (count, n) => ((Math.floor(count) % n) + n) % n;
@@ -48,6 +56,7 @@ export function createScene(seed = 1, { bar = LOFI_CLOCK.bar, parkBar = bar, pla
   return {
     bar, parkBar, place,
     trail: [], flights: [], caseCoins: 0, gold: null, clapFrom: -1,
+    gift: null, // a keepsake dropping into the case: { id, t }
     // your loop's notes, { pitch, t }, in time order (t may be a moment ahead: scheduled that way)
     loopTrail: [],
     lastNote: -Infinity, // when you last played a note (you strum)
@@ -60,7 +69,7 @@ export function createScene(seed = 1, { bar = LOFI_CLOCK.bar, parkBar = bar, pla
 }
 
 // A note you played: index is its place in the ears' note list (for its echo). A loud one scatters
-// the pigeons, if they're there (or wakes the night market's cat).
+// the pigeons, if they're there (or wakes the night market's cat, or makes the island's fish jump).
 export function sceneNote(scene, pitch, index, t, strength = 0) {
   scene.trail.push({ pitch, index, t });
   scene.lastNote = t;
@@ -85,6 +94,7 @@ export function sceneEvents(scene, events, t) {
       for (let k = 0; k < e.coins; k++) scene.flights.push({ from: [e.person.x, e.person.y - 34], t: t + k * 0.12 });
     } else if (e.type === 'rule' && e.rule === 'callback') scene.gold = { t, first: e.first };
     else if (e.type === 'end') scene.clapFrom = t;
+    else if (e.type === 'keepsake') scene.gift = { id: e.id, t };
   }
 }
 
@@ -302,4 +312,42 @@ export function catAt(scene, t, time) {
   return { pose: 'sleep', frame: frameOf(time / CAT_BREATH, 2), x: hx, y: hy, dir: -1 };
 }
 
-export { TRAIL_LIFE, LOOP_TRAIL_LIFE, FLIGHT, GOLD, TRAIN_LENGTH, PIGEON_FLY, PIGEON_WALK, CAT_RUN, CAT_WALK };
+// One Tree Island. Its sky's stage for each band at `bar`, as the park's (skyStages) but horizon first:
+// the sunrise lightens from the horizon up, from before dawn (0) to morning (4).
+export const sunriseStages = (bar) => skyStages(bar).reverse();
+
+// How far the sun has come up, in pixels, `bars` (a fraction is fine) into the set: still behind the
+// far pines until ISLAND.sunFrom, then rising to ISLAND.sunRise by ISLAND.sunTo.
+export function sunUp(bars) {
+  const k = (bars - ISLAND.sunFrom) / (ISLAND.sunTo - ISLAND.sunFrom);
+  return Math.round(ISLAND.sunRise * Math.min(1, Math.max(0, k)));
+}
+
+// How many of the mist's streaks are still on the water at `bars`: all ISLAND.mist of them at the
+// start, one fewer at a time, none from ISLAND.mistGone.
+export const mistLeft = (bars) => Math.max(0, ISLAND.mist - Math.floor((Math.max(0, bars) / ISLAND.mistGone) * ISLAND.mist));
+
+// The island's fish at set time t: null while it's under, or jumping out of the water at a loud note
+// (the pigeons' scaredAt), { pose: 'jump', frame (0 going up, 1 coming down), x, y }, then its splash,
+// { pose: 'splash', frame, x, y }. It jumps from ISLAND.fish.
+export function fishAt(scene, t) {
+  if (scene.scaredAt === null) return null;
+  const since = t - scene.scaredAt, [x, y] = ISLAND.fish;
+  if (since < 0) return null;
+  if (since < FISH_JUMP) {
+    const k = since / FISH_JUMP;
+    return { pose: 'jump', frame: k < 0.5 ? 0 : 1, x: Math.round(x + FISH_ON * k), y: Math.round(y - FISH_HIGH * 4 * k * (1 - k)) };
+  }
+  if (since < FISH_JUMP + SPLASH) return { pose: 'splash', frame: since < FISH_JUMP + SPLASH / 2 ? 0 : 1, x: x + FISH_ON, y };
+  return null;
+}
+
+// The keepsake an animal left, at set time t: null if none, or { id, x, y, landed, sparkle }: dropping
+// from above into the case (CASE), then lying there, its sparkle on frame 0 or 1 by the page's `time`.
+export function giftAt(scene, t, time) {
+  if (!scene.gift) return null;
+  const k = Math.min(1, Math.max(0, (t - scene.gift.t) / GIFT_FALL));
+  return { id: scene.gift.id, x: CASE[0], y: Math.round(CASE[1] - GIFT_FROM * (1 - k * k)), landed: k === 1, sparkle: frameOf(time / SPARKLE, 2) };
+}
+
+export { TRAIL_LIFE, LOOP_TRAIL_LIFE, FLIGHT, GOLD, TRAIN_LENGTH, PIGEON_FLY, PIGEON_WALK, CAT_RUN, CAT_WALK, FISH_JUMP, SPLASH, GIFT_FALL };

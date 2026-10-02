@@ -132,12 +132,18 @@ export const PLACES = {
   },
 };
 
-// One Tree Island's crowd: the line each sort of animal crosses along (animals.js cross): the land
+// One Tree Island. Its crowd: the line each sort of animal crosses along (animals.js cross): the land
 // animals walk along the island at y 146, as people walk the park's path, the swimmers out on the lake
 // behind it (behind the reeds, the rock and the rowboat on its shore), and the birds high up; and the
 // eleven spots they settle on, [x, y of their feet, sort]: three in the pine, four on the grass round
 // you, and four in the water just off the shore (two in the shallows, the rock and the lily pad).
+// Its sunrise (scene.js and render.js), over the same PARK.bars as the park's evening: the sky lightens
+// a band at a time from the horizon up, through its five stages; the sun comes up from behind the far
+// pines, rising `sunRise` pixels from bar `sunFrom` to bar `sunTo`; the mist's `mist` streaks thin out
+// one by one and are gone by bar `mistGone`; and a loud note makes the fish jump at `fish` (its x, and
+// the water's y there), which then stays down PARK.pigeonsAway bars, as the pigeons stay away.
 export const ISLAND = {
+  sunFrom: 4, sunTo: 50, sunRise: 44, mist: 4, mistGone: 40, fish: [262, 124],
   lanes: { land: 146, water: 124, sky: 40 },
   spots: [
     [122, 93, 'pine'], [190, 77, 'pine'], [138, 61, 'pine'],

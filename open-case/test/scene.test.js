@@ -6,10 +6,11 @@ import {
   skyStages, sunDrop, windowLit, lampState, starsOut, trainX, cloudX, createFlocks, birdsAt, pigeonsAt, frameOf,
   PIGEONS, TRAIN_LENGTH, PIGEON_FLY, PIGEON_WALK,
   stationClock, trainAt, boardFirst, marketStages, lanternsLit, steamFrame, catAt, CAT, TRAIN, CAT_RUN, CAT_WALK,
+  sunriseStages, sunUp, mistLeft, fishAt, giftAt, FISH_JUMP, SPLASH, GIFT_FALL,
 } from '../src/scene.js';
 import { createCrowd } from '../src/crowd.js';
 import { LOFI_CLOCK } from '../src/beats.js';
-import { PARK, STATION, MARKET } from '../src/tuning.js';
+import { PARK, STATION, MARKET, ISLAND } from '../src/tuning.js';
 const { bar: BAR } = LOFI_CLOCK;
 
 test('each note leaves a glyph that floats up from the guitar, higher notes higher, and fades over 2 bars', () => {
@@ -314,4 +315,60 @@ test('woken again while strolling back, the cat runs off from where it is, not f
   const run = catAt(scene, mid + 0.01, 0);
   assert.equal(run.pose, 'run');
   assert.ok(Math.abs(run.x - there) <= 2, `runs from ${run.x}, where it was (${there})`);
+});
+
+test("the island's sunrise lightens the sky a band at a time, at bar lines, from before dawn to morning, the horizon first", () => {
+  assert.deepEqual(sunriseStages(0), [0, 0, 0, 0, 0, 0, 0]);
+  assert.deepEqual(sunriseStages(PARK.bars), [4, 4, 4, 4, 4, 4, 4]);
+  assert.deepEqual(sunriseStages(PARK.bandFirst), [0, 0, 0, 0, 0, 0, 1], 'the horizon first');
+  for (let bar = 0; bar <= PARK.bars; bar++) {
+    const s = sunriseStages(bar);
+    s.forEach((stage, band) => band < 6 && assert.ok(stage <= s[band + 1], `bar ${bar}: lighter toward the horizon`));
+    if (bar) s.forEach((stage, band) => assert.ok(stage >= sunriseStages(bar - 1)[band], `bar ${bar}: never darker again`));
+  }
+});
+
+test('the sun stays behind the far pines a few bars, then comes up, and the mist thins out and is gone by bar 40', () => {
+  assert.equal(sunUp(0), 0);
+  assert.equal(sunUp(ISLAND.sunFrom), 0);
+  assert.equal(sunUp(ISLAND.sunTo), ISLAND.sunRise);
+  assert.equal(sunUp(PARK.bars), ISLAND.sunRise);
+  for (let b = 1; b <= PARK.bars; b += 0.5) assert.ok(sunUp(b) >= sunUp(b - 0.5), `bar ${b}`);
+  assert.equal(mistLeft(0), ISLAND.mist);
+  assert.equal(ISLAND.mistGone, 40);
+  assert.ok(mistLeft(ISLAND.mistGone - 1) > 0);
+  assert.equal(mistLeft(ISLAND.mistGone), 0);
+  assert.equal(mistLeft(PARK.bars), 0);
+  for (let b = 1; b <= PARK.bars; b++) assert.ok(mistLeft(b) <= mistLeft(b - 1), `bar ${b}`);
+});
+
+test("a loud note makes the island's fish jump and splash, and it stays down 4 bars", () => {
+  const scene = createScene(1, { place: 'island' });
+  assert.equal(fishAt(scene, 5), null, 'under, until a loud note');
+  sceneNote(scene, 60, 0, 10, 3);
+  assert.equal(fishAt(scene, 10.1), null, 'a pick strength of 3 leaves it be');
+  sceneNote(scene, 60, 1, 10, 4);
+  const up = fishAt(scene, 10 + FISH_JUMP * 0.25), top = fishAt(scene, 10 + FISH_JUMP / 2), down = fishAt(scene, 10 + FISH_JUMP * 0.75);
+  assert.deepEqual([up.pose, up.frame, down.frame], ['jump', 0, 1]);
+  assert.ok(top.y < up.y && up.y < ISLAND.fish[1] && top.y <= ISLAND.fish[1] - 13, 'it leaps');
+  assert.ok(up.x < top.x && top.x < down.x, 'and along');
+  assert.equal(fishAt(scene, 10 + FISH_JUMP + 0.1).pose, 'splash');
+  assert.equal(fishAt(scene, 10 + FISH_JUMP + SPLASH + 0.1), null);
+  sceneNote(scene, 60, 2, 12, 4);
+  assert.equal(fishAt(scene, 12.1), null, "another loud note soon after doesn't count");
+  const back = 10 + PARK.pigeonsAway * BAR;
+  sceneNote(scene, 60, 3, back + 0.5, 4);
+  assert.equal(fishAt(scene, back + 0.6).pose, 'jump', '4 bars later it jumps again');
+});
+
+test('a keepsake left at the end drops into the case and lies there, sparkling', () => {
+  const scene = createScene(1, { place: 'island' });
+  assert.equal(giftAt(scene, 1, 1), null);
+  sceneEvents(scene, [{ type: 'end' }, { type: 'keepsake', id: 'acorn' }], 180);
+  const falling = giftAt(scene, 180 + GIFT_FALL / 2, 0);
+  assert.equal(falling.id, 'acorn');
+  assert.ok(!falling.landed && falling.y < CASE[1] && falling.x === CASE[0]);
+  const landed = giftAt(scene, 180 + GIFT_FALL + 1, 0);
+  assert.deepEqual([landed.x, landed.y, landed.landed], [...CASE, true]);
+  assert.notEqual(giftAt(scene, 183, 0).sparkle, giftAt(scene, 183, 0.3).sparkle, 'it sparkles');
 });
