@@ -106,14 +106,15 @@ RAIL = [(970, 300), (900, 300), (830, 300), (760, 300), (712, 300), (692, 300), 
 # above its kerb, halfway from the park to the station, where its label fits between theirs. Your
 # home stands at the west end of the first suburb's street, a bit apart from its houses, just above
 # the road to the coast with its gate facing it; its clear ground is no taller than the house and its
-# garden, so the woods come up close behind it.
+# garden, so the woods come up close behind it. One Tree Island is the smaller of the lake's islands
+# (ISLANDS[1]), drawn again over the land's.
 PICTURES = {
     'park': (404, 262, 80, 50), 'station': (604, 270, 92, 52), 'market': (424, 438, 76, 44),
-    'shop': (500, 284, 32, 22), 'home': (192, 323, 30, 20),
+    'island': (812, 116, 12, 8), 'shop': (500, 284, 32, 22), 'home': (192, 323, 30, 20),
     'suburb1': (250, 318, 70, 34), 'suburb2': (790, 420, 70, 34), 'farm': (870, 500, 54, 34),
     'lighthouse': (120, 178, 26, 30), 'marina': (334, 478, 60, 26), 'village': (650, 150, 56, 30),
 }
-PLACES = ['park', 'station', 'market']  # the pictures that are places to busk
+PLACES = ['park', 'station', 'market', 'island']  # the pictures that are places to busk
 STOPS = PLACES + ['shop', 'home']  # the map's stops: the places to busk, the music shop, then your home
 # Where the road and the railway cross the river, on bridges drawn from the side: each deck's left end
 # and its length.

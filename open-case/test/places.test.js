@@ -10,21 +10,23 @@ function memory(start = {}) {
   return { data, store: safeStorage({ getItem: (k) => data[k] ?? null, setItem: (k, v) => { data[k] = v; } }) };
 }
 
-test('three places, each with its words for the map, the prompt and the end card, and its crowd', () => {
-  assert.deepEqual(PLACE_IDS, ['park', 'station', 'market']);
+test('four places, each with its words for the map, the prompt and the end card, and its crowd', () => {
+  assert.deepEqual(PLACE_IDS, ['park', 'station', 'market', 'island']);
   for (const id of PLACE_IDS) {
     assert.ok(PLACE_WORDS[id].name && PLACE_WORDS[id].at && PLACE_WORDS[id].crowd, id);
     assert.ok(PLACES[id], id);
   }
   assert.equal(PLACE_WORDS.station.name, 'The Station');
   assert.equal(PLACE_WORDS.market.at, 'at the night market');
+  assert.deepEqual(PLACE_WORDS.island, { name: 'One Tree Island', at: 'on One Tree Island', crowd: 'Just you and the animals · no coins' });
+  assert.equal(PLACES.island.coins, false, 'nobody pays on the island');
   assert.ok(isPlace('market') && !isPlace('pier') && !isPlace(null));
 });
 
 test('the map has two more stops, the shop and home, which are not places to busk', () => {
-  assert.deepEqual(STOPS, ['park', 'station', 'market', 'shop', 'home']);
+  assert.deepEqual(STOPS, ['park', 'station', 'market', 'island', 'shop', 'home']);
   assert.deepEqual(STOP_WORDS.shop, { name: 'The Music Shop', about: 'pedals · instruments' });
-  assert.deepEqual(STOP_WORDS.home, { name: 'Home', about: 'your studio · make your own tracks' });
+  assert.deepEqual(STOP_WORDS.home, { name: 'Home', about: 'your studio · your keepsakes' });
   assert.ok(!isPlace('shop') && !isPlace('home'));
   assert.equal(loadPlace(memory({ 'open-case-place': 'home' }).store), 'park', 'a stored home loads as the park');
   assert.equal(loadPlace(memory({ 'open-case-place': 'shop' }).store), 'park', 'a stored shop loads as the park');

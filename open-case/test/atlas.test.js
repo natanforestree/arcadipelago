@@ -40,26 +40,34 @@ test('left and right step through the stops, round from the last to the first', 
   assert.equal(stopOf(a), 'station');
   keys(a, 'ArrowRight');
   assert.equal(stopOf(a), 'market');
-  keys(a, 'ArrowRight', 'ArrowRight', 'ArrowRight');
+  keys(a, 'ArrowRight', 'ArrowRight', 'ArrowRight', 'ArrowRight');
   assert.equal(stopOf(a), 'park', 'past home, round to the park');
-  keys(a, 'ArrowLeft', 'ArrowLeft', 'ArrowLeft');
+  keys(a, 'ArrowLeft', 'ArrowLeft', 'ArrowLeft', 'ArrowLeft');
   assert.equal(stopOf(a), 'market');
   assert.deepEqual(keys(a, 'ArrowUp', 'ArrowDown', 'Escape', 'KeyA'), [null, null, null, null], 'nothing else does anything with the tracks shut');
 });
 
-test('the shop is the fourth stop and home the fifth: right goes park, station, market, shop, home, park, and left from the park to home', () => {
+test('One Tree Island is the fourth stop, the shop the fifth and home the sixth: right goes park, station, market, island, shop, home, park, and left from the park to home', () => {
   const a = createAtlas({ tracks: trackList(beats()) });
   const seen = [];
-  for (let i = 0; i < 5; i++) { keys(a, 'ArrowRight'); seen.push(stopOf(a)); }
-  assert.deepEqual(seen, ['station', 'market', 'shop', 'home', 'park']);
+  for (let i = 0; i < 6; i++) { keys(a, 'ArrowRight'); seen.push(stopOf(a)); }
+  assert.deepEqual(seen, ['station', 'market', 'island', 'shop', 'home', 'park']);
   keys(a, 'ArrowLeft');
   assert.equal(stopOf(a), 'home');
+});
+
+test('One Tree Island is a place to busk like the others: Enter opens the tracks, or with straightGo goes straight there', () => {
+  for (const straightGo of [false, true]) {
+    const a = createAtlas({ place: 'island', tracks: trackList(beats()), straightGo });
+    assert.equal(stopOf(a), 'island', 'the island chosen last time');
+    assert.deepEqual(keys(a, 'Enter'), [straightGo ? 'go' : 'panel']);
+  }
 });
 
 test('with the shop chosen, Enter and Space go into it, the tracks stay shut, also with straightGo', () => {
   for (const straightGo of [false, true]) {
     for (const code of ['Enter', 'NumpadEnter', 'Space']) {
-      const a = createAtlas({ place: 'market', tracks: trackList(beats()), straightGo });
+      const a = createAtlas({ place: 'island', tracks: trackList(beats()), straightGo });
       keys(a, 'ArrowRight');
       assert.equal(stopOf(a), 'shop');
       assert.equal(atlasKey(a, code), 'shop', `${code}, straightGo ${straightGo}`);
@@ -68,7 +76,7 @@ test('with the shop chosen, Enter and Space go into it, the tracks stay shut, al
   }
 });
 
-test('with home chosen, Enter and Space go into the studio, the tracks stay shut, also with straightGo', () => {
+test('with home chosen, Enter and Space go home, to your room, the tracks stay shut, also with straightGo', () => {
   for (const straightGo of [false, true]) {
     for (const code of ['Enter', 'NumpadEnter', 'Space']) {
       const a = createAtlas({ tracks: trackList(beats()), straightGo });

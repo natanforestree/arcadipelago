@@ -1,8 +1,9 @@
 # Draws the pictures that stand on Open Case's map, at one screen pixel each (twice the land's detail,
 # as Nathan's reference draws its towns), and writes where everything goes:
-#   the three places to busk: the park (a ring of trees round a lawn, a pond, the bandstand), the station
-#     (the glass train shed, its brick front and clock tower, a limestone forecourt with a fountain) and
-#     the night market (striped stalls under lanterns on warm brick, townhouses behind, a boardwalk);
+#   the four places to busk: the park (a ring of trees round a lawn, a pond, the bandstand), the station
+#     (the glass train shed, its brick front and clock tower, a limestone forecourt with a fountain),
+#     the night market (striped stalls under lanterns on warm brick, townhouses behind, a boardwalk) and
+#     One Tree Island (the lake's smaller island again, its one pine, a rowboat pulled up on its shore);
 #   the music shop, on the road into town between the park and the station (a flat over a shopfront
 #     with a striped awning and a guitar in its lit window);
 #   your home, at the west end of the first suburb's street (a cottage with lit windows, smoke from its
@@ -610,6 +611,32 @@ def home():
     back_to_front(items)
     return cv
 
+def island():
+    """One Tree Island, the smaller of the lake's two, drawn again at twice the land's detail over its own:
+    its grass in the land's greens, sunlit on the right, the foam round its edge, its one pine with its
+    shadow, and a rowboat pulled up on its shore."""
+    cv = Canvas(40, 34)
+    cx, cy = 20, 23  # the island's middle, over the land's own
+    GRASS = [(122, 156, 52), (150, 174, 62), (180, 190, 84)]
+    for y in range(cy - 10, cy + 11):
+        for x in range(cx - 16, cx + 17):
+            dx, dy = (x - cx) / 14.5, (y - cy) / 9.5
+            d = dx * dx + dy * dy + (hsh(x, y, 61) - 0.5) * 0.1
+            if d <= 1:
+                cv.put(x, y, (214, 238, 228) if d > 0.78 else step(GRASS, 0.45 + (x - cx) / 30 - (y - cy) / 40 + (hsh(x, y, 62) - 0.5) * 0.3))
+    # the rowboat, its bow up on the grass to the right, its stern in the water
+    bx, by = cx + 6, cy + 3
+    for k, row in enumerate(['..ggggggg..', '.gDDDDDDDg.', 'GGGGGGGGGGG', '.HHHHHHHHH.']):
+        for i, ch in enumerate(row):
+            if ch != '.':
+                cv.put(bx + i, by + k, {'g': (204, 160, 108), 'D': (104, 66, 42), 'G': (166, 112, 72), 'H': (118, 76, 48)}[ch])
+    for i in range(1, 10):
+        cv.put(bx + i, by + 4, (20, 60, 90, 90))
+    cv.line([(bx + 2, by + 1), (bx + 8, by + 1)], (104, 66, 42))
+    cv.line([(bx + 3, by), (bx + 3, by + 1)], (204, 160, 108))  # the seat
+    tree(cv, cx, cy + 1, 6, 812, 'pine')  # over the land's own, a little taller
+    return cv
+
 # ---------------------------------------------------------------------------------------------
 # The settlements without a name
 
@@ -927,7 +954,7 @@ def top_row(cv):
 
 
 pictures = {
-    'park': park(), 'station': station(), 'market': market(), 'shop': shop(), 'home': home(), 'suburb1': suburb(3),
+    'park': park(), 'station': station(), 'market': market(), 'island': island(), 'shop': shop(), 'home': home(), 'suburb1': suburb(3),
     'suburb2': suburb(11), 'village': village(), 'farm': farm(), 'lighthouse': lighthouse(), 'marina': marina(),
 }
 the_city, city_at = city(pictures, masks())
@@ -936,7 +963,7 @@ clouds = {'cloud1': cloud(120, 44, 5), 'cloud2': cloud(90, 34, 9)}
 
 placed = [{'name': 'city', 'x': city_at[0], 'y': city_at[1]}]
 places = {}
-NAMES = {'park': 'The Park', 'station': 'The Station', 'market': 'The Night Market', 'shop': 'The Music Shop', 'home': 'Home'}
+NAMES = {'park': 'The Park', 'station': 'The Station', 'market': 'The Night Market', 'island': 'One Tree Island', 'shop': 'The Music Shop', 'home': 'Home'}
 for name, (cx, by, w, h) in sorted(PICTURES.items(), key=lambda kv: (kv[1][1], kv[0])):
     cv = pictures[name]
     x, y = cx * SCALE - cv.w // 2, by * SCALE - cv.h + 3

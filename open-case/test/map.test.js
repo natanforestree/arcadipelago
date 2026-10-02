@@ -33,6 +33,7 @@ test('every picture map.json names is there and lies on the map, the city first,
 });
 
 test("each place to busk has its picture, its name, and its pin, label and view on the map, the pin over the picture", () => {
+  assert.ok(PLACE_IDS.includes('island'), 'One Tree Island among them');
   assert.deepEqual(Object.keys(map.places), [...PLACE_IDS, 'shop', 'home'], 'the stops: the places to busk, the shop, then home');
   for (const id of PLACE_IDS) {
     const p = map.places[id], pic = map.pictures.find((q) => q.name === id), { w, h } = png(id);

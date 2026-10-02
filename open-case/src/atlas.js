@@ -38,12 +38,12 @@ export const trackOf = (a) => a.tracks[a.track];
 
 // A key on the map, by its code. Returns what happened, for main.js: 'place' (another stop is chosen),
 // 'panel' (the tracks open), 'track' (another track is chosen), 'go' (busk at the chosen place, to the
-// chosen track), 'shop' (go into the music shop), 'home' (go into the studio), 'back' (the panel
+// chosen track), 'shop' (go into the music shop), 'home' (go home, to your room), 'back' (the panel
 // closes), 'start' (the title was up and is cleared), or null (the key does nothing here).
 //   With the title up, any key but Esc clears it and does nothing else; Esc leaves it up.
 //   Left and right step through the stops, round from the last (home) to the first; Enter or Space
-//   opens the tracks (or goes, with straightGo), or goes into the shop or the studio when that's
-//   chosen, never opening the tracks. With the tracks open, up and down choose one, Enter or Space
+//   opens the tracks (or goes, with straightGo), or goes into the shop or home when that's chosen,
+//   never opening the tracks. With the tracks open, up and down choose one, Enter or Space
 //   goes, and Esc closes them.
 export function atlasKey(a, code) {
   if (a.intro) return code === 'Escape' ? null : clickTitle(a);
