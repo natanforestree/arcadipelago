@@ -28,4 +28,7 @@ return {
   go = "#6ed89a", -- the loop pedal playing, a listener's nod of recognition
   stone = { "#958873", "#bdb097", "#c9bca3" }, -- the station's platform: its joints, its slabs, every other slab
   brick = { "#6a3426", "#a4573c", "#c27a50" }, -- the night market's street: its joints, its bricks, bricks in the lanterns' light
+  morning = { "#5b8fd4", "#8cb8e8", "#c2dcef" }, -- One Tree Island's sky once the sun's up, top -> horizon
+  lake = { "#22466e", "#336592" }, -- the island's lake in the morning: its water and its ripples
+  mist = "#a49ec4", -- the dawn mist on the lake, and the ripples round what floats on it
 }

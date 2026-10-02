@@ -28,6 +28,10 @@
 --              and clock [x, y, r] (the clock's middle and radius, for its hands)
 --   market     the night market's: lanterns [[x, y, colour], ...] (where each hangs, in the order they
 --              light; their frames are lantern-off and lantern-<colour>) and stars [[x, y], ...]
+--   sunrise    One Tree Island's five stages of the sky, before dawn to morning, as `sky`
+--   island     its layout: sun [x, y] (where the sun's middle is before it comes up), trunk (the row the
+--              pine's trunk stands on, to sort it among the figures), glints [[x, y], ...] (where the
+--              water glints; the first sunGlints of them are the sun's reflection, under it)
 --   looks      { kind: ["woman" | "man", ...] }: each kind's passers-by, look 0 first (their frames are
 --              <kind>-<look>-walk-<0-3>, -stand-<0-1> and -nod-<0-1>, each -left and -right)
 --   colors     the named colours the game draws with in code
@@ -39,6 +43,8 @@ local G = dofile(here .. "gear.lua")
 local S = dofile(here .. "shop.lua")
 local ST = dofile(here .. "station.lua")
 local MK = dofile(here .. "market.lua")
+local IS = dofile(here .. "island.lua")
+local AN = dofile(here .. "animals.lua")
 local L, C = D.L, D.C
 local W, H = D.W, D.H
 local STAGES = D.stages()
@@ -150,6 +156,33 @@ for _, pose in ipairs({ "sleep", "walk", "run" }) do
     local b = L.buffer(24, 12)
     MK.cat(b, 11, 10, pose, f)
     frames[#frames + 1] = { name = name .. "-right", b = D.mirror(b), px = 12, py = 10 }
+  end
+end
+
+-- One Tree Island: the far shore and the lake in each stage of the sunrise, the mist's streaks, the
+-- fish leaping and its splash, the island, the pine's branches and its trunk, and the animals, each in
+-- each pose (crossing, settled, keeping the beat), facing left and mirrored to face right
+local SUNRISE = IS.stages()
+for s, st in ipairs(SUNRISE) do
+  screen("island-shore-" .. (s - 1), function(b) IS.shore(b, s) end)
+  screen("island-water-" .. (s - 1), function(b) IS.water(b, s, st[7]) end)
+end
+for i = 1, IS.MISTS do screen("island-mist-" .. (i - 1), function(b) IS.mist(b, i) end) end
+screen("island-land", IS.land)
+screen("island-pine", IS.pine)
+screen("island-trunk", IS.trunk)
+for _, pose in ipairs({ "jump", "splash" }) do
+  for f = 0, 1 do add(("fish-%s-%d"):format(pose, f), 12, 10, 6, 5, function(b) IS.fish(b, pose, f, 6, 5) end) end
+end
+for _, id in ipairs(AN.IDS) do
+  for _, pose in ipairs({ "cross", "sit", "beat" }) do
+    for f = 0, 1 do
+      local name = ("%s-%s-%d"):format(id, pose, f)
+      add(name .. "-left", 32, 24, 16, 22, function(b) AN.draw(b, id, pose, f, 16, 22) end)
+      local b = L.buffer(32, 24)
+      AN.draw(b, id, pose, f, 16, 22)
+      frames[#frames + 1] = { name = name .. "-right", b = D.mirror(b), px = 15, py = 22 }
+    end
   end
 end
 
@@ -297,6 +330,13 @@ local json = table.concat({
   '  "market": {',
   '    "lanterns": ' .. list(MK.lanterns(), function(l) return ("[%d, %d, %d]"):format(l[1], l[2], l[3]) end) .. ",",
   '    "stars": ' .. list(MK.stars(), pair),
+  "  },",
+  '  "sunrise": ' .. list(SUNRISE, function(st) return list(st, q) end) .. ",",
+  '  "island": {',
+  ('    "sun": [%d, %d],'):format(IS.SUN[1], IS.SUN[2]),
+  ('    "trunk": %d,'):format(IS.TRUNK_FEET),
+  '    "glints": ' .. list(IS.glints(), pair) .. ",",
+  ('    "sunGlints": %d'):format(IS.SUN_GLINTS),
   "  },",
   '  "looks": { ' .. table.concat((function()
     local out = {}

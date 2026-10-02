@@ -7,7 +7,8 @@ import assert from 'node:assert/strict';
 import { readFileSync, statSync } from 'node:fs';
 import { readPng } from './png.js';
 import { KINDS, LOOKS, PATH_Y } from '../src/crowd.js';
-import { CROWD } from '../src/tuning.js';
+import { CROWD, ISLAND } from '../src/tuning.js';
+import { ANIMALS, ANIMAL_IDS } from '../src/animals.js';
 import { CASE } from '../src/scene.js';
 import { STOCK, PEDALS, INSTRUMENTS } from '../src/gear.js';
 import { CARD } from '../src/shop.js';
@@ -41,6 +42,10 @@ const FAMILIES = [
   ['market-skyline', 1], ['market-stalls', 1], [/^market-steam-\d$/, 2], ['market-strings', 1], ['market-street', 1],
   ['lantern-off', 1], [/^lantern-\d$/, 3],
   ...['sleep', 'walk', 'run'].flatMap((p) => ['left', 'right'].map((d) => [new RegExp(`^cat-${p}-\\d-${d}$`), 2])),
+  // One Tree Island, and its animals
+  [/^island-shore-\d$/, 5], [/^island-water-\d$/, 5], [/^island-mist-\d$/, 4], ['island-land', 1], ['island-pine', 1], ['island-trunk', 1],
+  [/^fish-jump-\d$/, 2], [/^fish-splash-\d$/, 2],
+  ...ANIMAL_IDS.flatMap((id) => ['cross', 'sit', 'beat'].flatMap((p) => ['left', 'right'].map((d) => [new RegExp(`^${id}-${p}-\\d-${d}$`), 2]))),
 ];
 
 test('every frame the game draws is there, as many of each as the spec says, and nothing else', () => {
@@ -220,5 +225,54 @@ test("the shop window's view stays inside its frame: the wall beside it is plain
   // two columns of wall left of the frame match the wall further left, all the way down.
   for (let y = 16; y <= 60; y++) {
     for (const x of [56, 57]) assert.equal(colourAt('shop-room', x, y), colourAt('shop-room', 54, y), `wall at ${x},${y}`);
+  }
+});
+
+test("One Tree Island's sunrise: five stages of seven bands, the sun hidden under the far shore until it comes up, and the glints on the water", () => {
+  assert.equal(data.sunrise.length, 5);
+  for (const stage of data.sunrise) assert.equal(stage.length, 7);
+  const [, waterTop] = cover('island-water-0', 0, 0), [sx, sy] = data.island.sun, [, sunTop] = cover('sun', sx, sy);
+  assert.ok(sunTop >= waterTop, `the sun's top (${sunTop}) is under the lake's far edge (${waterTop})`);
+  assert.ok(sunTop - ISLAND.sunRise < waterTop - 10, 'and it comes up well clear of it');
+  assert.ok(data.island.glints.length > data.island.sunGlints && data.island.sunGlints > 0);
+  for (const [x, y] of data.island.glints) assert.ok(x >= 0 && x < 320 && y > waterTop && y < 180, `glint ${x}, ${y}`);
+  for (const [x] of data.island.glints.slice(0, data.island.sunGlints)) assert.ok(Math.abs(x - sx) <= 4, 'the sun\'s glints lie under it');
+});
+
+test("the island's land runs right across the screen, the swimmers cross open water behind it, and each animal settles where its sort of spot says", () => {
+  const [, waterTop] = cover('island-water-0', 0, 0), { land, water, sky } = ISLAND.lanes;
+  const grass = new Set(['69,128,110', '46,93,92']); // the island's grass: the palette's two lighter leaf greens (palette.lua)
+  for (let x = 0; x < 320; x++) {
+    assert.ok(opaqueAt('island-land', 0, 0, x, land) && opaqueAt('island-land', 0, 0, x, land - 3), `the land animals walk on the island at ${x}`);
+    assert.ok(!opaqueAt('island-land', 0, 0, x, water + 1), `the swimmers are out on the lake at ${x}, behind everything on its shore`);
+  }
+  assert.ok(water > waterTop + 10 && water < land - 15, 'on the lake, well behind the land animals');
+  assert.ok(sky < waterTop - 30, 'the birds fly high');
+  for (const [x, y, sort] of ISLAND.spots) {
+    const under = [1, 2, 3].map((d) => colourAt('island-land', x, y + d));
+    if (sort === 'pine') assert.ok([1, 2, 3].some((d) => opaqueAt('island-pine', 0, 0, x, y + d)), `a branch under ${x}, ${y}`);
+    else if (sort === 'grass') assert.ok(grass.has(colourAt('island-land', x, y)), `grass at ${x}, ${y}`);
+    else if (sort === 'shallows') assert.ok(!opaqueAt('island-land', 0, 0, x, y), `water at ${x}, ${y}`);
+    else assert.ok(under.some((c) => c !== null), `the ${sort} under ${x}, ${y}`);
+  }
+});
+
+test('every animal fits on screen at each spot of its sort, and on the grass stands clear of the case', () => {
+  for (const id of ANIMAL_IDS) {
+    for (const [sx, sy, sort] of ISLAND.spots.filter(([, , s]) => ANIMALS[id].spots.includes(s))) {
+      const name = `${id}-sit-0-${sx < CROWD.playerX ? 'right' : 'left'}`, [pl, pt, pr, pb] = cover(name, sx, sy);
+      assert.ok(pl >= 0 && pt >= 0 && pr <= 320 && pb <= 180, `${id} at ${sx},${sy} fits on screen`);
+      if (sort !== 'grass') continue;
+      for (let y = pt; y < pb; y++) {
+        for (let x = pl; x < pr; x++) assert.ok(!(opaqueAt(name, sx, sy, x, y) && opaqueAt('case', 0, 0, x, y)), `${id} at ${sx},${sy} clear of the case`);
+      }
+    }
+  }
+});
+
+test('each animal is its own, and smaller than a person: its frames are no taller than 20 rows over its feet', () => {
+  for (const id of ANIMAL_IDS) {
+    for (const name of names.filter((n) => n.startsWith(`${id}-`))) assert.ok(data.frames[name][5] <= 20, `${name} reaches ${data.frames[name][5]} rows`);
+    for (const other of ANIMAL_IDS) if (id < other) assert.ok(differ(`${id}-sit-0-left`, `${other}-sit-0-left`) >= 30, `${id} and ${other}`);
   }
 });
