@@ -815,16 +815,16 @@ export function createAudio(storage) {
         break;
       }
       case 'clap': { // a handclap: three quick slaps of noise, then a short tail
-        const v = n.vel * 0.5;
+        const v = n.vel * 1.2;
         for (let i = 0; i < 3; i++) burst(out, t + i * 0.01, { len: 0.01, freq: 1200, q: 1, vol: v });
         burst(out, t + 0.03, { len: 0.15, freq: 1150, q: 1, vol: v * 0.7 });
         break;
       }
       case 'tightHat': // the 808's hats: crisper and tighter than the lo-fi's
-        burst(out, t, { len: 0.025, type: 'highpass', freq: 9000, vol: n.vel * 0.32 });
+        burst(out, t, { len: 0.025, type: 'highpass', freq: 9000, vol: n.vel * 0.5 });
         break;
       case 'cowbell': { // the 808's cowbell: two squares, at 540 and 800 Hz, through a bandpass
-        const fl = ctx.createBiquadFilter(), v = n.vel * 0.07;
+        const fl = ctx.createBiquadFilter(), v = n.vel * 0.06;
         fl.type = 'bandpass';
         fl.frequency.value = 800;
         fl.Q.value = 1.2;
@@ -846,7 +846,7 @@ export function createAudio(storage) {
         break;
       }
       case 'conga': { // an open conga tone, with a tiny click as the hand lands
-        const v = n.vel * 0.5;
+        const v = n.vel * 0.25;
         tone(out, t, { len: 0.22, freq: 330, to: 300, vol: v, attack: 0.002 });
         burst(out, t, { len: 0.01, freq: 1500, q: 1, vol: v * 0.5 });
         break;
@@ -874,13 +874,13 @@ export function createAudio(storage) {
       }
       case 'ride': { // a ride cymbal: a metallic ping (three sines, out of tune with each other)
         // over a wash of bright noise
-        const v = n.vel * 0.12;
+        const v = n.vel * 0.06;
         burst(out, t, { len: 0.45, type: 'highpass', freq: 6000, vol: v });
         for (const hz of [3150, 3870, 4730]) tone(out, t, { len: 0.5, freq: hz, vol: v * 0.2, attack: 0.001 });
         break;
       }
       case 'tom': { // a floor tom: a falling sine and a short, dark slap of the skin
-        const v = n.vel * 0.7;
+        const v = n.vel * 0.3;
         tone(out, t, { len: 0.4, freq: 130, to: 95, vol: v });
         burst(out, t, { len: 0.05, type: 'lowpass', freq: 900, vol: v * 0.6 });
         break;
@@ -906,7 +906,7 @@ export function createAudio(storage) {
         // slowly across the note. One that starts while the one before still sounds (give or take
         // 10 ms) starts on its pitch and slides to its own.
         const o = ctx.createOscillator(), grit = ctx.createWaveShaper(), g = ctx.createGain();
-        const v = n.vel * 0.45, hold = Math.max(0.01, len - BASS_RELEASE);
+        const v = n.vel * 0.18, hold = Math.max(0.01, len - BASS_RELEASE);
         const from = last808 && last808.start < t && last808.end >= t - 0.01 ? last808.hz : f;
         o.frequency.setValueAtTime(from, t);
         if (from !== f) o.frequency.exponentialRampToValueAtTime(f, t + 0.07);
@@ -981,7 +981,7 @@ export function createAudio(storage) {
         break;
       case 'strings': { // a soft string section: three saws a few cents apart, darkened,
         // swelling in, held for the chord and letting go slowly
-        const fl = ctx.createBiquadFilter(), v = n.vel * 0.02, hold = Math.max(len, 0.3);
+        const fl = ctx.createBiquadFilter(), v = n.vel * 0.028, hold = Math.max(len, 0.3);
         fl.type = 'lowpass';
         fl.frequency.value = 2800;
         for (const k of [0.997, 1, 1.003]) tone(fl, t, { len: hold + 0.3, type: 'sawtooth', freq: f * k, vol: v, attack: 0.3, detune: true, hold });
@@ -1006,7 +1006,7 @@ export function createAudio(storage) {
       case 'synthPad': { // a warm 80s polysynth: two saws a little either side of the note, one
         // to the left and one to the right (in a browser with no panner, straight on), through a
         // filter that opens a little as the note starts; held for the chord, then letting go
-        const fl = ctx.createBiquadFilter(), v = n.vel * 0.03, hold = Math.max(len, 0.08);
+        const fl = ctx.createBiquadFilter(), v = n.vel * 0.045, hold = Math.max(len, 0.08);
         fl.type = 'lowpass';
         fl.frequency.setValueAtTime(700, t);
         fl.frequency.exponentialRampToValueAtTime(2000, t + 0.3);
