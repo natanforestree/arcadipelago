@@ -1476,3 +1476,58 @@ test('in the studio, a steel chord painted over one the band has already schedul
     assert.ok(Math.abs(strum[0]) < 1e-9, `its first string on the 16th, not after the old strum's: ${strum}`);
     assert.ok(strum.every((d, i) => Math.abs(d - strum[1] * i) < 1e-9) && strum[1] > 0, `evenly, low to high: ${strum}`);
   }));
+
+test("a band starting again forgets the old band's 808 note and strum: no slide from it, and its first chord strums on time", () => {
+  const bass = (s, degree, len) => ({ s, degree, len, vel: 0.8, tone: 0.5 });
+  const chord = { s: 0, degree: 0, len: 4, vel: 0.6, tone: 0.5 };
+  // The old band starts at 0.5 s; the new one (a new tempo, say) at `again`, with its own first
+  // notes.
+  const restart = (ctx, again) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    const beat = oneBar(audio, { bass: 'b808', chords: 'steel' }, { bass: [bass(0, 0, 16)], chords: [chord] });
+    runBand(ctx, audio, again - 0.1); // the old band has scheduled its bar-long C2 and its strum
+    const before = ctx().started.length;
+    audio.startBand(again, { ...beat, bass: [bass(0, 2, 4)] });
+    for (const { id } of LAYERS) audio.setLayer(id, true, again);
+    runBand(ctx, audio, again + 0.3);
+    return (id) => ctx().started.slice(before).filter((x) => downstream(x.node).includes(ctx().busGain(id)));
+  };
+  withAudio((ctx) => {
+    const into = restart(ctx, 1); // while the old band's C2 still sounds
+    const [osc] = into('bass').filter((x) => x.kind === 'osc');
+    const events = osc.node.frequency.events.filter(([how]) => how === 'set' || how === 'exp');
+    assert.deepEqual(events.map(([how]) => how), ['set'], `on its own pitch, no slide: ${JSON.stringify(events)}`);
+    assert.ok(Math.abs(events[0][1] - midiToHz(40)) < 1e-6, `E2, not the old band's C2: ${events[0][1]}`);
+  });
+  withAudio((ctx) => {
+    const into = restart(ctx, 0.5); // from the very moment of the old band's strum
+    const strum = into('keys').filter((x) => x.kind === 'buffer').map((x) => x.t - 0.5).sort((a, b) => a - b);
+    assert.ok(strum.length === 4 && Math.abs(strum[0]) < 1e-9, `the new chord's first string on its time: ${strum}`);
+  });
+});
+
+test("an 808 note the studio writes before one the band has already scheduled doesn't take over the slide", () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    const bass = (s, degree, len) => ({ s, degree, len, vel: 0.8, tone: 0.5 });
+    // straight 16ths at 80 bpm: 16th 4 at 1.25 s, 5 at 1.4375, 8 at 2. E2 on 5 runs into G2 on 8.
+    const beat = oneBar(audio, { bass: 'b808' }, { swing: 0.5, bass: [bass(5, 2, 3), bass(8, 4, 4)] });
+    audio.editBand();
+    runBand(ctx, audio, 1);
+    ctx().currentTime = 1.24;
+    audio.update(); // the band has scheduled 16th 5's E2
+    const at = (s) => 0.5 + clockOf(beat).timeOf16th(s);
+    assert.ok(ctx().started.some((x) => x.kind === 'osc' && Math.abs(x.t - at(5)) < 1e-9), "16th 5's note is scheduled");
+    const note = { voice: 'bass808', note: 36, vel: 0.8, len: 1, tone: 0.5 };
+    // a C2 painted on 16th 4, after the band has scheduled 16th 5
+    audio.playWritten({ part: 'bass', drum: null, layer: 'bass', notes: [note], s: 4 });
+    runBand(ctx, audio, 2.1);
+    const slot = ctx().busGain('bass');
+    const [g] = ctx().started.filter((x) => x.kind === 'osc' && Math.abs(x.t - at(8)) < 1e-9 && downstream(x.node).includes(slot));
+    const [set, exp] = g.node.frequency.events;
+    const from = `from E2, the note it runs on from, not the painted C2: ${JSON.stringify(set)}`;
+    assert.ok(set[0] === 'set' && Math.abs(set[1] - midiToHz(40)) < 1e-6, from);
+    assert.ok(exp?.[0] === 'exp' && Math.abs(exp[1] - midiToHz(43)) < 1e-6, `to G2: ${JSON.stringify(exp)}`);
+  }));

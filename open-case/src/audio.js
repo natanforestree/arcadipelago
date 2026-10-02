@@ -45,7 +45,7 @@ const PERC_SNAP_LEVEL = 0.32;
 const PERC_TAP_HZ = 95; // the low tap: a soft thud, like a hand on the guitar's body
 const PERC_TAP_DROP_HZ = 55; // ...its pitch dropping quickly
 const PERC_TAP_LEVEL = 0.4;
-// The band's own sounds (each voice's numbers are in playBand, but for these).
+// A few numbers for the band's own sounds (each voice's other numbers are in playBand).
 // The steel guitar strums each chord low to high: a string sounds this many seconds after the one
 // below it.
 const STRUM_GAP = 0.012;
@@ -828,7 +828,9 @@ export function createAudio(storage) {
         fl.type = 'bandpass';
         fl.frequency.value = 800;
         fl.Q.value = 1.2;
-        for (const hz of [540, 800]) tone(fl, t, { len: 0.3, type: 'square', freq: hz, vol: v, attack: 0.002 });
+        for (const hz of [540, 800]) {
+          tone(fl, t, { len: 0.3, type: 'square', freq: hz, vol: v, attack: 0.002 });
+        }
         fl.connect(out);
         break;
       }
@@ -876,7 +878,9 @@ export function createAudio(storage) {
         // over a wash of bright noise
         const v = n.vel * 0.06;
         burst(out, t, { len: 0.45, type: 'highpass', freq: 6000, vol: v });
-        for (const hz of [3150, 3870, 4730]) tone(out, t, { len: 0.5, freq: hz, vol: v * 0.2, attack: 0.001 });
+        for (const hz of [3150, 3870, 4730]) {
+          tone(out, t, { len: 0.5, freq: hz, vol: v * 0.2, attack: 0.001 });
+        }
         break;
       }
       case 'tom': { // a floor tom: a falling sine and a short, dark slap of the skin
@@ -898,7 +902,9 @@ export function createAudio(storage) {
         fl.Q.value = 6;
         fl.frequency.setValueAtTime(f * 12, t);
         fl.frequency.exponentialRampToValueAtTime(f * 1.5, t + 0.15);
-        tone(fl, t, { len: hold + BASS_RELEASE, type: 'sawtooth', freq: f, vol: n.vel * 0.15, attack: 0.003, hold });
+        tone(fl, t, {
+          len: hold + BASS_RELEASE, type: 'sawtooth', freq: f, vol: n.vel * 0.15, attack: 0.003, hold,
+        });
         fl.connect(out);
         break;
       }
@@ -910,7 +916,11 @@ export function createAudio(storage) {
         const from = last808 && last808.start < t && last808.end >= t - 0.01 ? last808.hz : f;
         o.frequency.setValueAtTime(from, t);
         if (from !== f) o.frequency.exponentialRampToValueAtTime(f, t + 0.07);
-        last808 = { hz: f, start: t, end: t + len };
+        // A note played out of time order (the studio's, written at once while the band has
+        // already scheduled a later one) leaves the last note as it is. (A note a studio gate cut
+        // off still counts as sounding to its end, so the next may slide from a pitch no one hears:
+        // rare.)
+        if (!last808 || t >= last808.start) last808 = { hz: f, start: t, end: t + len };
         grit.curve = gritCurve;
         g.gain.setValueAtTime(0.0001, t);
         g.gain.exponentialRampToValueAtTime(v, t + 0.005);
@@ -923,9 +933,8 @@ export function createAudio(storage) {
       }
       case 'upright': { // an upright bass: a dark, woody string that soon stops ringing, with a
         // soft thump as the finger plucks it
-        const level = 1;
-        bandString(out, t, len, n, { ring: 0.9, bright: 0.2, pick: 0.35 }, level);
-        burst(out, t, { len: 0.05, type: 'lowpass', freq: 250, vol: n.vel * level * 0.5 });
+        bandString(out, t, len, n, { ring: 0.9, bright: 0.2, pick: 0.35 }, 1);
+        burst(out, t, { len: 0.05, type: 'lowpass', freq: 250, vol: n.vel * 0.5 });
         break;
       }
       case 'fuzz': { // a fuzz bass: two sawtooths a little apart, clipped hard, the fizz taken off,
@@ -984,7 +993,9 @@ export function createAudio(storage) {
         const fl = ctx.createBiquadFilter(), v = n.vel * 0.028, hold = Math.max(len, 0.3);
         fl.type = 'lowpass';
         fl.frequency.value = 2800;
-        for (const k of [0.997, 1, 1.003]) tone(fl, t, { len: hold + 0.3, type: 'sawtooth', freq: f * k, vol: v, attack: 0.3, detune: true, hold });
+        for (const k of [0.997, 1, 1.003]) {
+          tone(fl, t, { len: hold + 0.3, type: 'sawtooth', freq: f * k, vol: v, attack: 0.3, detune: true, hold });
+        }
         fl.connect(out);
         break;
       }
@@ -1017,7 +1028,8 @@ export function createAudio(storage) {
             side.pan.value = pan;
             side.connect(fl);
           }
-          tone(side, t, { len: hold + 0.4, type: 'sawtooth', freq: f * Math.pow(2, cents / 1200), vol: v, attack: 0.08, detune: true, hold });
+          const freq = f * Math.pow(2, cents / 1200);
+          tone(side, t, { len: hold + 0.4, type: 'sawtooth', freq, vol: v, attack: 0.08, detune: true, hold });
         }
         fl.connect(out);
         break;
@@ -1047,6 +1059,8 @@ export function createAudio(storage) {
     if (!ctx) return;
     editing = false; // the studio's gates are only for the studio: editBand turns them on
     gates.clear();
+    last808 = null; // a new band's first 808 note slides from nothing...
+    strum = { t: null, into: null, count: 0 }; // ...and its first steel chord strums afresh
     beat = b;
     clock = clockOf(b);
     delayLine.delayTime.setValueAtTime(clock.beat * DELAY_BEATS, at);
