@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, statSync } from 'node:fs';
 import { readPng } from './png.js';
 import { KINDS, LOOKS, PATH_Y } from '../src/crowd.js';
-import { CROWD, ISLAND } from '../src/tuning.js';
+import { CROWD, ISLAND, KEEPSAKE } from '../src/tuning.js';
 import { ANIMALS, ANIMAL_IDS } from '../src/animals.js';
 import { KEEPSAKES } from '../src/keepsakes.js';
 import { CASE } from '../src/scene.js';
@@ -348,7 +348,7 @@ test('nothing in your room floats: the groovebox, the mug and the lamp stand on 
 });
 
 test("the keepsakes in your case lie on its lid's lining, side by side", () => {
-  assert.equal(data.caseKeeps.length, 3);
+  assert.equal(data.caseKeeps.length, KEEPSAKE.caseHolds);
   data.caseKeeps.forEach(([x, y], i) => {
     if (i) assert.ok(x - data.caseKeeps[i - 1][0] >= 6, 'clear of each other');
     for (const { id } of KEEPSAKES) {

@@ -115,7 +115,8 @@ export function stepSet(set, dt = DT) {
   for (const e of c.out) {
     if (e.type === 'coin') set.coins += e.coins;
     else if (e.type === 'fond') set.fondness += e.fondness;
-    else if (e.type === 'left' && e.happy && e.person.animal) set.fans.push({ animal: e.person.animal, stayed: e.person.stayed });
+    // (One that leaves happy once the set has ended was counted as still there at the end.)
+    else if (e.type === 'left' && e.happy && e.person.animal && (set.phase === 'playing' || ending)) set.fans.push({ animal: e.person.animal, stayed: e.person.stayed });
     set.events.push(e);
   }
   c.out.length = 0;

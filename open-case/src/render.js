@@ -301,7 +301,7 @@ export function createRenderer(g, art) {
   // case with your keepsakes in its lid, its coins and a keepsake dropping in, and the pigeons on the
   // ground (at the night market, the cat; on the island, neither). Returns the pigeons in the air,
   // drawn later.
-  function figures({ set, scene, t, time, gear, loop, inCase = [] }) {
+  function figures({ set, scene, t, time, still, gear, loop, inCase = [] }) {
     const things = [
       { y: data.feet.you, draw: () => sprite(youFrame(scene, t, time, gear.instrument), 0, 0) },
       {
@@ -321,7 +321,7 @@ export function createRenderer(g, art) {
           if (gift) {
             sprite(`keep-${gift.id}`, gift.x, gift.y);
             if (gift.landed) {
-              const sparks = gift.sparkle ? [[-7, -11], [6, -5], [-2, -15]] : [[5, -12], [-6, -4], [8, -9]];
+              const sparks = gift.sparkle && !still ? [[-7, -11], [6, -5], [-2, -15]] : [[5, -12], [-6, -4], [8, -9]];
               for (const [dx, dy] of sparks) px(gift.x + dx, gift.y + dy, 1, 1, C.light);
             }
           }

@@ -63,6 +63,26 @@ test('Enter or Space on a keepsake you have puts it in your case or takes it out
   assert.deepEqual(keeps, someKept());
 });
 
+test("the case's refusal goes when the pointer moves off the keepsake it was said for", () => {
+  const keeps = { ...someKept(), inCase: ['dandelion', 'acorn', 'sock'] };
+  const refused = () => {
+    const room = createRoom();
+    room.at = at('ring');
+    press(room, keeps, 10);
+    assert.equal(roomCard(room, keeps, 10.5).full, true);
+    return room;
+  };
+  let room = refused();
+  roomKey(room, keeps, 'ArrowRight', 10.5);
+  assert.equal(roomCard(room, keeps, 10.6).full, false, 'an arrow key');
+  room = refused();
+  roomHover(layout, room, ...mid(cubbyBox(layout, at('sock'))));
+  assert.equal(roomCard(room, keeps, 10.6).says, 'in your case: enter to take it out', 'the mouse, onto one in your case');
+  room = refused();
+  roomHover(layout, room, ...mid(cubbyBox(layout, at('ring'))));
+  assert.equal(roomCard(room, keeps, 10.6).full, true, 'staying on it keeps the refusal');
+});
+
 test('a fourth is refused, and the card says so for two seconds', () => {
   const room = createRoom(), keeps = { ...someKept(), inCase: ['dandelion', 'acorn', 'sock'] };
   room.at = at('ring');

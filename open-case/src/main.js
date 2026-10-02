@@ -18,8 +18,8 @@
 // the crowd only ever hears the notes you play live.
 //
 // URL options: ?sound (the sound check); ?debug (interest bars, the corner panel, and Run the bots on
-// the end card); ?seed=N (fixes the passers-by, and the park's windows, train and birds); ?bot=random or
-// ?bot=lick (the bot plays the set, audibly); ?sky=N (the place as it is N bars into a set, until a set
+// the end card); ?seed=N (fixes the passers-by, and the park's windows, train and birds, and the
+// island's animals); ?bot=random or ?bot=lick (the bot plays the set, audibly); ?sky=N (the place as it is N bars into a set, until a set
 // starts); ?coins=N (your savings are N on this page, and nothing bought on it is kept); ?beat=lofi,
 // bossa, funk, reggae or ballad (every set plays that ready-made beat); ?place=park, station, market or
 // island (every set is there, with no map, and the place isn't kept); ?studio (the first key opens the
@@ -486,8 +486,7 @@ function game(art, atlasView) {
           addFound(keeps, e.id);
           keepKeeps();
         }
-      }
-      else if (e.type === 'end') {
+      } else if (e.type === 'end') {
         audio.endBand(start + set.t);
         // Stepped to the set's own end time first: a take finishing exactly then still becomes a
         // layer (and counts, as the frame loop's own step would have counted it); only a take not
@@ -678,7 +677,11 @@ function game(art, atlasView) {
     const r = canvas.getBoundingClientRect();
     return [((e.clientX - r.left) / r.width) * W, ((e.clientY - r.top) / r.height) * H];
   };
+  // Which screen a press began on: its click, which comes after the mouse is let go, only counts
+  // there, so the press that leaves the studio doesn't also click on your room.
+  let pressedIn = null;
   canvas.addEventListener('mousedown', (e) => {
+    pressedIn = screen;
     if (screen !== 'studio' || e.button !== 0) return;
     e.preventDefault();
     const what = mouseDown(studio, studioDrag, ...scenePoint(e), bandTime(), pageTime());
@@ -742,7 +745,7 @@ function game(art, atlasView) {
     return screen === 'shop' ? hit(art.data.shop, shop, gear, ((e.clientX - r.left) / r.width) * W, ((e.clientY - r.top) / r.height) * H) : null;
   };
   canvas.addEventListener('click', (e) => {
-    if (screen === 'room') return roomDid(roomClick(art.data.room, room, keeps, ...scenePoint(e), pageTime()));
+    if (screen === 'room') return pressedIn === 'room' && roomDid(roomClick(art.data.room, room, keeps, ...scenePoint(e), pageTime()));
     const target = inShop(e);
     if (target?.hit === 'item') {
       choose(shop, target.at);

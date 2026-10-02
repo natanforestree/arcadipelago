@@ -1115,9 +1115,9 @@ test('your keepsakes show in your case\'s lid wherever you busk, none to three o
 test('a keepsake left at the end drops into the case and lies there, sparkling', () => {
   const { scene, view: v } = placed('island', 180);
   sceneEvents(scene, [{ type: 'keepsake', id: 'ring' }], 180);
-  const at = (t, time = 1) => {
+  const at = (t, time = 1, still = false) => {
     const g = fakeContext();
-    createRenderer(g, art)({ ...v, t, time });
+    createRenderer(g, art)({ ...v, t, time, still });
     return g;
   };
   const falling = drawn(at(180 + GIFT_FALL / 2), 'keep-ring')[0];
@@ -1126,6 +1126,8 @@ test('a keepsake left at the end drops into the case and lies there, sparkling',
   assert.deepEqual([ring.x + data.frames['keep-ring'][4], ring.y + data.frames['keep-ring'][5]], CASE, 'in the case');
   const sparks = (g) => g.rects.filter(([, , w, h, c]) => w === 1 && h === 1 && c === data.colors.light).map(([x, y]) => `${x},${y}`).join(' ');
   assert.notEqual(sparks(at(182, 0)), sparks(at(182, 0.3)), 'its sparkle twinkles');
+  assert.equal(sparks(at(182, 0, true)), sparks(at(182, 0.3, true)), 'with reduced motion it holds steady');
+  assert.ok(sparks(at(182, 0, true)).length > 0, 'and still shows');
 });
 
 test('every frame the renderer asks for on the island is in the sheet, over a whole set, every animal in every state', () => {

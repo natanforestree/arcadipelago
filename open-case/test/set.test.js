@@ -128,17 +128,31 @@ test('on the island every tip is fondness, never coins, and the fans are the ani
 
 test("a set on the island ends with its keepsake, once its last tips are in: the first is from whoever stayed longest", () => {
   const set = createSet(4, LOFI, 'island');
-  const moments = momentsOf(goodSet(4)), events = [];
+  const moments = momentsOf(goodSet(4)), events = [], ends = [];
   let i = 0;
   while (set.phase !== 'over') {
     for (; i < moments.length && moments[i].t <= set.t + DT; i++) if (moments[i].note) playNote(set, moments[i].note.pitch, 3, moments[i].t);
     stepSet(set, DT);
-    events.push(...set.events.map((e) => e.type));
+    for (const e of set.events) {
+      if (e.type === 'fond' && e.why === 'end') ends.push(events.length);
+      events.push(e.type);
+    }
   }
   const { kind, look } = set.crowd.longest;
   assert.equal(set.keepsake, KEEPSAKES.find((k) => k.animal === ANIMALS_OF[kind][look]).id);
   assert.deepEqual(events.filter((e) => e === 'keepsake' || e === 'end'), ['end', 'keepsake'], 'once, just after the end');
-  assert.ok(events.lastIndexOf('fond') < events.indexOf('keepsake'), 'after the last tips');
+  assert.ok(ends.length > 0 && ends.every((i) => i < events.indexOf('keepsake')), "the end's tips come before it");
+});
+
+test("an animal whose stay runs out in the ending window is one fan; one that leaves the step the set ends is kept", () => {
+  const fansWith = (budget) => {
+    const set = createSet(1, LOFI, 'island');
+    stoodAt(set.crowd, 'elder', 0, { animal: 'heron', budget: budget(set), interest: 1e6 });
+    runTo(set, endTime(set) + BAR + 2);
+    return set.fans.map((f) => f.animal);
+  };
+  assert.deepEqual(fansWith((set) => endTime(set) + BAR / 2), ['heron'], 'a half bar after the end');
+  assert.deepEqual(fansWith((set) => endTime(set)), ['heron'], 'in the very step the set ends');
 });
 
 test("the keepsake's roll never moves the crowd's draws, and the same seed and notes leave the same keepsake", () => {

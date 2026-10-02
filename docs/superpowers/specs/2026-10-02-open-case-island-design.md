@@ -343,7 +343,7 @@ Nathan picks One Tree Island on the map and rows out. As the mist lifts, a duck 
 - **A fix that came with it:**
   - **The live bug:** the Enter that chose the music shop on the map also bought the first item there, if you had the coins.
   - **The fix:** now a key that leaves the map is the map's alone. Without it, the Enter that goes home would have taken your first keepsake straight back out of your case.
-- **`?keepsakes=`** keeps nothing, as `?coins=` doesn't. A keepsake found on such a page joins its shelf only for that page. A bot's never does.
+- **`?keepsakes=`** keeps nothing, as `?coins=` keeps nothing. A keepsake found on such a page joins its shelf only for that page. A bot's never does.
 - **The art:**
   - **Colours:** six join the palette (the morning sky's three blues, the lake's two, and the mist), making 61.
   - **The sheet** has 801 frames and comes to about 160 KB.

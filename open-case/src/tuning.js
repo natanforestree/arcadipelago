@@ -154,7 +154,7 @@ export const ISLAND = {
 
 // The keepsakes (keepsakes.js): once you've found your first, a set on the island leaves another with a
 // chance that rises with its fondness, up to `most` at `full` fondness. Tuned with the bots over seeds
-// 1 to 200, with one keepsake found: the honest set is left one in 26% of sets (it wins 33 to 69
+// 1 to 200, with one keepsake found: the honest set is left one in 26% of sets (it wins 17 to 80
 // fondness a set), in key but never bringing an idea back 4.5%, and random notes and the lick none.
 // Your case holds `caseHolds`.
 export const KEEPSAKE = { full: 30, most: 0.22, caseHolds: 3 };

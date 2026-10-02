@@ -17,17 +17,24 @@ export function createRoom() {
   return { at: 0, said: null };
 }
 
+// Move the pointer to `at`; the case's refusal belongs to the keepsake it was said for, so moving
+// off it clears it.
+function pointAt(room, at) {
+  if (at !== room.at) room.said = null;
+  room.at = at;
+}
+
 // The arrow keys: left and right step along the row, and right from its last cubby goes to the desk
 // (left from the desk comes back, to the top row); up and down switch rows (on the desk, nothing).
 function step(room, code) {
   if (room.at === DESK) {
-    if (code === 'ArrowLeft') room.at = (COLUMNS - 1) * 2;
+    if (code === 'ArrowLeft') pointAt(room, (COLUMNS - 1) * 2);
     return;
   }
   const col = room.at >> 1, row = room.at & 1;
-  if (code === 'ArrowUp' || code === 'ArrowDown') room.at = col * 2 + (code === 'ArrowDown' ? 1 : 0);
-  else if (code === 'ArrowLeft' && col > 0) room.at = (col - 1) * 2 + row;
-  else if (code === 'ArrowRight') room.at = col < COLUMNS - 1 ? (col + 1) * 2 + row : DESK;
+  if (code === 'ArrowUp' || code === 'ArrowDown') pointAt(room, col * 2 + (code === 'ArrowDown' ? 1 : 0));
+  else if (code === 'ArrowLeft' && col > 0) pointAt(room, (col - 1) * 2 + row);
+  else if (code === 'ArrowRight') pointAt(room, col < COLUMNS - 1 ? (col + 1) * 2 + row : DESK);
 }
 
 // Enter on where the pointer is: the desk opens the studio ('studio'); a keepsake you've found goes in
@@ -71,8 +78,8 @@ export function roomHit(layout, px, py) {
 // it's over something a click does something with (for the cursor).
 export function roomHover(layout, room, px, py) {
   const target = roomHit(layout, px, py);
-  if (target?.hit === 'cubby') room.at = target.at;
-  else if (target?.hit === 'desk') room.at = DESK;
+  if (target?.hit === 'cubby') pointAt(room, target.at);
+  else if (target?.hit === 'desk') pointAt(room, DESK);
   return !!target;
 }
 
@@ -82,7 +89,7 @@ export function roomClick(layout, room, keeps, px, py, time) {
   const target = roomHit(layout, px, py);
   if (!target) return null;
   if (target.hit === 'map') return 'map';
-  room.at = target.hit === 'desk' ? DESK : target.at;
+  pointAt(room, target.hit === 'desk' ? DESK : target.at);
   return press(room, keeps, time);
 }
 
