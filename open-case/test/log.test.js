@@ -58,6 +58,13 @@ test('each set logs how many loop layers were recorded in it', () => {
   assert.deepEqual(readLog(s), [{ date: '2026-09-30T20:00:00Z', coins: 25, stopped: 4, instrument: 'electric', pedals: [], layers: 3, choice: 'another' }]);
 });
 
+test('a set on the island logs the keepsake it left, or that none came', () => {
+  const s = memoryStorage();
+  logSet(s, { date: 'a', coins: 0, stopped: 4, place: 'island', keepsake: 'bottlecap' });
+  logSet(s, { date: 'b', coins: 0, stopped: 2, place: 'island', keepsake: null });
+  assert.deepEqual(readLog(s).map((e) => [e.place, e.keepsake]), [['island', 'bottlecap'], ['island', null]]);
+});
+
 test('each set logs where it was played', () => {
   const s = memoryStorage();
   logSet(s, { date: '2026-10-01T18:00:00Z', coins: 14, stopped: 4, beat: 'Funk', place: 'station' });

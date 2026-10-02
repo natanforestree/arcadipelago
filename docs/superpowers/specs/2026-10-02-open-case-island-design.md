@@ -1,7 +1,7 @@
 # Open Case: One Tree Island and keepsakes (design spec)
 
 **Date:** 2026-10-02
-**Status:** Nathan agreed the design in chat, one part at a time ("yes that looks right"), and approved this spec ("go ahead and continue"). Then, seeing the prototype, he asked for two changes, which this version has:
+**Status:** Nathan agreed the design in chat, one part at a time ("yes that looks right"), and approved this spec ("go ahead and continue"). It's built as `docs/superpowers/plans/2026-10-02-open-case-island.md`, and what the build settled is at the end. Then, seeing the prototype, he asked for two changes, which this version has:
 - **The land runs off the screen:** "can you make the land extend to outside of the frame, right now the animals cross from the water and its a bit weird". The island's grass now runs across the screen, and the land animals walk along it instead of floating over the water.
 - **The room's window shows woods:** "where the house is there are trees and no water.. so it should show trees". It looked out on the lake before.
 
@@ -304,6 +304,50 @@ They're only for looks, and the crowd doesn't notice them, just as your gear onl
 ## How we'll know it works
 
 Nathan picks One Tree Island on the map and rows out. As the mist lifts, a duck family paddles by, the fox trots along the shore and settles on the grass beside him, its tail swaying to his groove, and a crow lands in the pine. At the end, a blackberry drops into his case. At home, it sits on his shelf, the first of 22, and in his case's lid at the park the next evening. Later island sets mostly give nothing, until one morning the crow leaves a gold ring.
+
+## What the build settled
+
+- **Where the animals cross and settle** (`ISLAND` in `tuning.js`):
+  - **Lines:** the land animals walk along the island at y 146, where people walk the park's path; the swimmers cross the lake at y 124, behind the reeds, the rock and the rowboat on the shore; and the birds fly high up, at y 40.
+  - **The eleven spots:**
+    - the pine's branches: the low left tip (122, 93), the middle right (190, 77) and the upper left (138, 61);
+    - the grass round you: (70, 158), (96, 165), (196, 165) and (228, 158);
+    - the shallows: (52, 134) and (214, 134);
+    - the rock: (290, 133);
+    - the lily pad: (22, 136).
+  - **Which spot:** the turtle takes the rock, or if it's taken, the nearest shallows. The frog only takes the lily pad.
+- **The squirrel** hops along the land like the others, then up to its branch in the pine.
+- **The numbers:**
+  - Over seeds 1 to 200, the honest set wins 17 to 80 fondness a set, and the random bot and the lick bot almost none.
+  - `KEEPSAKE` is a chance of 0.22 at 30 fondness or more, less below. With one keepsake found, the honest set is left one in 26% of sets, a set in key that never brings an idea back in 5%, and the random bot and the lick bot in none.
+- **The sunrise:**
+  - **The sky** keeps the evening's timing in reverse, so the horizon lightens first. Its five stages are the dusk's colours, then the morning's blues.
+  - **The far shore's pines and the lake** follow the horizon's band.
+  - **The sun** rises 44 pixels from bar 4 to bar 50, and once it's up, it glints on the water below it.
+  - **The mist** is four streaks, and one lifts every 10 bars, the nearest first, so it's gone at bar 40.
+  - **The fish** is out of the water for 0.8 s, then splashes for 0.5 s.
+- **A keepsake dropping in:**
+  - It falls from 70 pixels above the case for 0.8 s and lands where the coins do, with a coin's clink, then twinkles there until the end card.
+  - **The case's lid** shows 5 × 5 versions, which fit its lining better than the 6 × 6 the spec planned.
+- **Your room:**
+  - **The look:** a teal wall, a window onto the woods behind the house, the shelf with 11 columns by 2 rows of 14-pixel cubbies, and on the right a desk with the groovebox, a mug and a lamp. A rug and a plant fill the rest.
+  - **The card** runs along the bottom, as in the shop.
+  - **Marks:** a keepsake in your case has a 2 × 2 gold mark at its cubby's top right. The pointer is a gold frame, or a gold arrow over the groovebox for the desk.
+  - **The arrow keys:** right from the end of a row goes to the desk.
+  - **The words:** "in your case: enter to take it out" and "enter to put it in your case". A missing keepsake's hint reads "Something from the fox" over "the fox likes the groove", and for a special one, "Something special from the crow". The crow and the owl like "a tune brought back".
+- **The end card on the island:**
+  - **The place:** "4 animals stopped to listen on One Tree Island." carries the place, since the coins line is gone.
+  - **Nobody stayed:** "No animal stayed this time."
+  - **?debug's Run the bots** compares fondness.
+- **The birds** sing from the island's waiting screen through the set and its end card. They're quiet in the shop and the studio, and sing again in your room.
+- **A fix that came with it:**
+  - **The live bug:** the Enter that chose the music shop on the map also bought the first item there, if you had the coins.
+  - **The fix:** now a key that leaves the map is the map's alone. Without it, the Enter that goes home would have taken your first keepsake straight back out of your case.
+- **`?keepsakes=`** keeps nothing, as `?coins=` doesn't. A keepsake found on such a page joins its shelf only for that page. A bot's never does.
+- **The art:**
+  - **Colours:** six join the palette (the morning sky's three blues, the lake's two, and the mist), making 61.
+  - **The sheet** has 801 frames and comes to about 160 KB.
+  - **The map:** its picture of the island draws it and its pine again at twice the land's detail, with the rowboat on its right shore. The map comes to 448 KB.
 
 ## Not in this change
 
