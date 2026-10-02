@@ -137,3 +137,12 @@ test('on One Tree Island nobody pays: an honest set wins the animals over, and r
   assert.ok(sum(fondness(good)) >= 10 * sum(fondness(random)), `honest ${fondness(good)}, random bot ${fondness(random)}`);
   assert.equal(sum(fondness(lick)), 0);
 });
+
+test('with a keepsake found, an honest set on the island is left another about 1 time in 4, random notes and a lick almost never', () => {
+  const seeds = Array.from({ length: 200 }, (_, i) => i + 1);
+  const share = (bot) => seeds.filter((seed) => runSet(seed, bot(seed), LOFI, 'island', ['dandelion']).keepsake).length / seeds.length;
+  const good = share(goodSet), random = share(randomBot), lick = share(lickBot);
+  assert.ok(good >= 0.2 && good <= 0.3, `honest: ${good}`);
+  assert.ok(random < 0.05, `random bot: ${random}`);
+  assert.ok(lick <= 0.005, `lick bot: ${lick}`);
+});

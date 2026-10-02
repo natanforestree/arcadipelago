@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createSet, stepSet, playNote, momentsOf, endTime } from '../src/set.js';
+import { createSet, stepSet, playNote, momentsOf, endTime, runSet } from '../src/set.js';
+import { goodSet, randomBot } from '../src/bots.js';
+import { KEEPSAKES } from '../src/keepsakes.js';
+import { ANIMALS_OF } from '../src/animals.js';
 import { LOFI, LOFI_CLOCK, readyBeat } from '../src/beats.js';
 import { DT, TIPS } from '../src/tuning.js';
 import { stoodAt } from './helpers.js';
@@ -121,4 +124,32 @@ test('on the island every tip is fondness, never coins, and the fans are the ani
   assert.equal(set.fondness, TIPS.happyElder + TIPS.end);
   assert.deepEqual(set.fans.map((f) => f.animal), ['heron', 'fox'], 'not the crow, who left bored');
   assert.ok(Math.abs(set.fans[0].stayed - 5) < 0.05 && Math.abs(set.fans[1].stayed - 20) < 0.05);
+});
+
+test("a set on the island ends with its keepsake, once its last tips are in: the first is from whoever stayed longest", () => {
+  const set = createSet(4, LOFI, 'island');
+  const moments = momentsOf(goodSet(4)), events = [];
+  let i = 0;
+  while (set.phase !== 'over') {
+    for (; i < moments.length && moments[i].t <= set.t + DT; i++) if (moments[i].note) playNote(set, moments[i].note.pitch, 3, moments[i].t);
+    stepSet(set, DT);
+    events.push(...set.events.map((e) => e.type));
+  }
+  const { kind, look } = set.crowd.longest;
+  assert.equal(set.keepsake, KEEPSAKES.find((k) => k.animal === ANIMALS_OF[kind][look]).id);
+  assert.deepEqual(events.filter((e) => e === 'keepsake' || e === 'end'), ['end', 'keepsake'], 'once, just after the end');
+  assert.ok(events.lastIndexOf('fond') < events.indexOf('keepsake'), 'after the last tips');
+});
+
+test("the keepsake's roll never moves the crowd's draws, and the same seed and notes leave the same keepsake", () => {
+  for (const seed of [1, 2, 3]) {
+    const notes = goodSet(seed), sets = [[], ['dandelion'], KEEPSAKES.map((k) => k.id)].map((found) => runSet(seed, notes, LOFI, 'island', found));
+    const crowd = (s) => [s.fondness, s.crowd.stoppedEver, s.crowd.longest, s.fans];
+    assert.deepEqual(crowd(sets[1]), crowd(sets[0]));
+    assert.deepEqual(crowd(sets[2]), crowd(sets[0]));
+    assert.equal(sets[2].keepsake, null, 'all 22 found: nothing');
+    assert.equal(runSet(seed, notes, LOFI, 'island', ['dandelion']).keepsake, sets[1].keepsake);
+  }
+  assert.equal(runSet(1, goodSet(1), LOFI, 'park', []).keepsake, null, 'nothing anywhere but the island');
+  assert.equal(runSet(1, randomBot(1), LOFI, 'island', []).keepsake !== null, true, 'your first comes however you played');
 });
