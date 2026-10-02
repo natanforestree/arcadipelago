@@ -10,7 +10,8 @@ import { KINDS, LOOKS } from '../src/crowd.js';
 import { LOFI_CLOCK, readyBeat } from '../src/beats.js';
 import { INTEREST, LOOP, PARK, STATION, ISLAND } from '../src/tuning.js';
 import { ANIMALS, ANIMAL_IDS, ANIMALS_OF } from '../src/animals.js';
-import { KEEPSAKES } from '../src/keepsakes.js';
+import { KEEPSAKES, someKeepsakes } from '../src/keepsakes.js';
+import { createRoom, cubbyBox, DESK } from '../src/room.js';
 import { STOCK, PEDALS, INSTRUMENTS, freshGear, buy, stomp } from '../src/gear.js';
 import { createShop, choose, CARD, BUTTON } from '../src/shop.js';
 import { createLoop, record, step, loopLength } from '../src/looper.js';
@@ -1142,5 +1143,41 @@ test('every frame the renderer asks for on the island is in the sheet, over a wh
     set.t = t;
     for (const p of set.crowd.people) p.reaction.t = t - 0.1;
     for (const still of [false, true]) draw(view({ set, scene, t, bars: t / BAR, time: t * 1.1, still, inCase: ['sock', 'ring', 'lily'] }));
+  }
+});
+
+test('your room: every keepsake found in its cubby and the rest as outlines, the count, a gold mark on those in your case, the pointer, the card and the map key', () => {
+  for (const n of [0, 5, 22]) {
+    const g = fakeContext(), keeps = someKeepsakes(n), room = createRoom();
+    room.at = 4;
+    createRenderer(g, art)(view({ screen: 'room', room, keeps, time: 3 }));
+    assert.ok(drawn(g, 'room').length === 1);
+    assert.ok(g.texts.includes(`${n} of 22`), `${n} of 22`);
+    const shown = drawn(g, 'keep-').map((k) => k.name);
+    assert.deepEqual(shown, KEEPSAKES.map(({ id }, i) => (i < n ? `keep-${id}` : `keep-${id}-hint`)));
+    KEEPSAKES.forEach((k, i) => {
+      const s = drawn(g, `keep-${k.id}`)[0], [x, y, w, h] = cubbyBox(data.room, i);
+      const [l, t] = [s.x, s.y], [, , fw, fh] = data.frames[s.name];
+      assert.ok(l >= x && t >= y && l + fw <= x + w && t + fh <= y + h, `${s.name} inside its cubby`);
+    });
+    const marks = g.rects.filter(([, , w, h, c]) => w === 2 && h === 2 && c === data.colors.gold);
+    assert.equal(marks.length, Math.min(n, 3), 'a mark for each in your case');
+    const [x, y, w] = cubbyBox(data.room, 4);
+    assert.ok(g.rects.some(([rx, ry, rw, , c]) => rx === x - 1 && ry === y - 1 && rw === w + 2 && c === data.colors.gold), 'the pointer round the chosen cubby');
+    assert.ok(g.texts.includes(n > 4 ? 'Acorn' : 'Something from the squirrel'), 'the card');
+    assert.ok(g.texts.includes('map') && g.texts.includes('esc'), 'the map key');
+    assert.equal(drawn(g, 'you-').length, 0);
+  }
+  const g = fakeContext();
+  createRenderer(g, art)(view({ screen: 'room', room: { ...createRoom(), at: DESK }, keeps: someKeepsakes(1), time: 3 }));
+  assert.ok(g.texts.includes('Your studio') && g.texts.includes('enter to open it'));
+});
+
+test('the studio opened from your room has a "room" key in its corner, and from anywhere else a "map" key', () => {
+  for (const back of ['room', 'map']) {
+    const g = fakeContext(), studio = createStudio({ slots: [null, null, null, null, null, null], chosen: null }, back === 'room' ? { back } : undefined);
+    createRenderer(g, art)(view({ screen: 'studio', studio, t: 0 }));
+    const [x, y, w, h] = MAP_KEY, inKey = (p) => p.x >= x && p.x < x + w && p.y >= y && p.y < y + h;
+    assert.ok(g.positions.some((p) => p.s === back && inKey(p)), back);
   }
 });

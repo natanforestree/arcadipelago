@@ -42,7 +42,8 @@ export const SOUND_ARROWS = {
   left: [BUTTONS.sound[0] + 2, BUTTONS.sound[1] + 3, 3, 5],
   right: [BUTTONS.sound[0] + BUTTONS.sound[2] - 5, BUTTONS.sound[1] + 3, 3, 5],
 };
-// The map key, in the free corner left of the picture of the loop: it leaves the studio for the map.
+// The map key, in the free corner left of the picture of the loop: it leaves the studio for the map, or
+// for your room when you came from there (and your room has the same key, for the map).
 export const MAP_KEY = [4, 138, 40, 24];
 export const PAD = [82, 22, 234, 108];
 export const STRIP = [48, 134, 268, 44]; // the picture of the loop: its numbers row, then the lanes
@@ -177,7 +178,7 @@ export function drawStudio(d, studio, t) {
   }
   if (PARTS.includes(part)) wheel(d, studio, tone[part]);
   buttons(d, studio);
-  mapKey(d);
+  cornerKey(d, studio.back);
   if (part === 'mix') mix(d, studio, tone);
   else pad(d, studio, tone[part]);
   strip(d, studio, t, tone);
@@ -292,13 +293,13 @@ function buttons({ px, text, C }, studio) {
   }
 }
 
-// The map key: a raised key with a little ◀ (3 wide, 5 tall, as the knob's) and "map" on its top row,
-// and "esc" in grey under them, as Esc does the same.
-function mapKey({ px, text, C }) {
+// The map key: a raised key with a little ◀ (3 wide, 5 tall, as the knob's) and where it leads ("map",
+// or "room") on its top row, and "esc" in grey under them, as Esc does the same. Your room has it too.
+export function cornerKey({ px, text, C }, word) {
   const [x, y, w] = MAP_KEY;
   raisedKey(px, C, MAP_KEY, C.charcoal, false);
   for (let i = 0; i < 3; i++) px(x + 6 + i, y + 6 - i, 1, 1 + 2 * i, C.grey);
-  text('map', x + 12, y + 4, C.light);
+  text(word, x + 12, y + 4, C.light);
   text('esc', x + w / 2, y + 14, C.grey, 'center');
 }
 

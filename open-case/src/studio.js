@@ -42,9 +42,11 @@ export function chosenBeat(beats) {
 }
 
 // A studio over your beats (loadBeats), with the beat your sets play open.
-export function createStudio(beats) {
+// back: where its corner key and Esc lead, 'map' or 'room' (your room, when you came from its desk).
+export function createStudio(beats, { back = 'map' } = {}) {
   const studio = {
     beats,
+    back,
     open: null, // where the open beat is: { ready: id } or { slot }
     beat: null, // the open beat: a ready-made one itself, until a change copies it into a slot
     version: 0, // goes up with every change to the open beat, or opening another

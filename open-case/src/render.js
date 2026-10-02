@@ -5,9 +5,9 @@
 // pedal, the open case with your keepsakes in its lid and the band's speaker, the passers-by (or the
 // island's animals), their reactions, the pigeons and birds (or the market's cat, or the island's
 // fish), a keepsake dropping into the case, the note
-// trail (and your loop's), the memory strip, the gear strip, the music shop, and the title card (on the
-// pages that skip the map), the key chart, and the pause and ?debug overlays. The end card and the map
-// are HTML (index.html, atlasview.js).
+// trail (and your loop's), the memory strip, the gear strip, the music shop, your room and its shelf of
+// keepsakes, and the title card (on the pages that skip the map), the key chart, and the pause and
+// ?debug overlays. The end card and the map are HTML (index.html, atlasview.js).
 import { CROWD, PLAY, LAYERS, INTEREST, LOOP } from './tuning.js';
 import { LOFI_CLOCK } from './beats.js';
 import {
@@ -18,7 +18,9 @@ import {
 import { STOCK, PEDALS, owns, stockItem } from './gear.js';
 import { card, trying, CARD, BUTTON } from './shop.js';
 import { loopState } from './looper.js';
-import { drawStudio } from './studioview.js';
+import { drawStudio, cornerKey } from './studioview.js';
+import { roomCard, cubbyBox, DESK, CARD as ROOM_CARD } from './room.js';
+import { KEEPSAKES } from './keepsakes.js';
 
 export const W = 320, H = 180;
 const FONT = '8px Silkscreen, monospace';
@@ -592,6 +594,40 @@ export function createRenderer(g, art) {
     }
   }
 
+  // Your room: the room itself, the count over the shelf, each keepsake you've found in its cubby (a
+  // gold mark on those in your case) and the outline of each still to find, the gold pointer round the
+  // chosen cubby (or bobbing over the groovebox on the desk), the card for it, and the map key.
+  function roomView({ room, keeps, time, still }) {
+    const R = data.room;
+    sprite('room', 0, 0);
+    text(`${keeps.found.length} of ${KEEPSAKES.length}`, R.count[0], R.count[1], C.light, 'center');
+    KEEPSAKES.forEach(({ id }, i) => {
+      const [x, y, w, h] = cubbyBox(R, i);
+      sprite(keeps.found.includes(id) ? `keep-${id}` : `keep-${id}-hint`, x + Math.floor(w / 2), y + h - 2);
+      if (keeps.inCase.includes(id)) px(x + w - 3, y + 1, 2, 2, C.gold);
+      if (i !== room.at) return;
+      px(x - 1, y - 1, w + 2, 1, C.gold);
+      px(x - 1, y + h, w + 2, 1, C.gold);
+      px(x - 1, y, 1, h, C.gold);
+      px(x + w, y, 1, h, C.gold);
+    });
+    if (room.at === DESK) {
+      const [x, y, w] = R.desk, cx = x + Math.floor(w / 2) - 2, cy = y - 7 - (!still && Math.sin(time * 5) > 0 ? 1 : 0);
+      px(cx - 2, cy, 5, 1, C.gold);
+      px(cx - 1, cy + 1, 3, 1, C.gold);
+      px(cx, cy + 2, 1, 1, C.gold);
+    }
+    const words = roomCard(room, keeps, time), [x, y, w, h] = ROOM_CARD;
+    g.globalAlpha = 0.92;
+    px(x, y, w, h, C.ink);
+    g.globalAlpha = 1;
+    text(words.name, x + 6, y + 3, words.found ? C.gold : C.grey);
+    text(words.line, x + 6, y + 12, words.found ? C.light : C.grey);
+    text(words.says, x + 6, y + 21, words.full ? C.red : C.gold);
+    text('arrows choose   esc back to the map', x + 6, y + 30, C.greyDark);
+    cornerKey({ px, text, C }, 'map');
+  }
+
   function debugView(set, info) {
     for (const p of set.crowd.people) {
       const x = Math.round(p.x) - 10, y = Math.round(p.y) + 3;
@@ -614,7 +650,7 @@ export function createRenderer(g, art) {
     lines.forEach((s, i) => text(s, W - 129, DEBUG_PANEL_TOP + 2 + i * 9));
   }
 
-  // view: { screen: 'title' | 'ready' | 'playing' | 'paused' | 'over' | 'shop', set, scene, keys,
+  // view: { screen: 'title' | 'ready' | 'playing' | 'paused' | 'over' | 'shop' | 'studio' | 'room', set, scene, keys,
   //   t (set time, which is the band's; in the shop, the time of the band you try the loop pedal
   //   over), bars (bars into the set, a fraction is fine; 0 with no set), time (seconds since the page
   //   opened), still (reduced motion), flocks (the birds, from createFlocks), gear (gear.js),
@@ -624,15 +660,17 @@ export function createRenderer(g, art) {
   //     (the loop pedal's last news, and when: see loopWords; with none showing, loopCue takes its
   //     place over the strip: the count-in, or the recording's progress),
   //   shop: the shop's state (shop.js) on the shop screen, studio: the studio's state (studio.js) on
-  //   the studio screen, where t is the band time of the beat it plays, debug: null | { reported, measured },
+  //   the studio screen, where t is the band time of the beat it plays, room: your room's state
+  //   (room.js) on the room screen, keeps: your keepsakes (keepsakes.js), debug: null | { reported, measured },
   //   busking: null | the name of the beat your next set plays, said over the prompt on the 'ready'
   //     screen (null leaves the prompt alone),
   //   teach: the 'ready' screen shows the key chart (the first set of the visit), not the short prompt,
-  //   inCase: the keepsakes in your case (keepsakes.js), shown in its lid wherever you busk }
+  //   inCase: the keepsakes in your case (keeps.inCase), shown in its lid wherever you busk }
   return function draw(view) {
     const { screen, set, scene, keys, t, time } = view;
     g.imageSmoothingEnabled = false;
     if (screen === 'shop') return shopView(view);
+    if (screen === 'room') return roomView(view);
     if (screen === 'studio') return drawStudio({ px, text, big, measure, C }, view.studio, t);
     ({ park, station, market, island })[scene.place](view);
     const flying = figures(view);
