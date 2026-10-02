@@ -14,7 +14,7 @@ import { createShop, choose, CARD, BUTTON } from '../src/shop.js';
 import { createLoop, record, step, loopLength } from '../src/looper.js';
 import { stoodAt } from './helpers.js';
 import { createStudio, rhythmOf, setTab, newBeat, startNaming, typeName, saveName } from '../src/studio.js';
-import { STRIP, PAD, NAME_FIELD, SETTINGS, WHEEL, BUTTONS, MAP_KEY, arrowsIn, ringLight } from '../src/studioview.js';
+import { STRIP, PAD, NAME_FIELD, SETTINGS, WHEEL, BUTTONS, SOUND_ARROWS, MAP_KEY, arrowsIn, ringLight } from '../src/studioview.js';
 const { bar: BAR, beat: BEAT } = LOFI_CLOCK;
 const LOOP_LENGTH = loopLength(createLoop());
 
@@ -728,7 +728,7 @@ test("the studio screen: the top bar, the wheel, the buttons and each tab's pad"
   const bass = drawOn('bass');
   for (const s of ['C', 'D', 'E', 'F', 'G', 'A', 'B', 'round bass', 'oct 0']) assert.ok(bass.texts.includes(s), s);
   const chords = drawOn('chords');
-  for (const s of ['Dm', 'Em', 'F', 'Am', 'Bdim', 'electric piano']) assert.ok(chords.texts.includes(s), s);
+  for (const s of ['Dm', 'Em', 'F', 'Am', 'Bdim', 'e-piano']) assert.ok(chords.texts.includes(s), s);
   const mix = drawOn('mix');
   for (const s of ['pump', 'pad', 'vinyl', 'm']) assert.ok(mix.texts.includes(s), s);
 });
@@ -826,6 +826,31 @@ test("the octave button: its label clear of its ▲▼, the one that can't step 
   const off = drawOn('drums', 0);
   assert.equal(off.positions.find((q) => q.s === 'oct 0').color, C.greyDark);
   for (const dir of ['up', 'down']) assert.ok(rectsIn(off, arrows[dir]).every((r) => r[4] === C.greyDark), `off the bass, ${dir} dim`);
+});
+
+test("the sound key: a ◀ and a ▶ at its ends, pointing out, the knob's shape, grey, dim on the Mix; the sound's name centred between", () => {
+  const studio = createStudio({ slots: Array(6).fill(null), chosen: null });
+  const C = data.colors, [x, y, w] = BUTTONS.sound;
+  const drawOn = (tab) => {
+    setTab(studio, tab);
+    const g = fakeContext();
+    createRenderer(g, art)(view({ screen: 'studio', studio, t: 0 }));
+    return g;
+  };
+  for (const [tab, word, colour] of [['drums', 'lo-fi kit', C.grey], ['bass', 'round bass', C.grey], ['chords', 'e-piano', C.grey], ['mix', 'sound', C.greyDark]]) {
+    const g = drawOn(tab);
+    for (const side of ['left', 'right']) {
+      const [ax, ay] = SOUND_ARROWS[side], drawn = rectsIn(g, SOUND_ARROWS[side]).sort((a, b) => a[0] - b[0]);
+      assert.equal(drawn.reduce((n, [, , rw, rh]) => n + rw * rh, 0), 9, `${tab} ${side}: a triangle of 1, 3 and 5`);
+      assert.ok(drawn.every((r) => r[2] === 1 && r[4] === colour), `${tab} ${side}: columns, ${colour === C.grey ? 'grey' : 'dim'}`);
+      const heights = drawn.map((r) => r[3]), want = side === 'left' ? [1, 3, 5] : [5, 3, 1];
+      assert.deepEqual(heights, want, `${tab} ${side}: pointing out`);
+      assert.ok(drawn.every(([, ry, , rh]) => ry + rh / 2 === ay + 2.5), `${tab} ${side}: each column centred on the arrow's middle row`);
+      assert.equal(drawn[0][0], ax);
+    }
+    const p = g.positions.find((q) => q.s === word && q.y > y && q.y < y + 12);
+    assert.ok(p && p.align === 'center' && p.x === x + w / 2, `${tab}: "${word}" centred on the key`);
+  }
 });
 
 test("the studio's strip: every part's notes in its own lane and colour, the chords named, and the playhead", () => {

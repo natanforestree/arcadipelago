@@ -45,6 +45,15 @@ const PERC_SNAP_LEVEL = 0.32;
 const PERC_TAP_HZ = 95; // the low tap: a soft thud, like a hand on the guitar's body
 const PERC_TAP_DROP_HZ = 55; // ...its pitch dropping quickly
 const PERC_TAP_LEVEL = 0.4;
+// The band's own sounds (each voice's numbers are in playBand, but for these).
+// The steel guitar strums each chord low to high: a string sounds this many seconds after the one
+// below it.
+const STRUM_GAP = 0.012;
+// Seconds: a held bass note (the synth, 808 and fuzz basses) lets go over this, so it's quiet by
+// the end of its length.
+const BASS_RELEASE = 0.03;
+const GRIT_DRIVE = 1; // the 808 bass's grit: the overdrive's curve, driven gently, for just a touch
+const FUZZ_DRIVE = 8; // the fuzz bass's clipping: the same curve driven hard, nearly square
 // The loop pedal's count-in: a soft, woody stick click, quieter than the band's snare, never through
 // your pedals and never recorded.
 const COUNT_BURST_HZ = 2500; // a noise burst, narrow and bright...
@@ -251,6 +260,17 @@ export function createAudio(storage) {
   // The birds: whether they're asked for, their gain, each bird's way into it (its place), when the
   // next song is due on the audio clock and which bird sings it.
   let birdsOn = false, birdsGain = null, birdOuts = [], songAt = 0, singer = 0;
+  // The 808 bass's last note, { hz, start, end }: its pitch, when it started and when it ends (its
+  // start + its length), so a note starting while it still sounds slides from its pitch. Null
+  // before the first.
+  let last808 = null;
+  // The steel guitar's strum: the time of the chord it's strumming, the way in its notes play
+  // through and how many of them have sounded. A note at a new time, or through a new way in (a
+  // chord the studio writes over one the band had at the same moment comes through a gate of its
+  // own), starts a new strum.
+  let strum = { t: null, into: null, count: 0 };
+  // The 808 and fuzz basses' clipping curves, made once and shared by every note.
+  const gritCurve = softClip(GRIT_DRIVE), fuzzCurve = softClip(FUZZ_DRIVE);
   const level = () => (muted ? 0 : volume);
 
   function start() {
@@ -682,8 +702,9 @@ export function createAudio(storage) {
     return fl;
   }
 
-  // A plucked string of the band's (the nylon guitar, the plucked bass): its samples worked out the
-  // first time its note is played and kept, then damped len seconds after it starts.
+  // A plucked string of the band's (the nylon and steel guitars, the plucked and upright basses):
+  // its samples worked out the first time its note is played and kept, then damped len seconds
+  // after it starts.
   function bandString(out, t, len, n, { ring, bright, pick }, level) {
     const key = `${n.voice}:${n.note}`;
     let buf = bandPlucks.get(key);
@@ -780,6 +801,90 @@ export function createAudio(storage) {
         tone(out, t, { len: 0.06, type: 'triangle', freq: 820, vol: n.vel * 0.4, attack: 0.001 });
         burst(out, t, { len: 0.035, freq: 2000, q: 2, vol: n.vel * 0.3 });
         break;
+      // The 808 kit (its clap is the house kit's too).
+      case 'boomKick': { // the 808's kick: a sine whose pitch drops fast, then holds and booms on
+        const o = ctx.createOscillator(), g = ctx.createGain(), v = n.vel * 0.9;
+        o.frequency.setValueAtTime(130, t);
+        o.frequency.exponentialRampToValueAtTime(48, t + 0.06);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(v, t + 0.002);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
+        o.connect(g).connect(out);
+        o.start(t);
+        o.stop(t + 0.95);
+        break;
+      }
+      case 'clap': { // a handclap: three quick slaps of noise, then a short tail
+        const v = n.vel * 0.5;
+        for (let i = 0; i < 3; i++) burst(out, t + i * 0.01, { len: 0.01, freq: 1200, q: 1, vol: v });
+        burst(out, t + 0.03, { len: 0.15, freq: 1150, q: 1, vol: v * 0.7 });
+        break;
+      }
+      case 'tightHat': // the 808's hats: crisper and tighter than the lo-fi's
+        burst(out, t, { len: 0.025, type: 'highpass', freq: 9000, vol: n.vel * 0.32 });
+        break;
+      case 'cowbell': { // the 808's cowbell: two squares, at 540 and 800 Hz, through a bandpass
+        const fl = ctx.createBiquadFilter(), v = n.vel * 0.07;
+        fl.type = 'bandpass';
+        fl.frequency.value = 800;
+        fl.Q.value = 1.2;
+        for (const hz of [540, 800]) tone(fl, t, { len: 0.3, type: 'square', freq: hz, vol: v, attack: 0.002 });
+        fl.connect(out);
+        break;
+      }
+      // The hand drums (the shaker is the lo-fi kit's).
+      case 'cajon': { // the cajón's low thump: a falling sine and a short, dark thud of noise
+        const v = n.vel * 0.9;
+        tone(out, t, { len: 0.25, freq: 95, to: 60, vol: v });
+        burst(out, t, { len: 0.06, type: 'lowpass', freq: 400, vol: v });
+        break;
+      }
+      case 'slap': { // the cajón's slap: a bright, woody crack, a little snare buzz, and a knock
+        const v = n.vel * 0.5;
+        burst(out, t, { len: 0.12, freq: 2200, q: 0.8, vol: v });
+        tone(out, t, { len: 0.05, type: 'triangle', freq: 330, vol: v * 0.5, attack: 0.001 });
+        break;
+      }
+      case 'conga': { // an open conga tone, with a tiny click as the hand lands
+        const v = n.vel * 0.5;
+        tone(out, t, { len: 0.22, freq: 330, to: 300, vol: v, attack: 0.002 });
+        burst(out, t, { len: 0.01, freq: 1500, q: 1, vol: v * 0.5 });
+        break;
+      }
+      // The house kit (its clap is the 808's, its hats the lo-fi's and its open hat the funk's).
+      case 'houseKick': { // punchy, four on the floor, with a click on top
+        const v = n.vel;
+        tone(out, t, { len: 0.3, freq: 160, to: 50, vol: v });
+        burst(out, t, { len: 0.012, type: 'highpass', freq: 3500, vol: v * 0.15 });
+        break;
+      }
+      // The rock kit.
+      case 'rockKick': { // full and round, with the beater's knock
+        const v = n.vel;
+        tone(out, t, { len: 0.4, freq: 100, to: 45, vol: v });
+        burst(out, t, { len: 0.015, freq: 2500, q: 1, vol: v * 0.12 });
+        break;
+      }
+      case 'fatSnare': { // a fat snare: a wide band of noise, a body under it, and the drum's ring
+        const v = n.vel * 0.55;
+        burst(out, t, { len: 0.25, freq: 1500, q: 0.6, vol: v });
+        tone(out, t, { len: 0.15, type: 'triangle', freq: 200, to: 180, vol: v * 0.5 });
+        tone(out, t, { len: 0.3, freq: 330, vol: v * 0.15 });
+        break;
+      }
+      case 'ride': { // a ride cymbal: a metallic ping (three sines, out of tune with each other)
+        // over a wash of bright noise
+        const v = n.vel * 0.12;
+        burst(out, t, { len: 0.45, type: 'highpass', freq: 6000, vol: v });
+        for (const hz of [3150, 3870, 4730]) tone(out, t, { len: 0.5, freq: hz, vol: v * 0.2, attack: 0.001 });
+        break;
+      }
+      case 'tom': { // a floor tom: a falling sine and a short, dark slap of the skin
+        const v = n.vel * 0.7;
+        tone(out, t, { len: 0.4, freq: 130, to: 95, vol: v });
+        burst(out, t, { len: 0.05, type: 'lowpass', freq: 900, vol: v * 0.6 });
+        break;
+      }
       // The basses (the round bass is 'bass', above).
       case 'pluck': // a plucked bass string
         bandString(out, t, len, n, { ring: 1.2, bright: 0.45, pick: 0.25 }, 1);
@@ -787,6 +892,66 @@ export function createAudio(storage) {
       case 'deep': // a deep, round sine
         tone(out, t, { len, freq: f, vol: n.vel * 0.4, attack: 0.02 });
         break;
+      case 'synthBass': { // a sawtooth through a resonant filter that snaps shut, held for the note
+        const fl = ctx.createBiquadFilter(), hold = Math.max(0.01, len - BASS_RELEASE);
+        fl.type = 'lowpass';
+        fl.Q.value = 6;
+        fl.frequency.setValueAtTime(f * 12, t);
+        fl.frequency.exponentialRampToValueAtTime(f * 1.5, t + 0.15);
+        tone(fl, t, { len: hold + BASS_RELEASE, type: 'sawtooth', freq: f, vol: n.vel * 0.15, attack: 0.003, hold });
+        fl.connect(out);
+        break;
+      }
+      case 'bass808': { // the 808's bass: a long, booming sine with a touch of grit, dying away
+        // slowly across the note. One that starts while the one before still sounds (give or take
+        // 10 ms) starts on its pitch and slides to its own.
+        const o = ctx.createOscillator(), grit = ctx.createWaveShaper(), g = ctx.createGain();
+        const v = n.vel * 0.45, hold = Math.max(0.01, len - BASS_RELEASE);
+        const from = last808 && last808.start < t && last808.end >= t - 0.01 ? last808.hz : f;
+        o.frequency.setValueAtTime(from, t);
+        if (from !== f) o.frequency.exponentialRampToValueAtTime(f, t + 0.07);
+        last808 = { hz: f, start: t, end: t + len };
+        grit.curve = gritCurve;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(v, t + 0.005);
+        g.gain.exponentialRampToValueAtTime(v * Math.exp(-hold / 1.5), t + hold); // -63% each 1.5 s
+        g.gain.exponentialRampToValueAtTime(0.001, t + hold + BASS_RELEASE);
+        o.connect(grit).connect(g).connect(out);
+        o.start(t);
+        o.stop(t + hold + BASS_RELEASE + 0.05);
+        break;
+      }
+      case 'upright': { // an upright bass: a dark, woody string that soon stops ringing, with a
+        // soft thump as the finger plucks it
+        const level = 1;
+        bandString(out, t, len, n, { ring: 0.9, bright: 0.2, pick: 0.35 }, level);
+        burst(out, t, { len: 0.05, type: 'lowpass', freq: 250, vol: n.vel * level * 0.5 });
+        break;
+      }
+      case 'fuzz': { // a fuzz bass: two sawtooths a little apart, clipped hard, the fizz taken off,
+        // held for the note
+        const clip = ctx.createWaveShaper(), fl = ctx.createBiquadFilter(), g = ctx.createGain();
+        const v = n.vel * 0.1, hold = Math.max(0.01, len - BASS_RELEASE), end = t + hold + BASS_RELEASE;
+        clip.curve = fuzzCurve;
+        clip.oversample = '4x'; // as the overdrive's: the clipping's highs would fold back as noise
+        fl.type = 'lowpass';
+        fl.frequency.value = 1800;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(v, t + 0.005);
+        g.gain.setValueAtTime(v, t + hold);
+        g.gain.exponentialRampToValueAtTime(0.001, end);
+        for (const cents of [-6, 6]) {
+          const o = ctx.createOscillator();
+          o.type = 'sawtooth';
+          o.frequency.value = f;
+          o.detune.value = cents;
+          o.connect(clip);
+          o.start(t);
+          o.stop(end + 0.05);
+        }
+        clip.connect(fl).connect(g).connect(out);
+        break;
+      }
       // The chord sounds (the electric piano is 'ep', above).
       case 'nylon': // a nylon-strung guitar, plucked softly
         bandString(out, t, len, n, { ring: 1.4, bright: 0.3, pick: 0.18 }, 0.4);
@@ -813,6 +978,54 @@ export function createAudio(storage) {
       case 'piano': // a soft piano: a sine and a quieter octave over it, dying away
         tone(out, t, { len: Math.min(len + 0.8, 3), freq: f, vol: n.vel * 0.1, attack: 0.002 });
         tone(out, t, { len: Math.min(len, 1.5), type: 'triangle', freq: f * 2, vol: n.vel * 0.025, attack: 0.002 });
+        break;
+      case 'strings': { // a soft string section: three saws a few cents apart, darkened,
+        // swelling in, held for the chord and letting go slowly
+        const fl = ctx.createBiquadFilter(), v = n.vel * 0.02, hold = Math.max(len, 0.3);
+        fl.type = 'lowpass';
+        fl.frequency.value = 2800;
+        for (const k of [0.997, 1, 1.003]) tone(fl, t, { len: hold + 0.3, type: 'sawtooth', freq: f * k, vol: v, attack: 0.3, detune: true, hold });
+        fl.connect(out);
+        break;
+      }
+      case 'vibes': { // a vibraphone: a mallet on a bar, its bright overtone soon gone, the note
+        // dying away slowly, its level pulsing gently as the vibraphone's fans turn (the shimmer)
+        const shimmer = ctx.createGain(), lfo = ctx.createOscillator(), depth = ctx.createGain();
+        const v = n.vel * 0.1, ring = Math.min(len + 1.5, 3);
+        shimmer.gain.value = 0.8;
+        lfo.frequency.value = 5.5;
+        depth.gain.value = 0.2; // a quarter of its level, either way
+        lfo.connect(depth).connect(shimmer.gain);
+        tone(shimmer, t, { len: ring, freq: f, vol: v, attack: 0.002 });
+        tone(shimmer, t, { len: 0.4, freq: f * 4, vol: v * 0.2, attack: 0.002 });
+        shimmer.connect(out);
+        lfo.start(t);
+        lfo.stop(t + ring + 0.05);
+        break;
+      }
+      case 'synthPad': { // a warm 80s polysynth: two saws a little either side of the note, one
+        // to the left and one to the right (in a browser with no panner, straight on), through a
+        // filter that opens a little as the note starts; held for the chord, then letting go
+        const fl = ctx.createBiquadFilter(), v = n.vel * 0.03, hold = Math.max(len, 0.08);
+        fl.type = 'lowpass';
+        fl.frequency.setValueAtTime(700, t);
+        fl.frequency.exponentialRampToValueAtTime(2000, t + 0.3);
+        for (const [cents, pan] of [[-7, -0.5], [7, 0.5]]) {
+          let side = fl;
+          if (ctx.createStereoPanner) {
+            side = ctx.createStereoPanner();
+            side.pan.value = pan;
+            side.connect(fl);
+          }
+          tone(side, t, { len: hold + 0.4, type: 'sawtooth', freq: f * Math.pow(2, cents / 1200), vol: v, attack: 0.08, detune: true, hold });
+        }
+        fl.connect(out);
+        break;
+      }
+      case 'steel': // a strummed steel-string acoustic: bright strings that ring on, the chord's
+        // notes (which come lowest first) a string each, STRUM_GAP apart, low to high
+        if (strum.t !== t || strum.into !== into) strum = { t, into, count: 0 };
+        bandString(out, t + strum.count++ * STRUM_GAP, len, n, { ring: 1.8, bright: 0.65, pick: 0.12 }, 0.4);
         break;
     }
   }

@@ -129,6 +129,54 @@ test("a chord sound stacks the key's chords its own way; the 9th is left off whe
   assert.deepEqual(chordOf(beat('organ'), { degree: 0, notes: [1, 2], name: 'X' }), { notes: [1, 2], name: 'X' }, 'its own notes, as given');
 });
 
+test('each part has its sounds, in the order the sound key steps through them, each kit a voice for each drum', () => {
+  const names = (list) => Object.entries(list).map(([id, s]) => [id, s.name]);
+  assert.deepEqual(names(KITS), [
+    ['lofi', 'lo-fi kit'], ['brushes', 'brushes'], ['funk', 'funk kit'], ['reggae', 'reggae kit'],
+    ['k808', '808 kit'], ['hand', 'hand drums'], ['house', 'house kit'], ['rock', 'rock kit'],
+  ]);
+  assert.deepEqual(names(BASSES), [
+    ['round', 'round bass'], ['plucked', 'pluck bass'], ['deep', 'deep bass'],
+    ['synth', 'synth bass'], ['b808', '808 bass'], ['upright', 'upright'], ['fuzz', 'fuzz bass'],
+  ]);
+  assert.deepEqual(names(CHORD_SOUNDS), [
+    ['epiano', 'e-piano'], ['nylon', 'nylon gtr'], ['clav', 'clav'], ['organ', 'organ'], ['piano', 'piano'],
+    ['strings', 'strings'], ['vibes', 'vibraphone'], ['synthPad', 'synth pad'], ['steel', 'steel gtr'],
+  ]);
+  for (const [id, kit] of Object.entries(KITS)) {
+    for (const drum of ['kick', 'snare', 'hats', 'perc']) assert.ok(typeof kit[drum] === 'string' && kit[drum], `${id} ${drum}`);
+  }
+  for (const [id, s] of Object.entries({ ...BASSES, ...CHORD_SOUNDS })) assert.ok(typeof s.voice === 'string' && s.voice, id);
+  assert.deepEqual(['k808', 'hand', 'house', 'rock'].map((id) => KITS[id].kick), ['boomKick', 'cajon', 'houseKick', 'rockKick']);
+  assert.deepEqual(['synth', 'b808', 'upright', 'fuzz'].map((id) => BASSES[id].voice), ['synthBass', 'bass808', 'upright', 'fuzz']);
+  assert.deepEqual(['strings', 'vibes', 'synthPad', 'steel'].map((id) => CHORD_SOUNDS[id].voice), ['strings', 'vibes', 'synthPad', 'steel']);
+});
+
+test("every sound's name fits on the sound key between its ◀ and ▶: 10 letters at most", () => {
+  // Silkscreen at 8px is about 6 px a letter, and the key has 60 px between its arrows.
+  for (const list of [KITS, BASSES, CHORD_SOUNDS]) {
+    for (const [id, s] of Object.entries(list)) assert.ok(s.name.length <= 10, `${id}: "${s.name}" is ${s.name.length} letters`);
+  }
+});
+
+test("the piano's and the steel guitar's chords double the root an octave up; the other new sounds stack their size", () => {
+  const beat = (chords, mood) => ({ mood, sounds: { chords } });
+  for (const { id: mood } of MOODS) {
+    for (let degree = -7; degree <= 14; degree++) {
+      const triad = chordOf(beat('organ', mood), { degree }), doubled = [...triad.notes, triad.notes[0] + 12];
+      assert.deepEqual(chordOf(beat('piano', mood), { degree }), { notes: doubled, name: triad.name }, `piano ${mood} ${degree}, as before`);
+      assert.deepEqual(chordOf(beat('steel', mood), { degree }), { notes: doubled, name: triad.name }, `steel ${mood} ${degree}`);
+      const seventh = chordOf(beat('nylon', mood), { degree });
+      for (const id of ['strings', 'vibes', 'synthPad']) {
+        assert.equal(chordOf(beat(id, mood), { degree }).notes.length, CHORD_SOUNDS[id].size, `${id} ${mood} ${degree}`);
+        assert.deepEqual(chordOf(beat(id, mood), { degree }), seventh, `${id} ${mood} ${degree}: a 7th chord, as the nylon's`);
+      }
+    }
+  }
+  const doubles = Object.entries(CHORD_SOUNDS).filter(([, s]) => s.double).map(([id]) => id);
+  assert.deepEqual(doubles, ['piano', 'steel'], 'the doubling is a property of the sound');
+});
+
 test('every ready-made beat stays on the white keys, is 4 bars, and makes a set of about 3 minutes', () => {
   assert.deepEqual(READY.map((b) => b.id), ['lofi', 'bossa', 'funk', 'reggae', 'ballad']);
   assert.deepEqual(READY.map(setBars), [60, 100, 76, 56, 52]);
@@ -209,6 +257,20 @@ test("a stored chord's own notes must be MIDI notes in the key, or it falls back
     assert.deepEqual([b.chords[0].notes, b.chords[0].name], [undefined, undefined], `${JSON.stringify(notes)}: its notes and name dropped`);
     assert.deepEqual(chordOf(b, b.chords[0]), chordOf(b, { degree: 2 }), "the degree's chord");
   }
+});
+
+test('a stored beat with any of the sounds is kept as it was; a sound no part has is still turned away', () => {
+  for (const [part, list] of [['drums', KITS], ['bass', BASSES], ['chords', CHORD_SOUNDS]]) {
+    for (const id of Object.keys(list)) {
+      const b = stored();
+      b.sounds[part] = id;
+      assert.deepEqual(cleanBeat(b)?.sounds, b.sounds, `${part}: ${id}`);
+    }
+    const b = stored();
+    b.sounds[part] = 'kazoo';
+    assert.equal(cleanBeat(b), null, `${part}: kazoo`);
+  }
+  assert.deepEqual(cleanBeat(stored()).sounds, { drums: 'lofi', bass: 'round', chords: 'epiano' }, 'an old save, unchanged');
 });
 
 test('every ready-made beat passes the check, as it is', () => {

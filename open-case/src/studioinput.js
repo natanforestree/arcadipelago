@@ -172,9 +172,10 @@ export function mouseDown(studio, drag, x, y, t, now = 0) {
   return null;
 }
 
-// A button clicked; on the octave, dir 1 on its upper half (up an octave) or -1 on its lower.
+// A button clicked; on the sound key, dir -1 on its left half (the sound before) or 1 on its right
+// (the next); on the octave, dir 1 on its upper half (up an octave) or -1 on its lower.
 function button(studio, which, dir) {
-  if (which === 'sound') nextSound(studio);
+  if (which === 'sound') nextSound(studio, dir);
   else if (which === 'range') moveRange(studio, dir);
   else if (which === 'erase') setErase(studio, !studio.erase); // a mouse can't hold two things: here it's a switch
   else if (which === 'clear') clearPart(studio);
@@ -260,17 +261,18 @@ export function mouseUp(studio, drag) {
 }
 
 // The scroll wheel (dy, down the page) at page time `now`: over the rhythm wheel it turns it, and over
-// the tempo, the swing or the octave button it steps it as its arrows do, wheel up for ▲. A trackpad
-// sends a stream of small events, so those step at most once every WHEEL_GAP seconds; and a run of
-// steps on one setting, each within WHEEL_RUN of the last and nothing else changed between, is one
-// change for Undo (so a swipe doesn't fill the undo list). `wheel` is the controls' state for that:
-// { at, which, version, begun }, the last step's time and control, the beat's version after it, and
+// the tempo, the swing or the octave button it steps it as its arrows do, wheel up for ▲ (the
+// sound key's ◀ and ▶ are only for clicking: over it, the wheel does nothing). A trackpad sends a
+// stream of small events, so those step at most once every WHEEL_GAP seconds; and a run of steps on
+// one setting, each within WHEEL_RUN of the last and nothing else changed between, is one change
+// for Undo (so a swipe doesn't fill the undo list). `wheel` is the controls' state for that: { at,
+// which, version, begun }, the last step's time and control, the beat's version after it, and
 // whether its run has changed the beat yet.
 export function scroll(studio, x, y, dy, now = 0, wheel = {}) {
   const target = studioHit(studio, x, y);
   if (!dy || !target) return;
   if (target.hit === 'wheel') turnRhythm(studio, Math.sign(dy));
-  else if (target.dir && (wheel.at === undefined || now - wheel.at >= WHEEL_GAP)) {
+  else if (target.dir && target.which !== 'sound' && (wheel.at === undefined || now - wheel.at >= WHEEL_GAP)) {
     const dir = dy < 0 ? 1 : -1, which = target.which, before = studio.version;
     const again = wheel.begun && wheel.which === which && now - wheel.at < WHEEL_RUN && wheel.version === before;
     if (target.hit === 'setting') setSetting(studio, which, stepped(which, settingIndex(studio, which), dir), again);

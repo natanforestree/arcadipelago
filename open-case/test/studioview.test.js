@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  studioHit, padAt, faderValue, moodShort, arrowsIn, NAME, TAB_BOXES, SETTINGS, WHEEL, PANEL, KNOB_ARROWS, knobAngle, ringLight, BUTTONS, MAP_KEY, PAD, STRIP, SWITCHES, LIST_BUTTONS, NAME_BUTTONS, NAME_FIELD,
+  studioHit, padAt, faderValue, moodShort, arrowsIn, NAME, TAB_BOXES, SETTINGS, WHEEL, PANEL, KNOB_ARROWS, SOUND_ARROWS, knobAngle, ringLight, BUTTONS, MAP_KEY, PAD, STRIP, SWITCHES, LIST_BUTTONS, NAME_BUTTONS, NAME_FIELD,
 } from '../src/studioview.js';
 import { createStudio, newBeat, setTab, startNaming, DRUMS } from '../src/studio.js';
 import { STUDIO } from '../src/tuning.js';
@@ -78,7 +78,8 @@ test('a click lands on the name, a tab, a setting, the wheel (left or right) or 
   assert.deepEqual(studioHit(studio, WHEEL[0] + 10, WHEEL[1]), { hit: 'wheel', dir: 1 });
   assert.deepEqual(studioHit(studio, WHEEL[0] - 10, WHEEL[1] - 8), { hit: 'wheel', dir: -1 }, 'above the middle, too: the halves are left and right');
   assert.deepEqual(studioHit(studio, WHEEL[0] + 10, WHEEL[1] + 8), { hit: 'wheel', dir: 1 });
-  for (const which of ['sound', 'erase', 'clear', 'undo']) assert.deepEqual(studioHit(studio, ...mid(BUTTONS[which])), { hit: 'button', which });
+  for (const which of ['erase', 'clear', 'undo']) assert.deepEqual(studioHit(studio, ...mid(BUTTONS[which])), { hit: 'button', which });
+  assert.equal(studioHit(studio, ...mid(BUTTONS.sound)).which, 'sound', 'the sound key says which half, too (below)');
   assert.equal(studioHit(studio, ...mid(BUTTONS.range)), null, 'Range is only for the bass');
   setTab(studio, 'bass');
   assert.deepEqual(studioHit(studio, ...mid(BUTTONS.range)), { hit: 'button', which: 'range', dir: -1 }, 'with which half (below)');
@@ -118,6 +119,25 @@ test("the octave button, on the bass tab: its upper half is ▲ (dir 1) and its 
       assert.deepEqual(studioHit(studio, px, py), want, `${tab} at ${px}, ${py}`);
     }
   }
+});
+
+test("the sound key: its left half is ◀ (dir -1) and its right half ▶ (dir 1), all over, on every tab", () => {
+  const studio = createStudio(empty());
+  const [x, y, w, h] = BUTTONS.sound;
+  for (const tab of ['drums', 'bass', 'chords', 'mix']) {
+    setTab(studio, tab);
+    for (let px = x; px < x + w; px += 0.5) for (let py = y; py < y + h; py += 0.5) {
+      assert.deepEqual(studioHit(studio, px, py), { hit: 'button', which: 'sound', dir: px < x + w / 2 ? -1 : 1 }, `${tab} at ${px}, ${py}`);
+    }
+  }
+});
+
+test("the sound key's ◀ and ▶: the knob's size, 2 pixels in from its ends, level with its word", () => {
+  const [x, y, w] = BUTTONS.sound, { left, right } = SOUND_ARROWS;
+  assert.deepEqual([left[2], left[3], right[2], right[3]], [KNOB_ARROWS.left[2], KNOB_ARROWS.left[3], 3, 5], '3 wide and 5 tall, as the knob\'s are');
+  assert.deepEqual([left[0], right[0] + right[2]], [x + 2, x + w - 2], '2 pixels in from each end');
+  assert.deepEqual([left[1], right[1]], [y + 3, y + 3], "on the word's rows");
+  assert.ok(left[0] + left[2] <= x + w / 2 && right[0] >= x + w / 2, 'each in its own half');
 });
 
 test("Undo and the octave share the bottom row of the left column, lined up with Erase and Clear, the octave's arrows at its right", () => {

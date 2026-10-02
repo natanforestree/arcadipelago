@@ -81,10 +81,11 @@ The layout from the mockups, drawn in the game's flat style at 320×180. Each pa
     - **Chords:** long held chords, a chord a beat, offbeat stabs (the skank) and comping patterns like the bossa's.
   - The knob turns a sixteenth of a round a rhythm, its pointer going clockwise from straight up (the rhythm's number is on its gold cap). Scroll over it, click the left half (◀) to go back or the right half (▶) to go on, or press ↑ and ↓ to change the rhythm.
 - **The buttons** under the knob, drawn as raised keys (the one that's on, Erase when lit, is pressed in):
-  - **Sound:** steps through the part's sounds.
-    - Drums: the lo-fi, brushes, funk and reggae kits, each with its own four sounds.
-    - Bass: round, plucked and deep.
-    - Chords: electric piano, nylon guitar, clav, organ and piano.
+  - **Sound:** steps through the part's sounds: a click on its left end (◀) steps back, on its right end (▶) on, and it wraps round both ways.
+    - Drums: the lo-fi, brushes, funk, reggae, 808, hand drums, house and rock kits, each with its own four sounds.
+    - Bass: round, plucked, deep, synth, 808 (a note that runs on from the one before slides from its pitch), upright and fuzz.
+    - Chords: electric piano, nylon guitar, clav, organ, piano, strings, vibraphone, synth pad and steel guitar (strummed low to high).
+    - Added 2026-10-02, all free from the start: the 808, hand drums, house and rock kits; the synth, 808, upright and fuzz basses; and the strings, vibraphone, synth pad and steel guitar. The key's ◀ and ▶ came with them: its left end steps back and its right end on. To fit between them, the key shows short names (e-piano, nylon gtr, pluck bass, steel gtr). The five ready-made beats keep their sounds.
   - **Range** (bass only): moves the pad up or down an octave.
   - **Erase:** hold it, or Backspace, while holding the pad, and the part's notes vanish as the playhead passes.
   - **Clear:** empties the part you're on. Shift+Backspace does it too.

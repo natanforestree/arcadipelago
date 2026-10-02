@@ -78,35 +78,49 @@ export function chordName(notes) {
 // The name on the studio's pad for the chord on `degree`: the triad's (Am, Bdim, C).
 export const padChordName = (mood, degree) => chordName(stack(mood, degree, 3));
 
-// The sounds each part can have. A drum kit is a voice for each of its four drums; a bass is a
-// voice; a chord sound is a voice and how it stacks its chords.
+// The sounds each part can have, in the order the studio's sound key steps through them. A drum
+// kit is a voice for each of its four drums; a bass is a voice; a chord sound is a voice and how it
+// stacks its chords: how many notes, and whether it doubles the root an octave up on top. A sound
+// is saved by its id, so a name can change; each name fits on the sound key between its arrows.
 export const KITS = {
   lofi: { name: 'lo-fi kit', kick: 'kick', snare: 'snare', hats: 'hat', perc: 'shaker' },
   brushes: { name: 'brushes', kick: 'softKick', snare: 'brush', hats: 'shaker', perc: 'rim' },
   funk: { name: 'funk kit', kick: 'tightKick', snare: 'crack', hats: 'hat', perc: 'openHat' },
   reggae: { name: 'reggae kit', kick: 'deepKick', snare: 'rimshot', hats: 'hat', perc: 'shaker' },
+  k808: { name: '808 kit', kick: 'boomKick', snare: 'clap', hats: 'tightHat', perc: 'cowbell' },
+  hand: { name: 'hand drums', kick: 'cajon', snare: 'slap', hats: 'shaker', perc: 'conga' },
+  house: { name: 'house kit', kick: 'houseKick', snare: 'clap', hats: 'hat', perc: 'openHat' },
+  rock: { name: 'rock kit', kick: 'rockKick', snare: 'fatSnare', hats: 'ride', perc: 'tom' },
 };
 export const BASSES = {
   round: { name: 'round bass', voice: 'bass' },
-  plucked: { name: 'plucked bass', voice: 'pluck' },
+  plucked: { name: 'pluck bass', voice: 'pluck' },
   deep: { name: 'deep bass', voice: 'deep' },
+  synth: { name: 'synth bass', voice: 'synthBass' },
+  b808: { name: '808 bass', voice: 'bass808' },
+  upright: { name: 'upright', voice: 'upright' },
+  fuzz: { name: 'fuzz bass', voice: 'fuzz' },
 };
 export const CHORD_SOUNDS = {
-  epiano: { name: 'electric piano', voice: 'ep', size: 5 },
-  nylon: { name: 'nylon guitar', voice: 'nylon', size: 4 },
+  epiano: { name: 'e-piano', voice: 'ep', size: 5 },
+  nylon: { name: 'nylon gtr', voice: 'nylon', size: 4 },
   clav: { name: 'clav', voice: 'clav', size: 4 },
   organ: { name: 'organ', voice: 'organ', size: 3 },
-  piano: { name: 'piano', voice: 'piano', size: 3 },
+  piano: { name: 'piano', voice: 'piano', size: 3, double: true },
+  strings: { name: 'strings', voice: 'strings', size: 4 },
+  vibes: { name: 'vibraphone', voice: 'vibes', size: 4 },
+  synthPad: { name: 'synth pad', voice: 'synthPad', size: 4 },
+  steel: { name: 'steel gtr', voice: 'steel', size: 3, double: true },
 };
 export const SOUNDS = { drums: KITS, bass: BASSES, chords: CHORD_SOUNDS };
 
 // A chord hit's notes and name: its own, or its chord of the key as the beat's chord sound stacks it
-// (the piano doubles the root an octave up).
+// (a sound that doubles, the piano or the steel guitar, adds the root an octave up on top).
 export function chordOf(beat, hit) {
   if (hit.notes) return { notes: hit.notes, name: hit.name ?? chordName(hit.notes) };
   const sound = CHORD_SOUNDS[beat.sounds.chords];
   const notes = stack(beat.mood, hit.degree, sound.size);
-  return { notes: beat.sounds.chords === 'piano' ? [...notes, notes[0] + 12] : notes, name: chordName(notes) };
+  return { notes: sound.double ? [...notes, notes[0] + 12] : notes, name: chordName(notes) };
 }
 
 export const bassNote = (beat, hit) => keyNote(beat.mood, hit.degree, BASS_C);

@@ -449,6 +449,46 @@ test('tabs, the name, the wheel, the buttons and the scroll wheel', () => {
   assert.equal(studio.list, true);
 });
 
+test("the sound key: its left half steps the part's sound back and its right half on, round both ways; on the Mix it changes nothing", () => {
+  const studio = blank(), drag = { what: null }, [x, y, w, h] = BUTTONS.sound;
+  const left = [x + 3, y + h / 2], right = [x + w - 3, y + h / 2];
+  const sound = () => studio.beat.sounds[studio.tab];
+  mouseDown(studio, drag, ...left, 0);
+  assert.equal(sound(), 'rock', 'back from the first kit, round to the last');
+  mouseDown(studio, drag, ...right, 0);
+  assert.equal(sound(), 'lofi', 'and on again, round to the first');
+  mouseDown(studio, drag, ...right, 0);
+  assert.equal(sound(), 'brushes');
+  setTab(studio, 'bass');
+  mouseDown(studio, drag, x + w / 2 - 1, y + h / 2, 0);
+  assert.equal(sound(), 'fuzz', 'just left of the middle is the left half');
+  mouseDown(studio, drag, x + w / 2, y + h / 2, 0);
+  assert.equal(sound(), 'round', 'the middle on is the right half');
+  setTab(studio, 'chords');
+  for (let i = 0; i < 4; i++) mouseDown(studio, drag, ...left, 0);
+  assert.equal(sound(), 'strings');
+  setTab(studio, 'mix');
+  const { sounds } = studio.beat, version = studio.version;
+  mouseDown(studio, drag, ...left, 0);
+  mouseDown(studio, drag, ...right, 0);
+  assert.deepEqual(studio.beat.sounds, { ...sounds }, 'no part to change');
+  assert.equal(studio.version, version);
+});
+
+test('the scroll wheel over the sound key does nothing: its halves are for clicking', () => {
+  const studio = blank(), wheel = {};
+  for (const tab of ['drums', 'bass', 'chords']) {
+    setTab(studio, tab);
+    const before = JSON.stringify(studio.beat), range = studio.range;
+    for (const x of [BUTTONS.sound[0] + 3, BUTTONS.sound[0] + BUTTONS.sound[2] - 3]) {
+      scroll(studio, x, mid(BUTTONS.sound)[1], -100, tab.length + x, wheel);
+      scroll(studio, x, mid(BUTTONS.sound)[1], 100, tab.length + x + 0.5, wheel);
+    }
+    assert.equal(JSON.stringify(studio.beat), before, tab);
+    assert.equal(studio.range, range, `${tab}: the octave stays`);
+  }
+});
+
 test("the list: open a beat, Busk to this (so main.js keeps the choice), New, and Close", () => {
   const studio = blank(), drag = { what: null };
   studio.list = true;

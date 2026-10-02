@@ -364,7 +364,7 @@ test('the Mix: levels, mutes, the Pump, the Pad and the Vinyl', () => {
   assert.equal(studio.beat.sounds.chords, 'nylon');
   nextSound(studio, -1);
   nextSound(studio, -1);
-  assert.equal(studio.beat.sounds.chords, 'piano', 'round the sounds');
+  assert.equal(studio.beat.sounds.chords, 'steel', 'round the sounds, to the last');
 });
 
 test('every change moves the version on, so the sound and the screen can follow', () => {

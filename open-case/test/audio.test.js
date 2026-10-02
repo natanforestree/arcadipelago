@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createAudio, pluckSamples, softClip, safetyCurve, VOICING } from '../src/audio.js';
 import { fakeAudioContext } from './fake-audio.js';
-import { LOFI, LOFI_CLOCK, READY, readyBeat, clockOf, bandAt, cloneBeat, midiToHz } from '../src/beats.js';
+import { LOFI, LOFI_CLOCK, READY, KITS, BASSES, CHORD_SOUNDS, readyBeat, clockOf, bandAt, cloneBeat, midiToHz } from '../src/beats.js';
 import { PLAY, GROOVE, LAYERS } from '../src/tuning.js';
 import { PEDALS, INSTRUMENTS } from '../src/gear.js';
 import { createLoop, record, note, release, step, due, loopLength } from '../src/looper.js';
@@ -1319,3 +1319,160 @@ test('in a browser with no stereo panner, the birds sing all the same, straight 
     },
     { panner: false },
   ));
+
+// The sounds the studio gained on 2026-10-02.
+const NEW_SOUNDS = { drums: ['k808', 'hand', 'house', 'rock'], bass: ['synth', 'b808', 'upright', 'fuzz'], chords: ['strings', 'vibes', 'synthPad', 'steel'] };
+// A beat of your own, a bar long, with only `over`'s notes, in `sounds` (the lo-fi's for the rest),
+// the Pad and the Vinyl off; the band plays it from 0.5 s with every layer in.
+function oneBar(audio, sounds, over) {
+  const beat = {
+    ...cloneBeat(LOFI), bars: 1, mood: 'C', mix: { ...LOFI.mix, pad: false, vinyl: false }, sounds: { ...LOFI.sounds, ...sounds },
+    drums: [], bass: [], chords: [], ...over,
+  };
+  audio.startBand(0.5, beat);
+  for (const { id } of LAYERS) audio.setLayer(id, true, 0.5);
+  return beat;
+}
+// One hit of `part` in its sound `id` at 0.5 s (a drum strip's, or a note or chord 4 16ths long),
+// the band run on to just before it comes round again. Returns the sounds it started (the stand-in
+// percussion's left out: it plays into its own bus whatever the beat).
+function playOne(ctx, part, id, drum = 'kick') {
+  const audio = createAudio(memoryStorage());
+  audio.start();
+  const hit = part === 'drums' ? { s: 0, drum, vel: 1 } : { s: 0, degree: 0, len: 4, vel: 0.8, tone: 0.5 };
+  const beat = oneBar(audio, { [part]: id }, { [part]: [hit] });
+  const before = ctx().started.length;
+  runBand(ctx, audio, 0.5 + clockOf(beat).bar - GROOVE.ahead - 0.05);
+  const perc = ctx().busGain('perc');
+  return ctx().started.slice(before).filter((x) => !downstream(x.node).includes(perc));
+}
+// Each sound of a part: [what it's called in the test, its id, the drum strip], and the slot it
+// plays into.
+const eachSound = (part, ids) => (part === 'drums' ? ids.flatMap((id) => ['kick', 'snare', 'hats', 'perc'].map((d) => [`${id} ${d}`, id, d])) : ids.map((id) => [id, id]));
+const slotOfHit = (part, drum) => (part === 'drums' ? (drum === 'hats' ? 'top' : 'drums') : part === 'bass' ? 'bass' : 'keys');
+
+test('every sound of every part plays: each drum of each kit, each bass and each chord sound, into its slot', () => {
+  for (const [part, list] of [['drums', KITS], ['bass', BASSES], ['chords', CHORD_SOUNDS]]) {
+    for (const [name, id, drum] of eachSound(part, Object.keys(list))) {
+      withAudio((ctx) => {
+        const sounds = playOne(ctx, part, id, drum), slot = ctx().busGain(slotOfHit(part, drum));
+        assert.ok(sounds.some((x) => downstream(x.node).includes(slot)), `${name}: ${sounds.length} sounds, none into its slot`);
+      });
+    }
+  }
+});
+
+test("every new sound starts on its note's time or after it, and every part of it stops: nothing rings on forever", () => {
+  for (const [part, ids] of Object.entries(NEW_SOUNDS)) {
+    for (const [name, id, drum] of eachSound(part, ids)) {
+      withAudio((ctx) => {
+        const sounds = playOne(ctx, part, id, drum);
+        assert.ok(sounds.length > 0, name);
+        for (const x of sounds) {
+          assert.ok(x.t >= 0.5 - 1e-9 && x.t < 0.6, `${name}: a ${x.kind} starting at ${x.t}, its note at 0.5`);
+          const stops = ctx().stopped.filter((s) => s.node === x.node).map((s) => s.t);
+          if (x.kind === 'buffer' && Number.isFinite(x.duration)) stops.push(x.t + x.duration);
+          assert.ok(stops.length > 0, `${name}: a ${x.kind} at ${x.t} never stops`);
+          assert.ok(Math.min(...stops) > x.t && Math.min(...stops) < 0.5 + 4, `${name}: a ${x.kind} at ${x.t} stops at ${Math.min(...stops)}`);
+        }
+      });
+    }
+  }
+});
+
+test('the 808 bass slides from the note before when they run into each other, and starts on its own pitch after a gap', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    const bass = (s, degree, len) => ({ s, degree, len, vel: 0.8, tone: 0.5 });
+    // C2 to E2 (touching), E2 into G2 (overlapping), then a gap before C2
+    const beat = oneBar(audio, { bass: 'b808' }, { bass: [bass(0, 0, 4), bass(4, 2, 6), bass(8, 4, 2), bass(14, 0, 2)] });
+    runBand(ctx, audio, 0.5 + clockOf(beat).bar - GROOVE.ahead - 0.05);
+    const slot = ctx().busGain('bass'), at = (s) => 0.5 + LOFI_CLOCK.timeOf16th(s);
+    const oscs = ctx().started.filter((x) => x.kind === 'osc' && downstream(x.node).includes(slot)).sort((a, b) => a.t - b.t);
+    assert.deepEqual(oscs.map((x) => x.t.toFixed(6)), [0, 4, 8, 14].map((s) => at(s).toFixed(6)), 'one oscillator a note');
+    const [c, e, g] = [36, 40, 43].map(midiToHz);
+    const pitch = (x) => x.node.frequency.events.filter(([how]) => how === 'set' || how === 'exp');
+    const near = (a, b) => Math.abs(a - b) < 1e-6;
+    const [first, slid, slidAgain, alone] = oscs.map(pitch);
+    const startsOn = (events, hz, t) => events[0][0] === 'set' && near(events[0][1], hz) && near(events[0][2], t);
+    assert.ok(startsOn(first, c, at(0)) && first.length === 1, `the first note on its own pitch: ${JSON.stringify(first)}`);
+    for (const [events, from, to, s] of [[slid, c, e, 4], [slidAgain, e, g, 8]]) {
+      assert.ok(startsOn(events, from, at(s)), `16th ${s}: from the note before's pitch: ${JSON.stringify(events)}`);
+      const [how, hz, t] = events[1];
+      assert.ok(how === 'exp' && near(hz, to) && t > at(s) && t <= at(s) + 0.1, `16th ${s}: gliding to its own within 0.1 s: ${JSON.stringify(events)}`);
+    }
+    assert.ok(startsOn(alone, c, at(14)) && alone.length === 1, `after a gap, on its own pitch: ${JSON.stringify(alone)}`);
+  }));
+
+test('the steel guitar strums: each chord low to high, a few ms a string, the first on the beat; the next chord starts its own strum', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    const chord = (s, degree) => ({ s, degree, len: 4, vel: 0.6, tone: 0.5 });
+    const beat = oneBar(audio, { chords: 'steel' }, { chords: [chord(0, 0), chord(4, 3)] }), before = ctx().started.length;
+    runBand(ctx, audio, 0.5 + clockOf(beat).bar - GROOVE.ahead - 0.05);
+    const slot = ctx().busGain('keys');
+    const strings = ctx().started.slice(before).filter((x) => x.kind === 'buffer' && downstream(x.node).includes(slot)).sort((a, b) => a.t - b.t);
+    for (const [k, s] of [[0, 0], [1, 4]]) {
+      const notes = bandAt(beat, 'keys', s).map((n) => n.note), strum = strings.slice(k * 4, k * 4 + 4), t = 0.5 + LOFI_CLOCK.timeOf16th(s);
+      assert.deepEqual(notes, [...notes].sort((a, b) => a - b), 'the chord, lowest first');
+      assert.equal(strum.length, notes.length, `16th ${s}: a string a note`);
+      assert.ok(Math.abs(strum[0].t - t) < 1e-9, `16th ${s}: the first string on the chord's own time: ${strum[0].t}, wanted ${t}`);
+      const gaps = strum.slice(1).map((x, i) => x.t - strum[i].t);
+      assert.ok(gaps.every((d) => d >= 0.005 && d <= 0.025 && Math.abs(d - gaps[0]) < 1e-9), `16th ${s}: a few ms a string, evenly: ${gaps}`);
+      strum.forEach((x, i) => {
+        const want = 8000 / midiToHz(notes[i]), p = period(x.buffer.getChannelData(0), 400, want);
+        assert.ok(Math.abs(p / want - 1) < 0.02, `16th ${s}, string ${i}: a period of ${p}, wanted ${want} (note ${notes[i]})`);
+      });
+    }
+  }));
+
+test('the synth pad pans its two saws apart, a little either side of the note; with no stereo panner it plays all the same', () => {
+  for (const panner of [true, false]) {
+    withAudio(
+      (ctx) => {
+        const audio = createAudio(memoryStorage());
+        audio.start();
+        const beat = oneBar(audio, { chords: 'synthPad' }, { chords: [{ s: 0, degree: 0, len: 4, vel: 0.6, tone: 0.5 }] });
+        runBand(ctx, audio, 0.5 + clockOf(beat).bar - GROOVE.ahead - 0.05);
+        const slot = ctx().busGain('keys'), notes = bandAt(beat, 'keys', 0).map((n) => midiToHz(n.note));
+        const saws = ctx().started.filter((x) => x.kind === 'osc' && x.node.type === 'sawtooth' && downstream(x.node).includes(slot));
+        assert.equal(saws.length, notes.length * 2, `two saws a note (${panner ? 'with' : 'without'} a panner)`);
+        const cents = saws.map((x) => {
+          const hz = x.node.frequency.events[0][1], f = notes.reduce((a, b) => (Math.abs(b - hz) < Math.abs(a - hz) ? b : a));
+          return 1200 * Math.log2(hz / f);
+        });
+        assert.equal(cents.filter((c) => c > 3 && c < 12).length, notes.length, `one sharp of each note: ${cents}`);
+        assert.equal(cents.filter((c) => c < -3 && c > -12).length, notes.length, `and one flat: ${cents}`);
+        const pans = saws.map((x) => downstream(x.node).find((n) => n.kind === 'panner')?.pan.value);
+        if (!panner) {
+          assert.ok(pans.every((p) => p === undefined), 'straight on, with no panner');
+          return;
+        }
+        assert.equal(pans.filter((p) => p < -0.25).length, notes.length, `one to the left: ${pans}`);
+        assert.equal(pans.filter((p) => p > 0.25).length, notes.length, `one to the right: ${pans}`);
+      },
+      { panner },
+    );
+  }
+});
+
+test('in the studio, a steel chord painted over one the band has already scheduled strums afresh from its own time', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    const beat = studioBand(ctx, audio, { sounds: { ...LOFI.sounds, chords: 'steel' }, chords: [{ s: 4, degree: 0, len: 4, vel: 0.6, tone: 0.5 }] });
+    const T = at16(4), first = ctx().started.length;
+    runBand(ctx, audio, T - 0.1); // the band has scheduled 16th 4's chord
+    const strings = (before) => ctx().started.slice(before).filter((x) => x.kind === 'buffer' && downstream(x.node).includes(ctx().busGain('keys')));
+    assert.deepEqual(strings(first).map((x) => Math.round((x.t - T) * 1000)), [0, 12, 24, 36], "the band's chord, strummed");
+    ctx().currentTime = T - 0.04;
+    const before = ctx().started.length;
+    const notes = bandAt({ ...beat, chords: [{ s: 4, degree: 3, len: 4, vel: 0.6, tone: 0.5 }] }, 'keys', 4);
+    audio.playWritten({ part: 'chords', drum: null, layer: 'keys', notes, s: 4 });
+    const strum = strings(before).map((x) => x.t - T);
+    assert.equal(strum.length, notes.length);
+    assert.ok(Math.abs(strum[0]) < 1e-9, `its first string on the 16th, not after the old strum's: ${strum}`);
+    assert.ok(strum.every((d, i) => Math.abs(d - strum[1] * i) < 1e-9) && strum[1] > 0, `evenly, low to high: ${strum}`);
+  }));

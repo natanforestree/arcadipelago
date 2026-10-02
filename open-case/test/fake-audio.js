@@ -1,7 +1,8 @@
 // A stand-in for Web Audio in Node, enough for audio.js to build and play everything. It records
-// every sound started and stopped (what and when), every buffer made, every connection (each node's
-// `outs`, and what feeds each node or setting in its `from`), and every change scheduled on a setting
-// (each param's `events`), so tests can see what was played and how things are wired.
+// every sound started and stopped (what and when, and how long a buffer was started to play for),
+// every buffer made, every connection (each node's `outs`, and what feeds each node or setting in
+// its `from`), and every change scheduled on a setting (each param's `events`), so tests can see
+// what was played and how things are wired.
 function param(value = 0) {
   return {
     value,
@@ -73,7 +74,7 @@ export function fakeAudioContext() {
       return b;
     },
     createBufferSource: () => {
-      const s = node('buffer', { buffer: null, loop: false, start: (t = 0, offset = 0) => started.push({ kind: 'buffer', t, offset, buffer: s.buffer, node: s }), stop: (t) => stopped.push({ kind: 'buffer', t, node: s }) });
+      const s = node('buffer', { buffer: null, loop: false, start: (t = 0, offset = 0, duration = Infinity) => started.push({ kind: 'buffer', t, offset, duration, buffer: s.buffer, node: s }), stop: (t) => stopped.push({ kind: 'buffer', t, node: s }) });
       return s;
     },
     createOscillator: () => {

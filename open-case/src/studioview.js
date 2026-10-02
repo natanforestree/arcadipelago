@@ -36,6 +36,12 @@ export function ringLight(k, len) {
 }
 // The octave (range, the bass only) is wider than Undo beside it, for its ▲ and ▼ (arrowsIn).
 export const BUTTONS = { sound: [4, 84, 74, 12], erase: [4, 98, 36, 12], clear: [42, 98, 36, 12], undo: [4, 112, 28, 12], range: [34, 112, 44, 12] };
+// The sound key's ◀ and ▶, each [x, y, 3, 5] as the knob's are, 2 pixels in from its ends and
+// level with its word: its left half steps back through the part's sounds and its right half on.
+export const SOUND_ARROWS = {
+  left: [BUTTONS.sound[0] + 2, BUTTONS.sound[1] + 3, 3, 5],
+  right: [BUTTONS.sound[0] + BUTTONS.sound[2] - 5, BUTTONS.sound[1] + 3, 3, 5],
+};
 // The map key, in the free corner left of the picture of the loop: it leaves the studio for the map.
 export const MAP_KEY = [4, 138, 40, 24];
 export const PAD = [82, 22, 234, 108];
@@ -81,7 +87,7 @@ export function arrowsIn([x, y, w, h]) {
 //   'replace' { slot }, 'keep'                        while asking which slot to replace
 //   'open' { which }, 'new', 'busk', 'save', 'close'  in the list of beats
 //   'name', 'tab' { tab }, 'setting' { which }, 'wheel' { dir }, 'button' { which }
-//   (on the knob, dir is -1 on its left half, ◀, and 1 on its right, ▶)
+//   (on the knob and the sound key, dir is -1 on the left half, ◀, and 1 on the right, ▶)
 //   (on the tempo, the swing and the octave button, dir too: 1 on the upper half, the ▲, -1 below)
 //   'pad' { at }: { row, x } on the drums, { col, y } on the bass and chords
 //   'fader' { which, value } (a part's level, or 'pump'), 'mute' { part }, 'switch' { which }
@@ -110,6 +116,7 @@ export function studioHit(studio, x, y) {
   if ((x - wx) ** 2 + (y - wy) ** 2 <= (r + 8) ** 2) return { hit: 'wheel', dir: x < wx ? -1 : 1 };
   for (const [which, box] of Object.entries(BUTTONS)) {
     if (!inside(box, x, y)) continue;
+    if (which === 'sound') return { hit: 'button', which, dir: x < box[0] + box[2] / 2 ? -1 : 1 };
     if (which !== 'range') return { hit: 'button', which };
     if (studio.tab === 'bass') return { hit: 'button', which, dir: half(box, y) };
   }
@@ -276,6 +283,12 @@ function buttons({ px, text, C }, studio) {
     const arrows = id === 'range' && arrowsIn(box); // the octave's ▲ and ▼, dimmed at its ends
     text(word, arrows ? textLeftOf(x, arrows) : x + w / 2, y + 2 + pressed, faded ? C.greyDark : C.light, 'center');
     if (arrows) upDown(px, arrows, [studio.range < 1, studio.range > -1].map((can) => (can && !off ? C.grey : C.greyDark)));
+    // the sound key's ◀ and ▶ at its ends, pointing out, drawn as the knob's are: back and on
+    if (id === 'sound') {
+      for (const [ax, ay, aw] of [SOUND_ARROWS.left, SOUND_ARROWS.right]) {
+        for (let i = 0; i < aw; i++) px(ax + (ax < x + w / 2 ? i : aw - 1 - i), ay + 2 - i, 1, 1 + 2 * i, faded ? C.greyDark : C.grey);
+      }
+    }
   }
 }
 
