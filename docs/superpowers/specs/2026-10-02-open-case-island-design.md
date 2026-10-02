@@ -1,7 +1,9 @@
 # Open Case: One Tree Island and keepsakes (design spec)
 
 **Date:** 2026-10-02
-**Status:** Nathan agreed the design in chat, one part at a time ("yes that looks right"). The spec is awaiting his review.
+**Status:** Nathan agreed the design in chat, one part at a time ("yes that looks right"), and approved this spec ("go ahead and continue"). Then, seeing the prototype, he asked for two changes, which this version has:
+- **The land runs off the screen:** "can you make the land extend to outside of the frame, right now the animals cross from the water and its a bit weird". The island's grass now runs across the screen, and the land animals walk along it instead of floating over the water.
+- **The room's window shows woods:** "where the house is there are trees and no water.. so it should show trees". It looked out on the lake before.
 
 It started with Nathan: "it would be really fun to add a wonky silly place to go busk, like you go play on the island with the tree by yourself, no people, just a peaceful landscape surrounded by water and the one tree maybe some animals." He wasn't sure the island should pay, and was "open to ideas to things you maybe unlock there like trinkets or cosmetic things."
 
@@ -39,8 +41,8 @@ So the little island in the map's lake becomes a fourth place to busk. Animals c
   - **The sky** starts in the deep blue before dawn, turns pink and gold, and ends in a clear morning blue.
   - **The sun** comes up over the far shore's pines.
   - **The dawn mist** lies in bands on the water and thins out over the set, gone by about two thirds of the way through.
-  - **The water** is all round, with glints.
-  - **The island** barely fits you: you sit on your crate squeezed under the one pine, with your case at your feet and the rowboat tied up beside you. This is the wonky part.
+  - **The lake** lies behind you, with glints.
+  - **The island's grass** runs right across the screen and on out of it either side. You sit on your crate squeezed under the one pine, with your case at your feet and the rowboat pulled up on the shore.
   - **In the pigeons' place, a fish jumps** at a loud note, and doesn't jump again for PARK.pigeonsAway bars, the way the pigeons stay away.
 - **No city sounds.** The map's birds (`audio.birds`) sing softly through the whole set, like a dawn chorus.
 - **No coins.**
@@ -77,24 +79,23 @@ Animals take the people's place, and the crowd's rules are unchanged. Each anima
 - the park's tips, counted as fondness.
 
 **How they pass by.** Like people on the path, each animal comes in from one side and passes across the screen within earshot, so it can hear you and get hooked. Each crosses in its own way:
-- **The water:**
-  - the ducks paddle across in front of the island;
+- **The land**, along the island as people walk the park's path:
+  - the fox trots;
+  - the bunny and the squirrel hop;
+  - the hedgehog trundles;
+  - the deer walks.
+- **The water**, out on the lake behind the shore:
+  - the ducks paddle;
   - the heron wades;
-  - the deer swims with just its head up;
   - the turtle swims;
   - the frog hops from lily pad to lily pad.
 - **The sky:** the crow and the owl fly across.
-- **The land animals float over, which is the silly part:**
-  - the fox paddles a log;
-  - the bunny rides a big leaf;
-  - the squirrel rides a floating branch;
-  - the hedgehog floats by curled up in a ball.
 
-**Where they settle when hooked.** Each goes to the nearest free spot of its own sort. If none is free, it passes by, as a person does when the arc is full. The island has nine spots:
+**Where they settle when hooked.** Each goes to the nearest free spot of its own sort. If none is free, it passes by, as a person does when the arc is full. The island has eleven spots:
 - **three in the pine**, for the crow, the owl and the squirrel;
-- **two on the grass** either side of you, for the fox, the bunny and the hedgehog;
-- **four in the water:**
-  - the shallows, for the heron, the deer and the ducks;
+- **four on the grass** round you, for the fox, the bunny, the hedgehog and the deer;
+- **four in the water** just off the shore:
+  - the shallows, for the heron and the ducks;
   - a rock, for the turtle, which takes the nearest free spot if the rock is taken;
   - a lily pad, for the frog.
 
@@ -154,7 +155,7 @@ Each keepsake has a short line for the shelf, e.g. "Odd sock: the fox won't say 
 
 **Home opens your room** instead of the studio. It's a small pixel room in the flat style, drawn on the canvas as the shop is:
 - a wooden floor and a wall;
-- a window onto a morning sky;
+- a window onto a morning sky over the woods behind the house, as the map has them;
 - **the shelf** on the wall;
 - **a desk with your studio** (a groovebox) on it;
 - a raised **◀ MAP** key in the corner, the same key as the studio's.
@@ -208,7 +209,7 @@ They're only for looks, and the crowd doesn't notice them, just as your gear onl
   - `PLACES.island`, whose `coins: false` makes its tips count as fondness;
   - `ISLAND`, the sunrise's numbers (sky stages, the sun, the mist, the fish);
   - `KEEPSAKE`, the odds.
-- **`animals.js` (new, pure):** the eleven animals, each with its kind, how it crosses (water, sky or floating), its sort of spot, and its name for the end card ("the heron", "the ducks").
+- **`animals.js` (new, pure):** the eleven animals, each with its kind, how it crosses (along the land, on the water or in the sky), its sort of spot, and its name for the end card ("the heron", "the ducks").
 - **`keepsakes.js` (new, pure):**
   - the 22 keepsakes, each with its animal, tier, name, line and hint;
   - the end-of-set rule (the first, the chance, which one);
@@ -302,7 +303,7 @@ They're only for looks, and the crowd doesn't notice them, just as your gear onl
 
 ## How we'll know it works
 
-Nathan picks One Tree Island on the map and rows out. As the mist lifts, a duck family paddles by, the fox floats over on its log and settles on the grass beside him, its tail swaying to his groove, and a crow lands in the pine. At the end, a blackberry drops into his case. At home, it sits on his shelf, the first of 22, and in his case's lid at the park the next evening. Later island sets mostly give nothing, until one morning the crow leaves a gold ring.
+Nathan picks One Tree Island on the map and rows out. As the mist lifts, a duck family paddles by, the fox trots along the shore and settles on the grass beside him, its tail swaying to his groove, and a crow lands in the pine. At the end, a blackberry drops into his case. At home, it sits on his shelf, the first of 22, and in his case's lid at the park the next evening. Later island sets mostly give nothing, until one morning the crow leaves a gold ring.
 
 ## Not in this change
 
