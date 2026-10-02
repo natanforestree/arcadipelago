@@ -502,6 +502,13 @@ function D.caseCoinSpots(n)
   return out
 end
 
+-- Where the keepsakes in your case sit in its lid, in the order put in: { x, y } bottom middles on the
+-- lid's dark red lining, which leans right as it rises.
+function D.caseKeepSpots()
+  local x, y = D.CASE[1], D.CASE[2]
+  return { { x + 10, y - 2 }, { x + 16, y - 2 }, { x + 22, y - 2 } }
+end
+
 -- A coin, thrown: face-on and side-on by turns, so it spins. Centred on (x, y).
 function D.coin(b, x, y, f)
   if f % 2 == 0 then

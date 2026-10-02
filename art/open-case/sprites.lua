@@ -32,6 +32,12 @@
 --   island     its layout: sun [x, y] (where the sun's middle is before it comes up), trunk (the row the
 --              pine's trunk stands on, to sort it among the figures), glints [[x, y], ...] (where the
 --              water glints; the first sunGlints of them are the sun's reflection, under it)
+--   room       your room's layout: shelf [x, y, pitch, columns, rows] (the shelf's top-left, and its
+--              cubbies, each pitch - 1 square inside: keepsake k's is column k // 2, row k % 2), count
+--              [x, y] (the middle of the top of the count over it), desk [x, y, w, h] (the desk and its
+--              groovebox, a click opens the studio)
+--   caseKeeps  [[x, y], ...]: where the keepsakes in your case sit in its lid, their bottom middles
+--              (their frames are keep-<id>-case; on the shelf, keep-<id>, and until found, keep-<id>-hint)
 --   looks      { kind: ["woman" | "man", ...] }: each kind's passers-by, look 0 first (their frames are
 --              <kind>-<look>-walk-<0-3>, -stand-<0-1> and -nod-<0-1>, each -left and -right)
 --   colors     the named colours the game draws with in code
@@ -45,6 +51,8 @@ local ST = dofile(here .. "station.lua")
 local MK = dofile(here .. "market.lua")
 local IS = dofile(here .. "island.lua")
 local AN = dofile(here .. "animals.lua")
+local KS = dofile(here .. "keepsakes.lua")
+local RM = dofile(here .. "room.lua")
 local L, C = D.L, D.C
 local W, H = D.W, D.H
 local STAGES = D.stages()
@@ -185,6 +193,15 @@ for _, id in ipairs(AN.IDS) do
     end
   end
 end
+
+-- The keepsakes, each on the shelf (anchored by its bottom middle), as its outline there until it's
+-- found, and in your case's lid; and your room
+for i, k in ipairs(KS.LIST) do
+  add("keep-" .. k[1], 14, 14, 7, 12, function(b) KS.shelf(b, i, 7, 12) end)
+  add("keep-" .. k[1] .. "-hint", 14, 14, 7, 12, function(b) KS.outline(b, i, 7, 12, C.brown[1]) end)
+  add("keep-" .. k[1] .. "-case", 7, 7, 3, 5, function(b) KS.case(b, i, 3, 5) end)
+end
+screen("room", RM.room)
 
 -- The music shop: the room, the counter (drawn over the shopkeeper), the shopkeeper breathing (0, 1)
 -- and nodding at a sale (2, 3), the stock as it stands and chosen, and the tags
@@ -338,6 +355,12 @@ local json = table.concat({
   '    "glints": ' .. list(IS.glints(), pair) .. ",",
   ('    "sunGlints": %d'):format(IS.SUN_GLINTS),
   "  },",
+  '  "room": {',
+  ('    "shelf": [%d, %d, %d, %d, %d],'):format(RM.SHELF[1], RM.SHELF[2], RM.SHELF[3], RM.SHELF[4], RM.SHELF[5]),
+  ('    "count": [%d, %d],'):format(RM.COUNT[1], RM.COUNT[2]),
+  ('    "desk": [%d, %d, %d, %d]'):format(RM.DESK[1], RM.DESK[2], RM.DESK[3], RM.DESK[4]),
+  "  },",
+  '  "caseKeeps": ' .. list(D.caseKeepSpots(), pair) .. ",",
   '  "looks": { ' .. table.concat((function()
     local out = {}
     for i, kind in ipairs(F.KINDS) do

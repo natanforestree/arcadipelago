@@ -9,6 +9,7 @@ import { readPng } from './png.js';
 import { KINDS, LOOKS, PATH_Y } from '../src/crowd.js';
 import { CROWD, ISLAND } from '../src/tuning.js';
 import { ANIMALS, ANIMAL_IDS } from '../src/animals.js';
+import { KEEPSAKES } from '../src/keepsakes.js';
 import { CASE } from '../src/scene.js';
 import { STOCK, PEDALS, INSTRUMENTS } from '../src/gear.js';
 import { CARD } from '../src/shop.js';
@@ -46,6 +47,9 @@ const FAMILIES = [
   [/^island-shore-\d$/, 5], [/^island-water-\d$/, 5], [/^island-mist-\d$/, 4], ['island-land', 1], ['island-pine', 1], ['island-trunk', 1],
   [/^fish-jump-\d$/, 2], [/^fish-splash-\d$/, 2],
   ...ANIMAL_IDS.flatMap((id) => ['cross', 'sit', 'beat'].flatMap((p) => ['left', 'right'].map((d) => [new RegExp(`^${id}-${p}-\\d-${d}$`), 2]))),
+  // the keepsakes, on the shelf, as its outline there, and in your case; and your room
+  ...KEEPSAKES.flatMap(({ id }) => [[`keep-${id}`, 1], [`keep-${id}-hint`, 1], [`keep-${id}-case`, 1]]),
+  ['room', 1],
 ];
 
 test('every frame the game draws is there, as many of each as the spec says, and nothing else', () => {
@@ -275,4 +279,83 @@ test('each animal is its own, and smaller than a person: its frames are no talle
     for (const name of names.filter((n) => n.startsWith(`${id}-`))) assert.ok(data.frames[name][5] <= 20, `${name} reaches ${data.frames[name][5]} rows`);
     for (const other of ANIMAL_IDS) if (id < other) assert.ok(differ(`${id}-sit-0-left`, `${other}-sit-0-left`) >= 30, `${id} and ${other}`);
   }
+});
+
+test('each keepsake fits its cubby, up to 12 square on the shelf and 6 in your case, and its outline there is only its edge, in one colour', () => {
+  const [, , pitch] = data.room.shelf;
+  for (const { id } of KEEPSAKES) {
+    const [, , w, h] = data.frames[`keep-${id}`], [, , cw, ch] = data.frames[`keep-${id}-case`], [hx, hy, hw, hh] = data.frames[`keep-${id}-hint`];
+    assert.ok(w <= 12 && h <= 12 && w < pitch - 1 && h < pitch - 1, `keep-${id}: ${w}x${h}`);
+    assert.ok(cw <= 6 && ch <= 6, `keep-${id}-case: ${cw}x${ch}`);
+    const colours = new Set();
+    for (let y = 0; y < hh; y++) {
+      for (let x = 0; x < hw; x++) {
+        const i = ((hy + y) * sheet.w + hx + x) * 4;
+        if (sheet.data[i + 3]) colours.add(sheet.data.slice(i, i + 3).join());
+      }
+    }
+    assert.equal(colours.size, 1, `keep-${id}-hint`);
+    assert.ok(differ(`keep-${id}`, `keep-${id}-hint`) > 0);
+  }
+});
+
+test("your room: the shelf's 22 cubbies and the count on the wall, the desk beside them, all clear of the card and the map key", () => {
+  const [sx, sy, pitch, cols, rows] = data.room.shelf, [dx, dy, dw, dh] = data.room.desk, [cx, cy] = data.room.count;
+  assert.equal(cols * rows, KEEPSAKES.length);
+  assert.equal(cols, ANIMAL_IDS.length, 'a column for each animal');
+  const right = sx + cols * pitch, bottom = sy + rows * pitch;
+  assert.ok(sx >= 0 && right < dx && bottom < 138 && dy + dh <= 138 && dx + dw <= 320, 'side by side, above the card');
+  assert.ok(cy + 8 < sy && cx > sx && cx < right, 'the count over the shelf');
+  assert.ok(sx > 44, 'clear of the map key in the corner');
+});
+
+test("your room's window looks out on the woods behind your house, kept inside its frame: the wall beside it is plain wall", () => {
+  // The window's glass runs from x 12 to 70 (art/open-case/room.lua R.WINDOW) and its frame 3 pixels
+  // past it; the two columns of wall either side of the frame match the wall beyond them.
+  for (let y = 16; y <= 66; y++) {
+    for (const x of [7, 8]) assert.equal(colourAt('room', x, y), colourAt('room', 4, y), `wall at ${x},${y}`);
+    for (const x of [74, 75]) assert.equal(colourAt('room', x, y), colourAt('room', 76, y), `wall at ${x},${y}`);
+  }
+  const woods = new Set(['29,59,66', '46,93,92', '69,128,110']); // the palette's leaf greens (palette.lua)
+  let trees = 0;
+  for (let y = 50; y <= 66; y++) for (let x = 12; x <= 70; x++) if (woods.has(colourAt('room', x, y))) trees++;
+  assert.ok(trees > 0.8 * 17 * 59, `trees fill the bottom of the window (${trees} pixels)`);
+});
+
+test('nothing in your room floats: the groovebox, the mug and the lamp stand on the desk, and the plant on the floor', () => {
+  // Everything that isn't wall, in the space above the desk's top (or above the floor, under the
+  // window), must join up with it, without a gap of wall between (a pixel touching another at a corner,
+  // as along the lamp's thin arm, counts as joined).
+  // The wall is teal (palette.lua teal), with a stripe every 12 columns from x 6 in the leaves' green
+  // (leaf), which the plant has too.
+  const wall = (x, y) => { const c = colourAt('room', x, y); return c === '31,110,106' || (c === '46,93,92' && x % 12 === 6); };
+  const standsOn = ([x0, y0, x1], ground, what) => {
+    const solid = (x, y) => colourAt('room', x, y) !== null && !wall(x, y);
+    const seen = new Set(), queue = [];
+    for (let x = x0; x < x1; x++) if (solid(x, ground)) queue.push([x, ground]);
+    while (queue.length) {
+      const [x, y] = queue.pop(), key = `${x},${y}`;
+      if (seen.has(key) || x < x0 || x >= x1 || y < y0 || y > ground || !solid(x, y)) continue;
+      seen.add(key);
+      for (let ox = -1; ox <= 1; ox++) for (let oy = -1; oy <= 1; oy++) if (ox || oy) queue.push([x + ox, y + oy]);
+    }
+    for (let y = y0; y < ground; y++) for (let x = x0; x < x1; x++) assert.ok(!solid(x, y) || seen.has(`${x},${y}`), `${what}: ${x}, ${y} floats`);
+  };
+  // the desk's top: the first row of its light wood under the desk's box; the floor: row 110, a plank
+  const [dx, dy, dw] = data.room.desk, top = Array.from({ length: 30 }, (_, k) => dy + k).find((y) => colourAt('room', dx + 30, y) === '198,138,80');
+  standsOn([dx, dy - 20, dx + dw], top, 'on the desk');
+  standsOn([12, 78, 44], 110, 'by the window, under the sill');
+});
+
+test("the keepsakes in your case lie on its lid's lining, side by side", () => {
+  assert.equal(data.caseKeeps.length, 3);
+  data.caseKeeps.forEach(([x, y], i) => {
+    if (i) assert.ok(x - data.caseKeeps[i - 1][0] >= 6, 'clear of each other');
+    for (const { id } of KEEPSAKES) {
+      const name = `keep-${id}-case`, [l, t, r, b] = cover(name, x, y);
+      for (let yy = t; yy < b; yy++) {
+        for (let xx = l; xx < r; xx++) if (opaqueAt(name, x, y, xx, yy)) assert.ok(opaqueAt('case', 0, 0, xx, yy), `${id} in the lid at ${xx}, ${yy}`);
+      }
+    }
+  });
 });
