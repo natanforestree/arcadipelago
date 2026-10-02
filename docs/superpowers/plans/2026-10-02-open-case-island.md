@@ -25,14 +25,14 @@
 - Task 9 adds the spec's "What the build settled" section.
 
 **Prototyped:** everything below was built and run before this plan was written, in a scratch copy of the repo, one commit per task.
-- **Tests:** each task's end state passes the whole suite: 438 tests before, then 449, 465, 469, 473, 477, 485, 495, 496 and 497 after the tasks.
+- **Tests:** each task's end state passes the whole suite: 438 tests before, then 449, 465, 469, 473, 478, 486, 496, 497 and 498 after the tasks.
 - **The art:** the sprite sheet (801 frames, 61 colours) and the map's art rebuild byte for byte.
 - **Checked by eye in Chrome:**
   - the map's new stop, its label and line;
   - a set on the island from before dawn to morning: all eleven animals on their spots, the land animals walking and hopping along the island, the swimmers out on the lake behind it, reactions over their heads, and "fondness" in `?debug`'s panel;
   - a random bot's whole set on the island: its first keepsake (a crunchy leaf from the hedgehog) dropping into the case with a sparkle, then the end card ("The hedgehog left you a crunchy leaf.", "0 animals stopped to listen on One Tree Island.", "No animal stayed this time."), and the bot's keepsake never joining the shelf;
   - a whole set of your own there: "The frog left you a water lily.", the lily kept, in your case by itself and in the log, and the birds stopping at the shop's door and singing again outside it;
-  - your room with `?keepsakes=7`: the woods through its window, the shelf, the count, the gold marks, a fourth refused with its message, a keepsake taken out;
+  - your room with `?keepsakes=7`: the woods through its window, the lamp and the mug on the desk and the plant on the floor, the shelf, the count, the gold marks, a fourth refused with its message, a keepsake taken out;
   - the desk opening the studio with "room" on its corner key, Esc back to the room, Esc again to the map;
   - Enter on the music shop no longer buying the first pedal (see Review Focus).
 
@@ -2592,7 +2592,7 @@ Apply to `open-case/test/art.test.js`:
 
 ````diff
 diff --git a/open-case/test/art.test.js b/open-case/test/art.test.js
-index e0a9fa3..a9f8176 100644
+index e0a9fa3..393e115 100644
 --- a/open-case/test/art.test.js
 +++ b/open-case/test/art.test.js
 @@ -9,6 +9,7 @@ import { readPng } from './png.js';
@@ -2613,7 +2613,7 @@ index e0a9fa3..a9f8176 100644
  ];
  
  test('every frame the game draws is there, as many of each as the spec says, and nothing else', () => {
-@@ -276,3 +280,57 @@ test('each animal is its own, and smaller than a person: its frames are no talle
+@@ -276,3 +280,82 @@ test('each animal is its own, and smaller than a person: its frames are no talle
      for (const other of ANIMAL_IDS) if (id < other) assert.ok(differ(`${id}-sit-0-left`, `${other}-sit-0-left`) >= 30, `${id} and ${other}`);
    }
  });
@@ -2659,6 +2659,31 @@ index e0a9fa3..a9f8176 100644
 +  assert.ok(trees > 0.8 * 17 * 59, `trees fill the bottom of the window (${trees} pixels)`);
 +});
 +
++test('nothing in your room floats: the groovebox, the mug and the lamp stand on the desk, and the plant on the floor', () => {
++  // Everything that isn't wall, in the space above the desk's top (or above the floor, under the
++  // window), must join up with it, without a gap of wall between (a pixel touching another at a corner,
++  // as along the lamp's thin arm, counts as joined).
++  // The wall is teal (palette.lua teal), with a stripe every 12 columns from x 6 in the leaves' green
++  // (leaf), which the plant has too.
++  const wall = (x, y) => { const c = colourAt('room', x, y); return c === '31,110,106' || (c === '46,93,92' && x % 12 === 6); };
++  const standsOn = ([x0, y0, x1], ground, what) => {
++    const solid = (x, y) => colourAt('room', x, y) !== null && !wall(x, y);
++    const seen = new Set(), queue = [];
++    for (let x = x0; x < x1; x++) if (solid(x, ground)) queue.push([x, ground]);
++    while (queue.length) {
++      const [x, y] = queue.pop(), key = `${x},${y}`;
++      if (seen.has(key) || x < x0 || x >= x1 || y < y0 || y > ground || !solid(x, y)) continue;
++      seen.add(key);
++      for (let ox = -1; ox <= 1; ox++) for (let oy = -1; oy <= 1; oy++) if (ox || oy) queue.push([x + ox, y + oy]);
++    }
++    for (let y = y0; y < ground; y++) for (let x = x0; x < x1; x++) assert.ok(!solid(x, y) || seen.has(`${x},${y}`), `${what}: ${x}, ${y} floats`);
++  };
++  // the desk's top: the first row of its light wood under the desk's box; the floor: row 110, a plank
++  const [dx, dy, dw] = data.room.desk, top = Array.from({ length: 30 }, (_, k) => dy + k).find((y) => colourAt('room', dx + 30, y) === '198,138,80');
++  standsOn([dx, dy - 20, dx + dw], top, 'on the desk');
++  standsOn([12, 78, 44], 110, 'by the window, under the sill');
++});
++
 +test("the keepsakes in your case lie on its lid's lining, side by side", () => {
 +  assert.equal(data.caseKeeps.length, 3);
 +  data.caseKeeps.forEach(([x, y], i) => {
@@ -2676,11 +2701,12 @@ index e0a9fa3..a9f8176 100644
 - [ ] **Step 2: Run the tests to see them fail**
 
 Run: `cd open-case && npm test`
-Expected: FAIL. Five art tests fail, as the sheet has no keepsakes or room yet:
+Expected: FAIL. Six art tests fail, as the sheet has no keepsakes or room yet:
 - "every frame the game draws is there…";
 - "each keepsake fits its cubby…";
 - "your room: the shelf's 22 cubbies…";
 - "your room's window looks out on the woods…";
+- "nothing in your room floats…";
 - "the keepsakes in your case lie on its lid's lining…".
 
 The other 472 tests pass.
@@ -3040,7 +3066,7 @@ function R.room(b)
   rect(b, w[1] - 5, w[4] + 1, w[3] + 5, w[4] + 3, C.wood[3])
   rect(b, w[1] - 5, w[4] + 4, w[3] + 5, w[4] + 4, C.wood[1])
   -- the plant under the window, in its pot
-  stamp(b, 24, 84, {
+  stamp(b, 24, 96, {
     "....l..e......",
     "..e.le.le.....",
     ".lle.lel..l...",
@@ -3090,8 +3116,8 @@ function R.room(b)
     "kkkkkkkkkkkkkkkkkkkkkkkkk",
     "kkkkkkkkkkkkkkkkkkkkkkkkk",
   })
-  stamp(b, dx + 42, dy - 7, { "rrrr.", "rrrRR", "rrrR.R", "rrrRR", "RRRR." })
-  stamp(b, dx + 48, dy - 22, {
+  stamp(b, dx + 42, dy - 5, { "rrrr.", "rrrRR", "rrrR.R", "rrrRR", "RRRR." })
+  stamp(b, dx + 48, dy - 15, {
     "...yyyy..",
     "..yyyyyy.",
     ".YYYYYYYY",
@@ -3204,7 +3230,7 @@ Expected: `sprites: 801 frames on a 512x3265 sheet, 61 colours`.
 - [ ] **Step 4: Run the tests to see them pass**
 
 Run: `cd open-case && npm test`
-Expected: PASS, 477 tests.
+Expected: PASS, 478 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -3397,7 +3423,7 @@ index c11c9f7..105bccd 100644
 - [ ] **Step 2: Run the tests to see them fail**
 
 Run: `cd open-case && npm test`
-Expected: FAIL. `test/render.test.js` can't load: `The requested module '../src/render.js' does not provide an export named 'animalFrame'`. The other 421 tests pass.
+Expected: FAIL. `test/render.test.js` can't load: `The requested module '../src/render.js' does not provide an export named 'animalFrame'`. The other 422 tests pass.
 
 - [ ] **Step 3: Draw it**
 
@@ -3589,7 +3615,7 @@ index ab93382..8607190 100644
 - [ ] **Step 4: Run the tests to see them pass**
 
 Run: `cd open-case && npm test`
-Expected: PASS, 485 tests.
+Expected: PASS, 486 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -3816,7 +3842,7 @@ index 105bccd..8cf54ee 100644
 - [ ] **Step 2: Run the tests to see them fail**
 
 Run: `cd open-case && npm test`
-Expected: FAIL. `test/room.test.js` and `test/render.test.js` can't load: `Cannot find module '…/open-case/src/room.js'`. The other 421 tests pass.
+Expected: FAIL. `test/room.test.js` and `test/render.test.js` can't load: `Cannot find module '…/open-case/src/room.js'`. The other 422 tests pass.
 
 - [ ] **Step 3: The room, and the studio's way back to it**
 
@@ -4098,7 +4124,7 @@ index 8607190..191c489 100644
 - [ ] **Step 4: Run the tests to see them pass**
 
 Run: `cd open-case && npm test`
-Expected: PASS, 495 tests.
+Expected: PASS, 496 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -4249,7 +4275,7 @@ Expected: FAIL. Seven fail, as the island isn't a place or a stop yet:
 - in `atlas.test.js`: the stops' order, Enter on the island, and the shop test that now starts from the island;
 - in `map.test.js`: "each place to busk has its picture…".
 
-The other 489 tests pass.
+The other 490 tests pass.
 
 - [ ] **Step 3: The island as a stop, and its picture**
 
@@ -4431,7 +4457,7 @@ Expected: `land: 960x540, 309 colours`, then `places: 15 pictures, 2 clouds`.
 - [ ] **Step 4: Run the tests to see them pass**
 
 Run: `cd open-case && npm test`
-Expected: PASS, 496 tests.
+Expected: PASS, 497 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -4489,7 +4515,7 @@ index 2c17a03..8305c0a 100644
 - [ ] **Step 2: Run it**
 
 Run: `cd open-case && npm test`
-Expected: PASS, 497 tests. The log keeps whatever a set gives it, so this test passes already: it pins the island's entry, which `main.js` writes in Step 3.
+Expected: PASS, 498 tests. The log keeps whatever a set gives it, so this test passes already: it pins the island's entry, which `main.js` writes in Step 3.
 
 - [ ] **Step 3: Wire it in**
 
@@ -4970,7 +4996,7 @@ index 05ba787..3912e0b 100644
 - [ ] **Step 4: Run the tests to see them pass**
 
 Run: `cd open-case && npm test`
-Expected: PASS, 497 tests.
+Expected: PASS, 498 tests.
 
 - [ ] **Step 5: Check it in Chrome**
 
