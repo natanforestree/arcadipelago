@@ -18,6 +18,8 @@
 //     hear when the recording is about to start; never through your pedals, never recorded.
 //   - A dusty filter over the band; the Vinyl (crackle, hiss and tape wobble) when the beat has it on;
 //     coins landing and applause.
+//   - Birds on the map (birds): three of them, each in its place left to right, singing now and
+//     then, quietly, straight to the speakers rather than through the band's dusty filter.
 //   - A safety before the speakers, so a loop stacked on your playing can't clip.
 // Browsers only allow sound after a key press or click, so start() is called from inside one
 // (main.js). M mutes; the volume and mute are remembered.
@@ -54,6 +56,25 @@ const COUNT_TONE_DROP_HZ = 700;
 const COUNT_TONE_LEN = 0.03;
 const COUNT_TONE_LEVEL = 0.05;
 const COUNT_ATTACK = 0.002; // a quick onset, like a stick, not a slow swell
+// The birds on the map: three, fixed for the page, singing now and then. Each has its place
+// (pan, -1 left to 1 right), its distance (near: its level, 1 the nearest) and its call (songOf).
+const BIRDS = [
+  { pan: -0.6, near: 0.8, call: 'whistle' },
+  { pan: 0.15, near: 1, call: 'chirps' },
+  { pan: 0.65, near: 0.6, call: 'trill' },
+];
+// The birds' gain when on: their overall loudness. No note of theirs peaks above it, well under the
+// music.
+const BIRDS_LEVEL = 0.02;
+const BIRDS_FADE = 0.3; // seconds: their fade's time constant, all but done in a second
+const BIRDS_AHEAD = 0.2; // seconds: a song is scheduled once it's due within this
+const BIRDS_FIRST = [1, 2]; // seconds from the birds starting to their first song
+const BIRDS_GAP = [2.5, 7]; // seconds from the end of one song to the next...
+const BIRDS_ANSWER = 1 / 3; // ...but this often another bird answers...
+const BIRDS_ANSWER_GAP = [0.4, 1.2]; // ...this soon after
+const BIRDS_HUSH = 1 / 7; // ...and this often there's a longer quiet...
+const BIRDS_HUSH_GAP = [8, 14]; // ...this long
+const BIRDS_VARY = 0.08; // a song's pitch, up or down by up to this share: no two quite the same
 
 // Each instrument's voicing. `pluck` is a guitar's string: how long it rings (seconds to fall 60 dB), its pick's
 // brightness by strength, where the pick meets the string (a share of its length from the bridge),
@@ -227,6 +248,9 @@ export function createAudio(storage) {
   // it feeds; g: the gate; until: the 16th its longest note lasts to; end: when it's done }
   let editing = false;
   const gates = new Set();
+  // The birds: whether they're asked for, their gain, each bird's way into it (its place), when the
+  // next song is due on the audio clock and which bird sings it.
+  let birdsOn = false, birdsGain = null, birdOuts = [], songAt = 0, singer = 0;
   const level = () => (muted ? 0 : volume);
 
   function start() {
@@ -316,9 +340,23 @@ export function createAudio(storage) {
     hf.type = 'bandpass';
     hf.frequency.value = 4000;
     hf.Q.value = 0.5;
-    hiss.gain.value = beat.mix.vinyl ? HISS_LEVEL : 0;
+    // Silent until a band starts (startBand sets it from the beat), so the map doesn't hiss.
+    hiss.gain.value = 0;
     hs.connect(hf).connect(hiss).connect(bus.keys);
     hs.start();
+    // The birds' way to the speakers: each bird through its place, left to right (in a browser with
+    // no panner, straight on), into their own gain, silent until they're asked for (birds).
+    birdsGain = ctx.createGain();
+    birdsGain.gain.value = 0;
+    birdsGain.connect(master);
+    birdOuts = BIRDS.map(({ pan }) => {
+      if (!ctx.createStereoPanner) return birdsGain;
+      const place = ctx.createStereoPanner();
+      place.pan.value = pan;
+      place.connect(birdsGain);
+      return place;
+    });
+    if (birdsOn) fadeBirds(ctx.currentTime); // asked for before the sound started
   }
 
   const now = () => (ctx ? ctx.currentTime : 0);
@@ -594,7 +632,7 @@ export function createAudio(storage) {
     if (ctx) pedals[id].set(on, Math.max(at, ctx.currentTime));
   }
 
-  function tone(out, t, { len, type = 'sine', freq, to, vol, attack = 0.005, detune = false }) {
+  function tone(out, t, { len, type = 'sine', freq, to, vol, attack = 0.005, detune = false, hold = 0 }) {
     const o = ctx.createOscillator(), g = ctx.createGain();
     o.type = type;
     o.frequency.setValueAtTime(freq, t);
@@ -602,6 +640,7 @@ export function createAudio(storage) {
     if (detune) wobble.connect(o.detune);
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(vol, t + attack);
+    if (hold) g.gain.setValueAtTime(vol, t + hold); // a bird's note holds at its loudest till then
     g.gain.exponentialRampToValueAtTime(0.001, t + len);
     o.connect(g).connect(out);
     o.start(t);
@@ -989,13 +1028,16 @@ export function createAudio(storage) {
     if (id === 'drums') bus.perc.gain.setTargetAtTime(on ? 0 : 1, Math.max(at, ctx.currentTime), 0.02);
   }
 
-  // Called every frame: schedules the band's 16ths due in the next GROOVE.ahead seconds, the crackle,
-  // and your loop's notes due by then. loopDue(from, to) gives the looped notes starting between two
-  // band times (seconds since the band's first 16th), as looper.js's due does. Returns the looped
-  // notes it scheduled, each with `at`, its time on the audio clock.
+  // Called every frame, on every screen: schedules the birds' next song once it's due (while
+  // they're on, band or no band), and with a band, its 16ths due in the next GROOVE.ahead seconds,
+  // the crackle, and your loop's notes due by then. loopDue(from, to) gives the looped notes
+  // starting between two band times (seconds since the band's first 16th), as looper.js's due does.
+  // Returns the looped notes it scheduled, each with `at`, its time on the audio clock.
   function update(loopDue = null) {
-    if (!ctx || ctx.state !== 'running' || loopAt === null) return [];
+    if (!ctx || ctx.state !== 'running') return [];
     const t = ctx.currentTime;
+    sing(t);
+    if (loopAt === null) return [];
     // After a stall, skip what's already late rather than playing it all at once.
     const at16 = (s) => loopAt + clock.timeOf16th(s);
     while (at16(next16) < t - 0.1) next16++;
@@ -1024,6 +1066,74 @@ export function createAudio(storage) {
     const notes = loopDue(from, to).map((n) => ({ ...n, at: loopAt + n.t }));
     for (const n of notes) loopNote(n);
     return notes;
+  }
+
+  // The birds on the map, on or off. On, they fade in over about a second, and their first song
+  // comes a second or two later; off, they fade out and no new song starts (one already scheduled
+  // fades with them). Asking again for what they already are changes nothing. Before the sound
+  // starts, it's remembered for start().
+  function birds(on) {
+    if (birdsOn === on) return;
+    birdsOn = on;
+    if (ctx) fadeBirds(ctx.currentTime);
+  }
+
+  const randomIn = ([lo, hi]) => lo + (hi - lo) * Math.random();
+
+  // The birds' gain heads for on or off from `at`; on, their first song and its singer are picked.
+  function fadeBirds(at) {
+    birdsGain.gain.setTargetAtTime(birdsOn ? BIRDS_LEVEL : 0, at, BIRDS_FADE);
+    if (!birdsOn) return;
+    songAt = at + randomIn(BIRDS_FIRST);
+    singer = Math.floor(Math.random() * BIRDS.length);
+  }
+
+  // A song of a bird's call at pitch k (1 is the call's own): tone()'s notes, each `at` seconds
+  // into the song, its `vol` before the bird's distance.
+  function songOf(call, k) {
+    switch (call) {
+      case 'whistle': // two clear notes, the second lower ("fee-bee"), each gliding down a little
+        return [
+          { at: 0, len: 0.2, freq: 3600 * k, to: 3450 * k, vol: 1, attack: 0.02, hold: 0.12 },
+          { at: 0.28, len: 0.28, freq: 3000 * k, to: 2850 * k, vol: 0.8, attack: 0.02, hold: 0.17 },
+        ];
+      case 'chirps': // 2 to 5 quick rising chirps
+        return Array.from({ length: 2 + Math.floor(Math.random() * 4) }, (_, i) => {
+          const len = 0.05 + Math.random() * 0.02;
+          return { at: i * 0.11, len, freq: 2800 * k, to: 4200 * k, vol: 0.8, attack: 0.008, hold: len / 2 };
+        });
+      case 'trill': { // 8 to 14 tiny notes around 4.8 kHz, falling a little, swelling then fading
+        const n = 8 + Math.floor(Math.random() * 7);
+        return Array.from({ length: n }, (_, i) => ({
+          at: i * 0.045, len: 0.03,
+          freq: 5000 * k * Math.pow(0.92, i / (n - 1)), // from 5 kHz down to 4.6
+          vol: Math.sin((Math.PI * (i + 0.5)) / n),
+        }));
+      }
+    }
+    return [];
+  }
+
+  // The birds, every frame while they're on: once the next song is due within BIRDS_AHEAD, all its
+  // notes are scheduled through its bird's place, and the song after it picked. A song that's late
+  // (the page stalled: a hidden tab, say) starts now, alone: nothing missed is made up.
+  function sing(t) {
+    if (!birdsOn || songAt > t + BIRDS_AHEAD) return;
+    const at = Math.max(songAt, t), { near, call } = BIRDS[singer];
+    let end = at;
+    for (const n of songOf(call, 1 + (Math.random() * 2 - 1) * BIRDS_VARY)) {
+      tone(birdOuts[singer], at + n.at, { ...n, vol: n.vol * near });
+      end = Math.max(end, at + n.at + n.len);
+    }
+    // Next: another bird answering, a longer quiet, or a song from any of them a few seconds on.
+    const r = Math.random();
+    if (r < BIRDS_ANSWER) {
+      singer = (singer + 1 + Math.floor(Math.random() * (BIRDS.length - 1))) % BIRDS.length;
+      songAt = end + randomIn(BIRDS_ANSWER_GAP);
+    } else {
+      singer = Math.floor(Math.random() * BIRDS.length);
+      songAt = end + randomIn(r < BIRDS_ANSWER + BIRDS_HUSH ? BIRDS_HUSH_GAP : BIRDS_GAP);
+    }
   }
 
   function coin(at = now()) {
@@ -1059,7 +1169,7 @@ export function createAudio(storage) {
 
   return {
     start, now, warm, noteOn, noteOff, setRing, setInstrument, setPedal, startBand, editBand, setBeat, playWritten, tryBand, previewBand, endBand, stopBand,
-    stopLoop, countIn, setLayer, update, coin, clap, reportedLatency, heardAt,
+    stopLoop, countIn, setLayer, update, birds, coin, clap, reportedLatency, heardAt,
     // the band's first 16th on the audio clock (null with no band): band time counts from it
     get bandStart() {
       return loopAt;

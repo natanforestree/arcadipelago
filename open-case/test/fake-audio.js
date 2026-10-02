@@ -65,6 +65,7 @@ export function fakeAudioContext() {
     createWaveShaper: () => node('shaper', { curve: null, oversample: 'none' }),
     createDelay: (most = 1) => node('delay', { most, delayTime: param(0) }),
     createConvolver: () => node('convolver', { buffer: null, normalize: true }),
+    createStereoPanner: () => node('panner', { pan: param(0) }),
     createBuffer: (ch, len, rate) => {
       const data = new Float32Array(len);
       const b = { length: len, duration: len / rate, numberOfChannels: ch, getChannelData: () => data };

@@ -303,11 +303,13 @@ function game(art, atlasView) {
   // The map, before each set: where to busk and what track to play, your last answers already chosen.
   // straightGo: the track's chosen already (the studio's Busk to this, or ?beat=), so Enter on a place
   // goes straight there. intro: the title is over it (the first map of a visit). With ?place= there's
-  // no map: straight to the place.
+  // no map: straight to the place. Birds sing while it's up (on a fresh load, from the first key, when
+  // the sound starts), until you leave it (leaveMap).
   function openMap({ straightGo = false, intro = false } = {}) {
     audio.stopBand();
     set = null;
     if (fixedPlace) return toPlace();
+    audio.birds(true);
     atlas = createAtlas({
       place, tracks: trackList(beats), chosen: fixedBeat ? { ready: fixedBeat.id } : beats.chosen,
       straightGo: straightGo || !!fixedBeat, intro,
@@ -329,10 +331,18 @@ function game(art, atlasView) {
     sound();
   }
   const beatOf = (key) => (key.ready ? readyBeat(key.ready) : beats.slots[key.slot]) ?? LOFI;
-  // What happened on the map (atlas.js): the track you're on plays softly while the tracks are open;
-  // going keeps the place and the track for next time and sets off to the place; 'shop' goes into the
-  // music shop and 'home' into the studio, neither of which is kept as the place. 'start' (the title
-  // cleared) needs nothing more: the sound's started already.
+  // Off the map, to a place, the shop or home: its track and its birds go quiet.
+  function leaveMap() {
+    audio.stopBand();
+    audio.birds(false);
+    atlas = null;
+    atlasView.hide();
+    canvas.hidden = false;
+  }
+  // What happened on the map (atlas.js): the track you're on plays softly while the tracks are open
+  // (over the birds, who sing throughout); going keeps the place and the track for next time and sets
+  // off to the place; 'shop' goes into the music shop and 'home' into the studio, neither of which is
+  // kept as the place. 'start' (the title cleared) needs nothing more: the sound's started already.
   function atlasDid(what) {
     if (what === 'panel' || what === 'track') audio.previewBand(audio.now() + 0.1, beatOf(trackOf(atlas).key));
     else if (what === 'back') audio.stopBand();
@@ -343,22 +353,13 @@ function game(art, atlasView) {
         beats.chosen = { ...trackOf(atlas).key };
         keepBeats();
       }
-      audio.stopBand();
-      atlas = null;
-      atlasView.hide();
-      canvas.hidden = false;
+      leaveMap();
       toPlace();
     } else if (what === 'shop') {
-      audio.stopBand();
-      atlas = null;
-      atlasView.hide();
-      canvas.hidden = false;
+      leaveMap();
       openShop();
     } else if (what === 'home') {
-      audio.stopBand();
-      atlas = null;
-      atlasView.hide();
-      canvas.hidden = false;
+      leaveMap();
       openStudio();
     }
   }

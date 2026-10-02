@@ -6,6 +6,7 @@ import { LOFI, LOFI_CLOCK, READY, readyBeat, clockOf, bandAt, cloneBeat, midiToH
 import { PLAY, GROOVE, LAYERS } from '../src/tuning.js';
 import { PEDALS, INSTRUMENTS } from '../src/gear.js';
 import { createLoop, record, note, release, step, due, loopLength } from '../src/looper.js';
+import { createRng, nextRandom } from '../src/rng.js';
 const { bar: BAR, beat: BEAT, timeOf16th } = LOFI_CLOCK;
 const LOOP_LENGTH = loopLength(createLoop());
 
@@ -17,24 +18,35 @@ function memoryStorage() {
 // Runs fn with a fake AudioContext installed; fn gets a function returning the context made. The
 // context's createGain is wrapped to remember every gain node in the order audio.js makes them
 // (master, band, then each of LAYERS, then the stand-in percussion bus), so a test can read a bus's
-// level the same way it reads any other recorded node — ctx().busGain(id).gain.value.
-function withAudio(fn) {
+// level the same way it reads any other recorded node — ctx().busGain(id).gain.value. Its
+// createStereoPanner is wrapped the same way: only the birds have panners, so what they feed is the
+// birds' own gain, ctx().birdsGain(). With { panner: false }, the browser has no stereo panner.
+function withAudio(fn, { panner = true } = {}) {
   let ctx;
   globalThis.AudioContext = function () {
     ctx = fakeAudioContext();
-    const gains = [];
-    const createGain = ctx.createGain;
+    const gains = [], panners = [];
+    const createGain = ctx.createGain, createStereoPanner = ctx.createStereoPanner;
     ctx.createGain = () => {
       const g = createGain();
       gains.push(g);
       return g;
     };
+    if (panner) {
+      ctx.createStereoPanner = () => {
+        const p = createStereoPanner();
+        panners.push(p);
+        return p;
+      };
+    } else delete ctx.createStereoPanner;
     ctx.busGain = (id) => {
       const i = LAYERS.findIndex((l) => l.id === id);
       return gains[2 + (i < 0 ? LAYERS.length : i)];
     };
     ctx.master = () => gains[0];
     ctx.gainCount = () => gains.length;
+    ctx.panners = () => panners;
+    ctx.birdsGain = () => panners[0]?.outs[0];
     return ctx;
   };
   try {
@@ -263,6 +275,7 @@ test('with no Web Audio at all, everything is silently a no-op', () => {
   a.setRing(false);
   a.startBand(0);
   a.setLayer('drums', true);
+  a.birds(true);
   a.update();
   a.coin();
   a.clap(2);
@@ -1104,3 +1117,205 @@ test('outside the studio the band makes no gates: each note goes straight into i
     assert.notEqual(gate, ctx().busGain('drums'));
     assert.deepEqual(gate.outs, [ctx().busGain('drums')], 'in the studio, through a gate into the same slot');
   }));
+
+// The Vinyl's hiss: the gain after its looped noise.
+const hissOf = (ctx) => downstream(ctx().started.find((x) => x.kind === 'buffer' && x.node.loop).node).find((n) => n.kind === 'gain');
+
+test("the Vinyl's hiss is silent until a band starts, so the map doesn't hiss from the first key", () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start(); // the default beat is Lo-fi, whose Vinyl is on
+    const hiss = hissOf(ctx);
+    assert.equal(hiss.gain.value, 0, 'silent with no band');
+    assert.deepEqual(hiss.gain.events, [], 'and nothing scheduled to raise it');
+    audio.startBand(1, LOFI);
+    const [how, level, at] = hiss.gain.events.at(-1);
+    assert.deepEqual([how, at], ['set', 1], 'a band with the Vinyl on: from its first 16th...');
+    assert.ok(level > 0 && level <= 0.05, `...at the hiss's quiet level: ${level}`);
+    audio.stopBand();
+    audio.startBand(3, FUNK);
+    assert.deepEqual(hiss.gain.events.at(-1), ['set', 0, 3], 'a band with the Vinyl off: silent');
+  }));
+
+// Runs fn with Math.random drawing from a seeded stream (rng.js), so the birds sing the same songs
+// on every run; Math.random is put back after.
+function seeded(seed, fn) {
+  const random = Math.random, rng = createRng(seed);
+  Math.random = () => nextRandom(rng);
+  try {
+    return fn();
+  } finally {
+    Math.random = random;
+  }
+}
+// A bird's notes since the `before`-th sound: the oscillators that play through a panner (a bird's
+// place). panOf gives the panner a note plays through: which bird sang it.
+const panOf = (x) => downstream(x.node).find((n) => n.kind === 'panner');
+const birdNotes = (ctx, before = 0) => ctx().started.slice(before).filter((x) => x.kind === 'osc' && panOf(x));
+
+test('birds asked for before the sound starts sing once it does, a second or two in, each in its place, into their own gain and on to master', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.birds(true); // the map opens under the title, before the first key
+    audio.start();
+    runBand(ctx, audio, 20);
+    const notes = birdNotes(ctx);
+    assert.ok(notes.length > 0, 'they sing');
+    assert.ok(notes[0].t >= 1 - 1e-9 && notes[0].t <= 2 + 1e-9, `the first song a second or two in: ${notes[0].t}`);
+    const birds = ctx().birdsGain();
+    assert.equal(birds.kind, 'gain');
+    assert.deepEqual(birds.outs, [ctx().master()], 'into master, so the volume and mute apply to them');
+    const band = ctx().busGain('keys').outs[0];
+    for (const x of notes) {
+      assert.ok(panOf(x).outs.includes(birds), 'through its place into the birds gain');
+      assert.ok(!downstream(x.node).includes(band), "never through the band's bus and its dusty filter");
+    }
+    const places = ctx().panners().map((p) => p.pan.value);
+    assert.equal(new Set(places).size, 3, `three birds, each in a place of its own: ${places}`);
+    assert.ok(places.every((p) => p >= -1 && p <= 1));
+  }));
+
+test('with no birds asked for, none sing', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    const before = ctx().started.length;
+    runBand(ctx, audio, 30);
+    assert.equal(ctx().started.length, before, 'no band and no birds: nothing at all');
+  }));
+
+test("every bird's note is a high sine, and quiet, well under the music", () =>
+  seeded(7, () =>
+    withAudio((ctx) => {
+      const audio = createAudio(memoryStorage());
+      audio.start();
+      audio.birds(true);
+      runBand(ctx, audio, 120);
+      const notes = birdNotes(ctx), level = ctx().birdsGain().gain.value; // all the way in by now
+      assert.ok(notes.length > 20 && level > 0, `${notes.length} notes, the birds at ${level}`);
+      assert.equal(new Set(notes.map(panOf)).size, 3, 'all three birds sang');
+      for (const x of notes) {
+        assert.equal(x.node.type, 'sine');
+        for (const [, hz] of x.node.frequency.events) assert.ok(hz >= 2000 && hz <= 6000, `${hz} Hz`);
+        const peak = Math.max(...x.node.outs[0].gain.events.map(([, v]) => v));
+        assert.ok(peak * level <= 0.02 + 1e-9, `a note peaking at ${peak * level}`);
+      }
+    })));
+
+test("the birds sing with no band at all, and the band stopping (a preview changing, leaving the map) doesn't touch them", () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    audio.birds(true);
+    runBand(ctx, audio, 15);
+    assert.ok(birdNotes(ctx).length > 0, 'singing, with no band');
+    const birds = ctx().birdsGain(), events = birds.gain.events.length;
+    audio.previewBand(ctx().currentTime + 0.1, FUNK);
+    runBand(ctx, audio, 18);
+    audio.stopBand();
+    assert.equal(birds.gain.events.length, events, 'the band coming and going leaves their gain alone');
+    const before = ctx().started.length;
+    runBand(ctx, audio, 40);
+    assert.ok(birdNotes(ctx, before).length > 0, 'and they sing on');
+  }));
+
+test('birds(false) fades them out and starts no new song; birds(true) again fades them back in and they sing on', () =>
+  withAudio((ctx) => {
+    const audio = createAudio(memoryStorage());
+    audio.start();
+    audio.birds(true);
+    const birds = ctx().birdsGain(), fade = () => birds.gain.events.at(-1);
+    let [how, level, at, tc] = fade();
+    assert.deepEqual([how, at], ['target', 0], 'they fade in from now...');
+    assert.ok(level > 0 && tc >= 0.1 && tc <= 0.5, `...over about a second: to ${level}, ${tc}`);
+    runBand(ctx, audio, 10);
+    audio.birds(false); // leaving the map
+    [how, level, at, tc] = fade();
+    assert.deepEqual([how, level, at], ['target', 0, ctx().currentTime], 'they fade out from now...');
+    assert.ok(tc >= 0.1 && tc <= 0.5, `...over about a second: ${tc}`);
+    const events = birds.gain.events.length;
+    audio.birds(false);
+    assert.equal(birds.gain.events.length, events, 'asking again changes nothing');
+    const before = ctx().started.length;
+    runBand(ctx, audio, 70);
+    assert.equal(ctx().started.length, before, 'no new song, over a minute');
+    const on = ctx().currentTime;
+    audio.birds(true); // back on the map
+    [how, level, at] = fade();
+    assert.ok(how === 'target' && level > 0 && at === on, 'they fade back in');
+    audio.birds(true);
+    assert.equal(birds.gain.events.length, events + 1, 'asking again changes nothing');
+    runBand(ctx, audio, 90);
+    const again = birdNotes(ctx, before);
+    assert.ok(again.length > 0, 'and they sing again');
+    assert.ok(again[0].t >= on + 1 - 1e-9, `a second or two after they come back: ${again[0].t - on}`);
+  }));
+
+test('after a stall the birds make up nothing: no song while the context is suspended, and at most one, none in the past, after a minute hidden', () =>
+  seeded(3, () =>
+    withAudio((ctx) => {
+      const audio = createAudio(memoryStorage());
+      audio.birds(true);
+      audio.start();
+      runBand(ctx, audio, 10);
+      ctx().suspend();
+      let before = ctx().started.length;
+      audio.update();
+      assert.equal(ctx().started.length, before, 'nothing while the context is suspended');
+      ctx().resume();
+      ctx().currentTime += 60; // a hidden tab: no frames, but the audio clock ran on
+      const now = ctx().currentTime;
+      before = ctx().started.length;
+      audio.update();
+      const notes = birdNotes(ctx, before);
+      assert.ok(notes.every((x) => x.t >= now - 1e-9), 'nothing in the past');
+      assert.ok(new Set(notes.map(panOf)).size <= 1 && notes.every((x) => x.t < now + 1.5), "one song at most, not a minute's worth");
+      before = ctx().started.length;
+      runBand(ctx, audio, now + 0.3);
+      assert.equal(birdNotes(ctx, before).length, 0, 'and none more on the frames after');
+    })));
+
+test('a bird sings every few seconds; now and then another answers, and now and then there is a longer quiet', () =>
+  seeded(11, () =>
+    withAudio((ctx) => {
+      const audio = createAudio(memoryStorage());
+      audio.birds(true);
+      audio.start();
+      runBand(ctx, audio, 600);
+      // The songs, each { start, end, bird }: notes are under 0.2 s apart within a song.
+      const songs = [];
+      for (const x of birdNotes(ctx).sort((a, b) => a.t - b.t)) {
+        const end = x.node.outs[0].gain.events.at(-1)[2], song = songs.at(-1);
+        if (song && x.t - song.end < 0.2) {
+          assert.equal(panOf(x), song.bird, 'one bird to a song');
+          song.end = Math.max(song.end, end);
+        } else songs.push({ start: x.t, end, bird: panOf(x) });
+      }
+      assert.ok(songs[0].start >= 1 - 1e-9 && songs[0].start <= 2 + 1e-9, 'the first a second or two in');
+      const gaps = songs.slice(1).map((s, i) => ({ gap: s.start - songs[i].end, same: s.bird === songs[i].bird }));
+      assert.ok(gaps.length > 60, `${gaps.length + 1} songs in ten minutes`);
+      const answers = gaps.filter((g) => g.gap < 2), hushes = gaps.filter((g) => g.gap > 7.5);
+      for (const { gap, same } of answers) assert.ok(gap >= 0.4 - 1e-9 && gap <= 1.2 + 1e-9 && !same, `an answer ${gap} s after, by another bird`);
+      for (const { gap } of hushes) assert.ok(gap >= 8 - 1e-9 && gap <= 14 + 1e-9, `a longer quiet: ${gap} s`);
+      for (const { gap } of gaps) assert.ok(gap < 2 || gap > 7.5 || (gap >= 2.5 - 1e-9 && gap <= 7 + 1e-9), `a song ${gap} s after the last`);
+      assert.ok(answers.length > gaps.length / 5 && answers.length < gaps.length / 2, `${answers.length} answers in ${gaps.length}`);
+      assert.ok(hushes.length > gaps.length / 15 && hushes.length < gaps.length / 4, `${hushes.length} longer quiets in ${gaps.length}`);
+    })));
+
+test('in a browser with no stereo panner, the birds sing all the same, straight into their gain', () =>
+  withAudio(
+    (ctx) => {
+      const audio = createAudio(memoryStorage());
+      audio.birds(true);
+      audio.start();
+      const before = ctx().started.length;
+      runBand(ctx, audio, 20);
+      const notes = ctx().started.slice(before);
+      assert.ok(notes.length > 0, 'they sing');
+      for (const x of notes) {
+        const birds = x.node.outs[0].outs[0]; // past the note's own gain
+        assert.ok(birds.gain.value > 0 && birds.outs.includes(ctx().master()), 'into the birds gain, on to master');
+      }
+    },
+    { panner: false },
+  ));
