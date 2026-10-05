@@ -32,14 +32,45 @@ local AX, AY, ORX, ORY, IRX, IRY = 44, 34, 26, 17, 22, 13
 
 local function scenery()
   local b = L.buffer(W, H)
-  -- the underside, narrowing to a tip; lit from the left
-  for y = 56, 77 do
-    local half = math.floor(36 * (1 - (y - 56) / 22) ^ 1.3 + 0.5)
-    for x = 44 - half, 44 + half do
-      local c = C.rock[2]
-      if x < 44 - half * 0.45 then c = C.rock[3] elseif x > 44 + half * 0.55 then c = C.rock[1] end
-      if (x + y * 3) % 9 == 0 then c = C.rock[1] end
+  -- the underside: an irregular stone mass lit from the top-left, dithered between tones, with sagebrush
+  -- roots and a dangling stone or two hanging from it (nothing lower than row 77)
+  local bottom = {}
+  for x = 8, 80 do
+    local t = math.abs(x - 42) / 36
+    local depth = 21 * (1 - t ^ 1.4) ^ 1.1
+    depth = depth + 2.2 * math.sin(x * 0.9) + 1.6 * math.sin(x * 2.3 + 1)
+    bottom[x] = 56 + math.max(2, math.floor(depth + 0.5))
+    if bottom[x] > 74 then bottom[x] = 74 end
+  end
+  for x = 8, 80 do
+    for y = 56, bottom[x] do
+      local u = (x - 8) / 72                          -- 0 = lit left, 1 = shaded right
+      local v = (y - 56) / 20                         -- 0 = under the rim, 1 = the tip
+      local k = u * 0.75 + v * 0.45 + 0.1 * math.sin(x * 1.7 + y * 0.8)
+      local c
+      if k < 0.28 then c = C.rock[4] elseif k < 0.36 then c = ((x + y) % 2 == 0) and C.rock[4] or C.rock[3]
+      elseif k < 0.62 then c = C.rock[3] elseif k < 0.72 then c = ((x + y) % 2 == 0) and C.rock[3] or C.rock[2]
+      elseif k < 0.92 then c = C.rock[2] elseif k < 1.02 then c = ((x + y) % 2 == 0) and C.rock[2] or C.rock[1]
+      else c = C.rock[1] end
+      if y == bottom[x] and u > 0.3 then c = C.rock[1] end   -- shaded lower lip
       L.set(b, x, y, c)
+    end
+  end
+  -- dangling stones (tapering), lowest one reaches row 77
+  local function stone(cx, len, shade)
+    for i = 0, len - 1 do
+      local y = math.min(77, bottom[cx] + 1 + i)
+      local w = (i < len - 2) and 1 or 0
+      for x = cx - w, cx + w do L.set(b, x, y, (x == cx - w) and C.rock[shade] or C.rock[shade - 1 > 0 and shade - 1 or 1]) end
+    end
+  end
+  stone(42, 77 - bottom[42], 3)
+  stone(27, 5, 3)
+  stone(60, 4, 2)
+  -- sagebrush roots
+  for _, r in ipairs({ { 18, 4 }, { 34, 3 }, { 52, 5 }, { 70, 3 } }) do
+    for i = 1, r[2] do
+      L.set(b, r[1] + ((i % 2 == 0) and 1 or 0), math.min(77, bottom[r[1]] + i), (i == r[2]) and C.grass[3] or C.grass[1])
     end
   end
   -- the top: a sage verge with Virginia Street across it, and the rim's front edge

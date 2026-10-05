@@ -143,12 +143,12 @@ return {
   -- Reno Today (a website): from reno-today's art/lib.lua palette, plus warm desert stone.
   renoToday = {
     outline = "#1b1420",
-    rock = { "#2b2230", "#3d3042", "#5a4658", "#7a6170" },   -- dark -> light
+    rock = { "#3a2a26", "#6a4a38", "#9c6c48", "#c89a66" },   -- warm desert stone, dark -> light
     grass = { "#4f6b48", "#6f8f64", "#93b58c" },             -- sage
     road = { "#2a2a33", "#3b3b46" }, paint = "#f6ecd9",
     steel = { "#666c82", "#a3a9bb", "#d9dce6" },
     gold = { "#c7902e", "#ffd36b", "#fff1c2" }, bulbOff = "#6e5634",
-    neon = { "#a8466f", "#ff5fa2", "#ffd6ea" }, glow = "#ff3b5566",
+    neon = { "#a8466f", "#ff5fa2", "#ffd6ea" }, glow = "#ff3b5538",
     red = { "#8f1b2b", "#d42a3a", "#ec5562" },
     lamp = "#ffe08a",
   },
