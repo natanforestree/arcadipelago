@@ -37,7 +37,7 @@ return {
 
   -- The hover glow round each island.
   glow = { snake = "#fff4c2", marrow = "#ffd9b8", unfinished = "#ffe8b0", ["last-light"] = "#ffd7a0", ["open-case"] = "#ffe2a8",
-    rowan = "#ffdcae" },
+    rowan = "#ffdcae", ["ruby-radar"] = "#ff6b8b" },
 
   -- Snake: copied from art/snake-icon.lua (the card icon), plus a rock ramp for the underside.
   snake = {
@@ -124,6 +124,20 @@ return {
     mom = { "#9c6f1f", "#c9952f" }, dad = { "#3a5068", "#4f6b8a" }, legs = "#5b5470", shoe = "#3b2a22",
     blanket = { "#e0cfa6", "#f5ecdb" }, -- the baby's
     picnic = { "#a8432a", "#f5ecdb", "#d9b27a" }, -- the picnic blanket: check, cream, its shaded edge
+  },
+
+  -- Ruby Radar (a website, not a game): copied from finals-radar's palette (dev/ART-MANIFEST.md and the
+  -- in-between shades in art/lib.lua): its night-screen greys, teal for safe, gold, ruby for the sweats and
+  -- purple for live. Two slate steps and the ruby-lit rock are added here.
+  rubyRadar = {
+    outline = "#0d0b1a", -- void
+    slate = { "#1a1630", "#2a2347", "#4a4270", "#625a8a", "#8b85a8", "#bdb8d3" }, -- night, dusk, haze, +, mute, +
+    cream = "#f4f0e6",
+    teal = { "#12524f", "#17716d", "#1b8f8a", "#3ee0c2", "#a6f5e6" }, -- safe-deep, the radar logo's trail mid, safe-dark, safe, safe-light
+    gold = { "#8a5a12", "#c78a1a", "#ffcc33", "#ffe68a" }, -- gold-deep, gold-dark, gold, gold-light
+    ruby = { "#5c0d2b", "#8f1236", "#b81c42", "#e0284d", "#ff6b8b", "#ffb3c2" }, -- deep, dark, mid, ruby, light, pale
+    live = { "#6a3fb8", "#a970ff", "#d4b8ff" }, -- live-dark, live, live-light
+    rubyLit = { "#4b1b37", "#612549", "#773a66", "#884b78" }, -- night, dusk, haze and + where the crystals' glow falls
   },
 
   -- The sign: a wooden board round a parchment panel, hung on rope.
