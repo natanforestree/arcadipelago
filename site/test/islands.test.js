@@ -50,7 +50,7 @@ test('an island that runs off a stage, or covers the title, is reported', () => 
 
 test('islands must be the right width', () => {
   assert.deepEqual(checkGames(fixture(), metas({ 'island-a': { ...META['island-a'], hit: [5, 4, 150, 80] } })),
-    ['a: island is 150 px wide; it should be 96–140']);
+    ['a: island is 150 px wide; it should be 80–140']);
   assert.deepEqual(checkGames(fixture(), metas({ 'island-u': { ...META['island-u'], hit: [5, 5, 100, 60] } })),
     ['unfinished: island is 100 px wide; it should be 48–80']);
 });

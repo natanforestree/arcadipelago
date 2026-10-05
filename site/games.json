@@ -1,10 +1,11 @@
 {
   "games": [
-    { "id": "snake", "island": "island-snake", "at": { "landscape": [-7, 105], "portrait": [-11, 27] }, "bob": { "period": 4200, "phase": 0 } },
-    { "id": "marrow", "island": "island-marrow", "at": { "landscape": [224, -4], "portrait": [94, 136] }, "bob": { "period": 5300, "phase": 0.4 } },
-    { "id": "last-light", "island": "island-last-light", "at": { "landscape": [116, 113], "portrait": [2, 271] }, "bob": { "period": 4600, "phase": 0.2 } },
-    { "id": "open-case", "island": "island-open-case", "at": { "landscape": [245, 124], "portrait": [111, 266] }, "bob": { "period": 3900, "phase": 0.7 } },
-    { "id": "ruby-radar", "island": "island-ruby-radar", "at": { "landscape": [124, 41], "portrait": [-3, 166] }, "bob": { "period": 4400, "phase": 0.85 } },
-    { "id": "rowan", "island": "island-rowan", "at": { "landscape": [20, 44], "portrait": [109, 46] }, "bob": { "period": 5000, "phase": 0.55 } }
+    { "id": "snake", "island": "island-snake", "at": { "landscape": [-7, 105], "portrait": [-11, 23] }, "bob": { "period": 4200, "phase": 0 } },
+    { "id": "marrow", "island": "island-marrow", "at": { "landscape": [266, -4], "portrait": [94, 136] }, "bob": { "period": 5300, "phase": 0.4 } },
+    { "id": "last-light", "island": "island-last-light", "at": { "landscape": [124, 113], "portrait": [2, 281] }, "bob": { "period": 4600, "phase": 0.2 } },
+    { "id": "open-case", "island": "island-open-case", "at": { "landscape": [263, 124], "portrait": [111, 266] }, "bob": { "period": 3900, "phase": 0.7 } },
+    { "id": "ruby-radar", "island": "island-ruby-radar", "at": { "landscape": [93, 41], "portrait": [-3, 130] }, "bob": { "period": 4400, "phase": 0.85 } },
+    { "id": "rowan", "island": "island-rowan", "at": { "landscape": [-4, 44], "portrait": [109, 46] }, "bob": { "period": 5000, "phase": 0.55 } },
+    { "id": "reno-today", "island": "island-reno-today", "at": { "landscape": [192, 19], "portrait": [-1, 209] }, "bob": { "period": 4800, "phase": 0.3 } }
   ]
 }

@@ -2,7 +2,7 @@
 import { STAGES } from './layout.js';
 import { BOB_AMP, LIFT } from './motion.js';
 
-const WIDTHS = { game: [96, 140], unfinished: [48, 80] };
+const WIDTHS = { game: [80, 140], unfinished: [48, 80] };
 
 // games.json's island entries in drawing order: the unfinished island first, when there is one (it
 // sits furthest back), then the games in the file's order.

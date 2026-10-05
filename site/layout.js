@@ -1,7 +1,7 @@
 // The scene's two stages, in scene pixels, and where the fixed things sit on each. The canvas covers
 // the whole window: the stage is centred in it and the sky carries on round it.
 export const STAGES = {
-  landscape: { w: 384, h: 216, title: [14, 12, 172, 30], moon: [336, 14], sun: [276, 166], clouds: [8, 60, 150] },
+  landscape: { w: 384, h: 216, title: [14, 12, 172, 30], moon: [364, 14], sun: [276, 166], clouds: [8, 60, 150] },
   portrait: { w: 216, h: 384, title: [12, 14, 172, 30], moon: [188, 18], sun: [160, 330], clouds: [40, 170, 320] },
 };
 
