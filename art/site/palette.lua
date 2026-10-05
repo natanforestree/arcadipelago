@@ -37,7 +37,7 @@ return {
 
   -- The hover glow round each island.
   glow = { snake = "#fff4c2", marrow = "#ffd9b8", unfinished = "#ffe8b0", ["last-light"] = "#ffd7a0", ["open-case"] = "#ffe2a8",
-    rowan = "#ffdcae", ["ruby-radar"] = "#ff6b8b" },
+    rowan = "#ffdcae", ["ruby-radar"] = "#ff6b8b", ["reno-today"] = "#ff6fb5" },
 
   -- Snake: copied from art/snake-icon.lua (the card icon), plus a rock ramp for the underside.
   snake = {
@@ -138,6 +138,19 @@ return {
     ruby = { "#5c0d2b", "#8f1236", "#b81c42", "#e0284d", "#ff6b8b", "#ffb3c2" }, -- deep, dark, mid, ruby, light, pale
     live = { "#6a3fb8", "#a970ff", "#d4b8ff" }, -- live-dark, live, live-light
     rubyLit = { "#4b1b37", "#612549", "#773a66", "#884b78" }, -- night, dusk, haze and + where the crystals' glow falls
+  },
+
+  -- Reno Today (a website): from reno-today's art/lib.lua palette, plus warm desert stone.
+  renoToday = {
+    outline = "#1b1420",
+    rock = { "#2b2230", "#3d3042", "#5a4658", "#7a6170" },   -- dark -> light
+    grass = { "#4f6b48", "#6f8f64", "#93b58c" },             -- sage
+    road = { "#2a2a33", "#3b3b46" }, paint = "#f6ecd9",
+    steel = { "#666c82", "#a3a9bb", "#d9dce6" },
+    gold = { "#c7902e", "#ffd36b", "#fff1c2" }, bulbOff = "#6e5634",
+    neon = { "#a8466f", "#ff5fa2", "#ffd6ea" }, glow = "#ff3b5566",
+    red = { "#8f1b2b", "#d42a3a", "#ec5562" },
+    lamp = "#ffe08a",
   },
 
   -- The sign: a wooden board round a parchment panel, hung on rope.
