@@ -37,7 +37,7 @@ return {
 
   -- The hover glow round each island.
   glow = { snake = "#fff4c2", marrow = "#ffd9b8", unfinished = "#ffe8b0", ["last-light"] = "#ffd7a0", ["open-case"] = "#ffe2a8",
-    rowan = "#ffdcae", ["ruby-radar"] = "#ff6b8b", ["reno-today"] = "#ff6fb5" },
+    rowan = "#ffdcae", ["ruby-radar"] = "#ff6b8b", ["reno-today"] = "#ff6fb5", radiotext = "#00ffff" },
 
   -- Snake: copied from art/snake-icon.lua (the card icon), plus a rock ramp for the underside.
   snake = {
@@ -151,6 +151,21 @@ return {
     neon = { "#a8466f", "#ff5fa2", "#ffd6ea" }, glow = "#ff3b5538",
     red = { "#8f1b2b", "#d42a3a", "#ec5562" },
     lamp = "#ffe08a",
+  },
+
+  -- Radiotext (a website): the eight pure Teletext colours from radiotext's styles.css, for the TV's pages,
+  -- the mast (yellow, as on its icon), the beacon and the signal arcs. The rest is the site's own: Last
+  -- Light's charcoal stone, the unfinished island's timber for the TV's walnut cabinet, Open Case's grass,
+  -- Last Light's brass for the plugs on the antenna cables and Under the Rowan Tree's darkest berry for the
+  -- beacon when it's off.
+  radiotext = {
+    outline = "#0b0f1a",
+    tt = { black = "#000000", red = "#ff0000", green = "#00ff00", yellow = "#ffff00", blue = "#0000ff",
+      magenta = "#ff00ff", cyan = "#00ffff", white = "#ffffff" },
+    stone = { "#2a2c33", "#454852", "#676b77", "#8e929e" }, -- charcoal, dark -> light
+    wood = { "#4a3324", "#6e4c30", "#8f663f", "#b58a58" },  -- walnut, dark -> light
+    grass = { "#34503f", "#46684f", "#5f8a5e" },
+    brass = "#c9a045", beaconOff = "#7a1612",
   },
 
   -- The sign: a wooden board round a parchment panel, hung on rope.
