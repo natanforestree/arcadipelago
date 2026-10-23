@@ -1,11 +1,12 @@
 {
   "games": [
-    { "id": "snake", "island": "island-snake", "at": { "landscape": [-7, 105], "portrait": [-11, 23] }, "bob": { "period": 4200, "phase": 0 } },
-    { "id": "marrow", "island": "island-marrow", "at": { "landscape": [266, -4], "portrait": [94, 136] }, "bob": { "period": 5300, "phase": 0.4 } },
-    { "id": "last-light", "island": "island-last-light", "at": { "landscape": [124, 113], "portrait": [2, 281] }, "bob": { "period": 4600, "phase": 0.2 } },
-    { "id": "open-case", "island": "island-open-case", "at": { "landscape": [263, 124], "portrait": [111, 266] }, "bob": { "period": 3900, "phase": 0.7 } },
-    { "id": "ruby-radar", "island": "island-ruby-radar", "at": { "landscape": [93, 41], "portrait": [-3, 130] }, "bob": { "period": 4400, "phase": 0.85 } },
-    { "id": "rowan", "island": "island-rowan", "at": { "landscape": [-4, 44], "portrait": [109, 46] }, "bob": { "period": 5000, "phase": 0.55 } },
-    { "id": "reno-today", "island": "island-reno-today", "at": { "landscape": [192, 19], "portrait": [-1, 209] }, "bob": { "period": 4800, "phase": 0.3 } }
+    { "id": "snake", "island": "island-snake", "at": { "landscape": [109, 25], "portrait": [-11, 23] }, "bob": { "period": 4200, "phase": 0 } },
+    { "id": "marrow", "island": "island-marrow", "at": { "landscape": [266, -6], "portrait": [98, 168] }, "bob": { "period": 5300, "phase": 0.4 } },
+    { "id": "last-light", "island": "island-last-light", "at": { "landscape": [-8, 113], "portrait": [-8, 281] }, "bob": { "period": 4600, "phase": 0.2 } },
+    { "id": "open-case", "island": "island-open-case", "at": { "landscape": [183, 127], "portrait": [111, 295] }, "bob": { "period": 3900, "phase": 0.7 } },
+    { "id": "ruby-radar", "island": "island-ruby-radar", "at": { "landscape": [1, 40], "portrait": [-5, 130] }, "bob": { "period": 4400, "phase": 0.85 } },
+    { "id": "rowan", "island": "island-rowan", "at": { "landscape": [281, 134], "portrait": [113, 46] }, "bob": { "period": 5000, "phase": 0.55 } },
+    { "id": "reno-today", "island": "island-reno-today", "at": { "landscape": [104, 135], "portrait": [-1, 209] }, "bob": { "period": 4800, "phase": 0.3 } },
+    { "id": "radiotext", "island": "island-radiotext", "at": { "landscape": [190, 1], "portrait": [120, 129] }, "bob": { "period": 4500, "phase": 0.1 } }
   ]
 }
